@@ -1,0 +1,38 @@
+export const colors = {
+  light: {
+    background: '#F5F7FA',
+    surface: '#FFFFFF',
+    text: '#1A1A2E',
+    textSecondary: '#6B7280',
+    primary: '#059669',
+    primaryLight: '#D1FAE5',
+    danger: '#DC2626',
+    dangerLight: '#FEE2E2',
+    warning: '#F59E0B',
+    warningLight: '#FEF3C7',
+    border: '#E5E7EB',
+    tabBar: '#FFFFFF',
+    tabBarBorder: '#E5E7EB',
+    success: '#10B981',
+    cardShadow: '#00000010',
+  },
+  dark: {
+    background: '#0F172A',
+    surface: '#1E293B',
+    text: '#F1F5F9',
+    textSecondary: '#94A3B8',
+    primary: '#34D399',
+    primaryLight: '#064E3B',
+    danger: '#F87171',
+    dangerLight: '#7F1D1D',
+    warning: '#FBBF24',
+    warningLight: '#78350F',
+    border: '#334155',
+    tabBar: '#1E293B',
+    tabBarBorder: '#334155',
+    success: '#34D399',
+    cardShadow: '#00000030',
+  },
+};
+
+export type ThemeColors = typeof colors.light;
