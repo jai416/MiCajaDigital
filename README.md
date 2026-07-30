@@ -95,3 +95,4 @@ src/
 └── utils/         → UUID, helpers
 docs/              → Documentación y scripts SQL
 ```
+# MiCajaDigital
