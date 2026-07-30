@@ -7,7 +7,8 @@
 -- ANTES:
 -- 1. Authentication → Settings → desmarcar "Confirm email"
 -- 2. Settings → API → copiar service_role key para el admin
--- 
+-- 3. Storage → Create bucket → nombre: "fotos" → público
+--
 -- ============================================================
 
 -- 1. EXTENSIONES
@@ -31,15 +32,27 @@ CREATE TABLE IF NOT EXISTS negocios (
 -- 3. TABLA: ventas
 -- ============================================================
 CREATE TABLE IF NOT EXISTS ventas (
-  id            TEXT PRIMARY KEY,
-  user_id       UUID NOT NULL REFERENCES negocios(id) ON DELETE CASCADE,
-  producto      TEXT NOT NULL,
-  precio        REAL NOT NULL CHECK (precio > 0),
-  cliente       TEXT DEFAULT '',
-  tipo          TEXT DEFAULT 'contado' CHECK (tipo IN ('contado', 'fiado')),
-  pagado        INTEGER DEFAULT 1 CHECK (pagado IN (0, 1)),
-  fecha         TEXT NOT NULL,
-  created_at    TEXT DEFAULT (to_char(now(), 'YYYY-MM-DD HH24:MI:SS'))
+  id              TEXT PRIMARY KEY,
+  user_id         UUID NOT NULL REFERENCES negocios(id) ON DELETE CASCADE,
+  producto        TEXT NOT NULL,
+  precio          REAL NOT NULL CHECK (precio > 0),
+  costo           REAL DEFAULT 0,
+  cliente         TEXT DEFAULT '',
+  tipo            TEXT DEFAULT 'contado' CHECK (tipo IN ('contado', 'fiado', 'pedido')),
+  pagado          INTEGER DEFAULT 1 CHECK (pagado IN (0, 1)),
+  fecha           TEXT NOT NULL,
+  created_at      TEXT DEFAULT (to_char(now(), 'YYYY-MM-DD HH24:MI:SS')),
+  updated_at      TIMESTAMPTZ DEFAULT NOW(),
+  catalogo_id     TEXT,
+  metodo_pago     TEXT DEFAULT 'efectivo' CHECK (metodo_pago IN ('efectivo', 'tarjeta', 'transferencia')),
+  moneda          TEXT DEFAULT 'CUP' CHECK (moneda IN ('CUP', 'USD', 'MLC')),
+  tipo_pedido     TEXT DEFAULT 'contado' CHECK (tipo_pedido IN ('contado', 'fiado', 'pedido')),
+  anticipo        REAL DEFAULT 0,
+  saldo_pendiente REAL DEFAULT 0,
+  fecha_entrega   TEXT,
+  estado_pedido   TEXT DEFAULT 'pendiente' CHECK (estado_pedido IN ('pendiente', 'entregado', 'cancelado')),
+  nota            TEXT DEFAULT '',
+  deleted_at      TIMESTAMPTZ DEFAULT NULL
 );
 
 -- 4. TABLA: gastos
@@ -50,10 +63,88 @@ CREATE TABLE IF NOT EXISTS gastos (
   concepto      TEXT NOT NULL,
   monto         REAL NOT NULL CHECK (monto > 0),
   fecha         TEXT NOT NULL,
-  created_at    TEXT DEFAULT (to_char(now(), 'YYYY-MM-DD HH24:MI:SS'))
+  foto          TEXT DEFAULT '',
+  created_at    TEXT DEFAULT (to_char(now(), 'YYYY-MM-DD HH24:MI:SS')),
+  updated_at    TIMESTAMPTZ DEFAULT NOW()
 );
 
--- 5. INDICES
+-- 5. TABLA: catalogo (productos con stock)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS catalogo (
+  id            TEXT PRIMARY KEY,
+  user_id       UUID NOT NULL REFERENCES negocios(id) ON DELETE CASCADE,
+  nombre        TEXT NOT NULL,
+  precio        REAL NOT NULL CHECK (precio > 0),
+  stock         INTEGER DEFAULT 0,
+  descripcion   TEXT DEFAULT '',
+  codigo_barras TEXT DEFAULT '',
+  categoria     TEXT DEFAULT '',
+  foto          TEXT DEFAULT '',
+  created_at    TEXT DEFAULT (to_char(now(), 'YYYY-MM-DD HH24:MI:SS')),
+  updated_at    TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_catalogo_user_id ON catalogo(user_id);
+CREATE INDEX IF NOT EXISTS idx_catalogo_updated_at ON catalogo(updated_at);
+
+ALTER TABLE catalogo ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "SELECT propio catalogo"
+  ON catalogo FOR SELECT USING (user_id = auth.uid());
+CREATE POLICY "INSERT propio catalogo"
+  ON catalogo FOR INSERT WITH CHECK (user_id = auth.uid());
+CREATE POLICY "UPDATE propio catalogo"
+  ON catalogo FOR UPDATE USING (user_id = auth.uid()) WITH CHECK (user_id = auth.uid());
+CREATE POLICY "DELETE propio catalogo"
+  ON catalogo FOR DELETE USING (user_id = auth.uid());
+
+-- 6. TABLA: compras (reposición de inventario)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS compras (
+  id              TEXT PRIMARY KEY,
+  user_id         UUID NOT NULL REFERENCES negocios(id) ON DELETE CASCADE,
+  producto        TEXT NOT NULL,
+  costo_unitario  REAL NOT NULL CHECK (costo_unitario > 0),
+  cantidad        INTEGER NOT NULL DEFAULT 1 CHECK (cantidad > 0),
+  costo_total     REAL NOT NULL CHECK (costo_total > 0),
+  proveedor       TEXT DEFAULT '',
+  fecha           TEXT NOT NULL,
+  created_at      TEXT DEFAULT (to_char(now(), 'YYYY-MM-DD HH24:MI:SS')),
+  updated_at      TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_compras_user_id ON compras(user_id);
+CREATE INDEX IF NOT EXISTS idx_compras_updated_at ON compras(updated_at);
+
+ALTER TABLE compras ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "SELECT propias compras" ON compras FOR SELECT USING (user_id = auth.uid());
+CREATE POLICY "INSERT propias compras" ON compras FOR INSERT WITH CHECK (user_id = auth.uid());
+CREATE POLICY "UPDATE propias compras" ON compras FOR UPDATE USING (user_id = auth.uid()) WITH CHECK (user_id = auth.uid());
+CREATE POLICY "DELETE propias compras" ON compras FOR DELETE USING (user_id = auth.uid());
+
+-- 7. MIGRACIONES (seguras)
+-- ============================================================
+-- Solo ejecutan si la columna NO existe. No dan error si ya existe.
+DO $$ BEGIN ALTER TABLE ventas ADD COLUMN catalogo_id TEXT;                    EXCEPTION WHEN duplicate_column THEN NULL; END; $$;
+DO $$ BEGIN ALTER TABLE ventas ADD COLUMN metodo_pago TEXT DEFAULT 'efectivo'; EXCEPTION WHEN duplicate_column THEN NULL; END; $$;
+DO $$ BEGIN ALTER TABLE ventas ADD COLUMN tipo_pedido TEXT DEFAULT 'contado';  EXCEPTION WHEN duplicate_column THEN NULL; END; $$;
+DO $$ BEGIN ALTER TABLE ventas ADD COLUMN anticipo REAL DEFAULT 0;            EXCEPTION WHEN duplicate_column THEN NULL; END; $$;
+DO $$ BEGIN ALTER TABLE ventas ADD COLUMN saldo_pendiente REAL DEFAULT 0;     EXCEPTION WHEN duplicate_column THEN NULL; END; $$;
+DO $$ BEGIN ALTER TABLE ventas ADD COLUMN fecha_entrega TEXT;                 EXCEPTION WHEN duplicate_column THEN NULL; END; $$;
+DO $$ BEGIN ALTER TABLE ventas ADD COLUMN estado_pedido TEXT DEFAULT 'pendiente'; EXCEPTION WHEN duplicate_column THEN NULL; END; $$;
+DO $$ BEGIN ALTER TABLE ventas ADD COLUMN nota TEXT DEFAULT '';                EXCEPTION WHEN duplicate_column THEN NULL; END; $$;
+DO $$ BEGIN ALTER TABLE ventas ADD COLUMN costo REAL DEFAULT 0;              EXCEPTION WHEN duplicate_column THEN NULL; END; $$;
+DO $$ BEGIN ALTER TABLE ventas ADD COLUMN moneda TEXT DEFAULT 'CUP';        EXCEPTION WHEN duplicate_column THEN NULL; END; $$;
+DO $$ BEGIN ALTER TABLE gastos ADD COLUMN updated_at TIMESTAMPTZ DEFAULT NOW();EXCEPTION WHEN duplicate_column THEN NULL; END; $$;
+DO $$ BEGIN ALTER TABLE catalogo ADD COLUMN codigo_barras TEXT DEFAULT '';    EXCEPTION WHEN duplicate_column THEN NULL; END; $$;
+DO $$ BEGIN ALTER TABLE catalogo ADD COLUMN descripcion TEXT DEFAULT '';      EXCEPTION WHEN duplicate_column THEN NULL; END; $$;
+DO $$ BEGIN ALTER TABLE catalogo ADD COLUMN categoria TEXT DEFAULT '';       EXCEPTION WHEN duplicate_column THEN NULL; END; $$;
+DO $$ BEGIN ALTER TABLE catalogo ADD COLUMN foto TEXT DEFAULT '';           EXCEPTION WHEN duplicate_column THEN NULL; END; $$;
+DO $$ BEGIN ALTER TABLE gastos ADD COLUMN foto TEXT DEFAULT '';             EXCEPTION WHEN duplicate_column THEN NULL; END; $$;
+DO $$ BEGIN ALTER TABLE ventas ADD COLUMN deleted_at TIMESTAMPTZ DEFAULT NULL; EXCEPTION WHEN duplicate_column THEN NULL; END; $$;
+
+-- 8. INDICES
 -- ============================================================
 CREATE INDEX IF NOT EXISTS idx_ventas_user_id ON ventas(user_id);
 CREATE INDEX IF NOT EXISTS idx_ventas_fecha   ON ventas(fecha);
@@ -62,8 +153,12 @@ CREATE INDEX IF NOT EXISTS idx_gastos_user_id ON gastos(user_id);
 CREATE INDEX IF NOT EXISTS idx_gastos_fecha   ON gastos(fecha);
 CREATE INDEX IF NOT EXISTS idx_negocios_email ON negocios(email);
 CREATE INDEX IF NOT EXISTS idx_negocios_activo ON negocios(activo);
+CREATE INDEX IF NOT EXISTS idx_ventas_updated_at ON ventas(updated_at);
+CREATE INDEX IF NOT EXISTS idx_gastos_updated_at ON gastos(updated_at);
 
--- 6. ROW LEVEL SECURITY (RLS)
+
+
+-- 9. ROW LEVEL SECURITY (RLS)
 -- ============================================================
 ALTER TABLE negocios ENABLE ROW LEVEL SECURITY;
 ALTER TABLE ventas   ENABLE ROW LEVEL SECURITY;
@@ -125,7 +220,7 @@ CREATE POLICY "DELETE propios gastos"
   ON gastos FOR DELETE
   USING (user_id = auth.uid());
 
--- 7. FUNCION: resumen de cuadre del dia
+-- 9. FUNCION: resumen de cuadre del dia
 -- ============================================================
 CREATE OR REPLACE FUNCTION obtener_cuadre_dia(p_user_id UUID, p_fecha TEXT)
 RETURNS TABLE (
@@ -149,7 +244,7 @@ BEGIN
 END;
 $$;
 
--- 8. CONSULTAS DE EJEMPLO (comentadas)
+-- 10. CONSULTAS DE EJEMPLO (comentadas)
 -- ============================================================
 -- SELECT * FROM obtener_cuadre_dia('user-uuid', to_char(now(), 'YYYY-MM-DD'));
 --

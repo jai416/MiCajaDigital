@@ -12,7 +12,9 @@ export default function PasoTres() {
   const insets = useSafeAreaInsets();
 
   const finalizar = async () => {
-    await db.runAsync("UPDATE app_config SET valor = 'si' WHERE clave = 'tutorial_visto'");
+    try {
+      await db.runAsync("INSERT OR REPLACE INTO app_config (clave, valor) VALUES ('tutorial_visto', 'si')");
+    } catch { /* error silencioso */ }
     router.replace('/auth/login');
   };
 

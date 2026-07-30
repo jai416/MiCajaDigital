@@ -1,8 +1,8 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import { supabase } from '@/src/services/supabase';
 import { useSQLiteContext } from 'expo-sqlite';
-import { Alert } from 'react-native';
 import { type Session, type User } from '@supabase/supabase-js';
+import { setSecureValue, SECURE_KEYS } from '@/src/utils/storage';
 
 interface AuthState {
   user: User | null;
@@ -45,10 +45,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         loading: false,
       }));
       if (session?.user) {
-        db.runAsync('INSERT OR REPLACE INTO app_config (clave, valor) VALUES (?, ?)', [
-          'user_id',
-          session.user.id,
-        ]);
+        (async () => {
+          await db.runAsync('INSERT OR REPLACE INTO app_config (clave, valor) VALUES (?, ?)', [
+            'user_id',
+            session.user.id,
+          ]);
+          await setSecureValue(SECURE_KEYS.USER_ID, session.user.id);
+        })();
       }
     });
 
@@ -60,10 +63,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         loading: false,
       }));
       if (session?.user) {
-        db.runAsync('INSERT OR REPLACE INTO app_config (clave, valor) VALUES (?, ?)', [
-          'user_id',
-          session.user.id,
-        ]);
+        (async () => {
+          await db.runAsync('INSERT OR REPLACE INTO app_config (clave, valor) VALUES (?, ?)', [
+            'user_id',
+            session.user.id,
+          ]);
+          await setSecureValue(SECURE_KEYS.USER_ID, session.user.id);
+        })();
       }
     });
 
@@ -102,7 +108,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         fecha_registro: new Date().toISOString(),
         fecha_expiracion: new Date(Date.now() + 15 * 86400000).toISOString(),
       });
-      if (dbError) console.warn('Error creando negocio:', dbError.message);
+      if (dbError) { /* error silencioso */ }
     }
 
     return null;

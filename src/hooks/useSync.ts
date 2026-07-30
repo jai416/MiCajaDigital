@@ -4,6 +4,7 @@ import NetInfo from '@react-native-community/netinfo';
 import { AppState, type AppStateStatus } from 'react-native';
 import { syncToSupabase } from '@/src/services/sync';
 import { useAuth } from '@/src/context/AuthContext';
+import { SYNC_MIN_INTERVAL_MS } from '@/src/constants';
 
 export function useSync() {
   const db = useSQLiteContext();
@@ -11,22 +12,24 @@ export function useSync() {
   const [syncing, setSyncing] = useState(false);
   const [lastSync, setLastSync] = useState<Date | null>(null);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const lastSyncTimeRef = useRef(0);
 
-  const doSync = useCallback(async () => {
-    if (!user) return;
+  const doSync = useCallback(async (): Promise<boolean> => {
+    if (!user) return false;
+
+    if (Date.now() - lastSyncTimeRef.current < SYNC_MIN_INTERVAL_MS) return false;
 
     const state = await NetInfo.fetch();
-    if (!state.isConnected) return;
+    if (!state.isConnected) return false;
 
     setSyncing(true);
     try {
       const result = await syncToSupabase(db);
-      if (result.ventas > 0 || result.gastos > 0) {
-        console.log(`Sync: ${result.ventas} ventas, ${result.gastos} gastos`);
-      }
+      lastSyncTimeRef.current = Date.now();
       setLastSync(new Date());
+      return true;
     } catch {
-      // Error silencioso - no molestar al usuario
+      return false;
     } finally {
       setSyncing(false);
     }
@@ -37,7 +40,7 @@ export function useSync() {
 
     doSync();
 
-    intervalRef.current = setInterval(doSync, 45000);
+    intervalRef.current = setInterval(doSync, 300000);
 
     const sub = AppState.addEventListener('change', (nextState: AppStateStatus) => {
       if (nextState === 'active') doSync();

@@ -1,0 +1,14 @@
+export const SYNC_INTERVAL_MS = 5 * 60 * 1000;
+export const SYNC_MIN_INTERVAL_MS = 30 * 1000;
+export const STOCK_WARN_THRESHOLD = 5;
+export const BUSCAR_LIMIT = 20;
+export const RETRASO_ALERTA = 7;
+export const RETRASO_WARN = 3;
+export const TOP_PRODUCTOS_LIMIT = 5;
+export const MS_PER_DAY = 86400000;
+export const QUINCE_DIAS_MS = 15 * MS_PER_DAY;
+export const RECORDATORIO_HORA = 20;
+export const DEUDOR_REMINDER_HORA = 10;
+export const DECIMAL_PLACES = 100;
+export const GRAPH_MAX_HEIGHT = 160;
+export const TAB_ICON_SIZE = 22;

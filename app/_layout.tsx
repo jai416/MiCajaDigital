@@ -6,7 +6,9 @@ import { SQLiteProvider } from 'expo-sqlite';
 import { initDatabase } from '@/src/database/schema';
 import { StatusBar } from 'expo-status-bar';
 import { useColorScheme } from 'react-native';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { AuthProvider } from '@/src/context/AuthContext';
+import { useSync } from '@/src/hooks/useSync';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -34,20 +36,28 @@ export default function RootLayout() {
   return <RootLayoutNav />;
 }
 
+function SyncInit() {
+  useSync();
+  return null;
+}
+
 function RootLayoutNav() {
   const colorScheme = useColorScheme();
 
   return (
-    <SQLiteProvider databaseName="micajadigital.db" onInit={initDatabase}>
-      <AuthProvider>
-        <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
-        <Stack screenOptions={{ headerShown: false }}>
-          <Stack.Screen name="index" />
-          <Stack.Screen name="tutorial" />
-          <Stack.Screen name="auth" />
-          <Stack.Screen name="(tabs)" />
-        </Stack>
-      </AuthProvider>
-    </SQLiteProvider>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <SQLiteProvider databaseName="micajadigital.db" onInit={initDatabase}>
+        <AuthProvider>
+          <SyncInit />
+          <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
+          <Stack screenOptions={{ headerShown: false }}>
+            <Stack.Screen name="index" />
+            <Stack.Screen name="tutorial" />
+            <Stack.Screen name="auth" />
+            <Stack.Screen name="(tabs)" />
+          </Stack>
+        </AuthProvider>
+      </SQLiteProvider>
+    </GestureHandlerRootView>
   );
 }

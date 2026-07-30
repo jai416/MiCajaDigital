@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   KeyboardAvoidingView,
   Platform,
@@ -28,6 +28,11 @@ export default function RegisterScreen() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [exito, setExito] = useState(false);
+  const timerRef = useRef<ReturnType<typeof setTimeout>>();
+
+  useEffect(() => {
+    return () => clearTimeout(timerRef.current);
+  }, []);
 
   const handleRegister = async () => {
     setError('');
@@ -46,7 +51,7 @@ export default function RegisterScreen() {
       setError(msg);
     } else {
       setExito(true);
-      setTimeout(() => router.replace('/auth/login'), 2000);
+      timerRef.current = setTimeout(() => router.replace('/auth/login'), 2000);
     }
   };
 

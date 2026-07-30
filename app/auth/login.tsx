@@ -34,12 +34,17 @@ export default function LoginScreen() {
       return;
     }
     setLoading(true);
-    const msg = await login(email.trim(), password);
-    setLoading(false);
-    if (msg) {
-      setError(msg);
-    } else {
-      router.replace('/(tabs)');
+    try {
+      const msg = await login(email.trim(), password.trim());
+      if (msg) {
+        setError(msg);
+      } else {
+        router.replace('/(tabs)');
+      }
+    } catch {
+      setError('Error de conexión. Verifica tu red e intenta de nuevo.');
+    } finally {
+      setLoading(false);
     }
   };
 
