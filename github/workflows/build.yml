@@ -9,10 +9,10 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5   # ✅ Actualizado a v5 (Node.js 24)
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6   # ✅ Actualizado a v6 (Node.js 24)
         with:
           node-version: 18
 
