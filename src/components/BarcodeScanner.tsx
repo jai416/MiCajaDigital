@@ -1,13 +1,15 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { CameraView, type BarcodeScanningResult } from 'expo-camera';
-import { useColorScheme } from '@/components/useColorScheme';
-import { colors } from '@/src/theme/colors';
+import { useAccentColors } from '@/src/context/AccentContext';
 
 export default function BarcodeScanner({ visible, onScan, onClose }: { visible: boolean; onScan: (code: string) => void; onClose: () => void }) {
-  const scheme = useColorScheme();
-  const c = colors[scheme ?? 'light'];
+  const { theme: c } = useAccentColors();
   const [scanned, setScanned] = useState(false);
+
+  useEffect(() => {
+    if (visible) setScanned(false);
+  }, [visible]);
 
   const handleBarCodeScanned = (result: BarcodeScanningResult) => {
     if (scanned) return;

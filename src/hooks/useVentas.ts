@@ -4,8 +4,9 @@ import { type Venta, type CuadreResumen } from '@/src/types';
 import { generarUUID } from '@/src/utils/uuid';
 import { getUserId } from '@/src/utils/user';
 import { useAuth } from '@/src/context/AuthContext';
-import { STOCK_WARN_THRESHOLD, MS_PER_DAY } from '@/src/constants';
+import { STOCK_WARN_THRESHOLD, MS_PER_DAY, LISTA_LIMITE, DEUDORES_LIMITE } from '@/src/constants';
 import { Alert } from 'react-native';
+import { registrarEvento } from '@/src/services/analytics';
 
 function hoy(): string {
   const d = new Date();
@@ -85,6 +86,7 @@ export function useVentas() {
             Alert.alert('Stock bajo', `"${input.producto}" solo tiene ${restante.stock} unidades.`);
           }
         }
+        registrarEvento(db, userId, { nombre: 'venta_creada', valor: input.producto });
       } catch (e) {
         throw e;
       } finally {
@@ -96,192 +98,244 @@ export function useVentas() {
 
   const pagarVenta = useCallback(
     async (id: string) => {
-      const ahora = new Date().toISOString();
-      await db.runAsync(
-        "UPDATE ventas SET pagado = 1, updated_at = ?, sincronizado = 0 WHERE id = ?",
-        [ahora, id]
-      );
+      try {
+        const ahora = new Date().toISOString();
+        await db.runAsync(
+          "UPDATE ventas SET pagado = 1, updated_at = ?, sincronizado = 0 WHERE id = ?",
+          [ahora, id]
+        );
+      } catch (e) {
+        console.error('Error al pagar venta:', e);
+        throw e;
+      }
     },
     [db]
   );
 
   const deleteVenta = useCallback(
     async (id: string) => {
-      await db.runAsync('UPDATE ventas SET deleted_at = ?, sincronizado = 0 WHERE id = ?', [new Date().toISOString(), id]);
+      try {
+        await db.runAsync('UPDATE ventas SET deleted_at = ?, sincronizado = 0 WHERE id = ?', [new Date().toISOString(), id]);
+      } catch (e) {
+        console.error('Error al eliminar venta:', e);
+        throw e;
+      }
     },
     [db]
   );
 
   const updateVenta = useCallback(
     async (id: string, data: Partial<AddVentaInput>) => {
-      const ahora = new Date().toISOString();
-      const sets: string[] = [];
-      const vals: unknown[] = [];
-      if (data.producto !== undefined) { sets.push('producto = ?'); vals.push(data.producto); }
-      if (data.precio !== undefined) { sets.push('precio = ?'); vals.push(data.precio); }
-      if (data.costo !== undefined) { sets.push('costo = ?'); vals.push(data.costo); }
-      if (data.cliente !== undefined) { sets.push('cliente = ?'); vals.push(data.cliente); }
-      if (data.moneda !== undefined) { sets.push('moneda = ?'); vals.push(data.moneda); }
-      if (data.tipo_pedido !== undefined) { sets.push('tipo_pedido = ?'); vals.push(data.tipo_pedido); }
-      if (data.metodo_pago !== undefined) { sets.push('metodo_pago = ?'); vals.push(data.metodo_pago); }
-      if (data.nota !== undefined) { sets.push('nota = ?'); vals.push(data.nota); }
-      sets.push('updated_at = ?'); vals.push(ahora);
-      sets.push('sincronizado = 0');
-      vals.push(id);
-      await db.runAsync(
-        `UPDATE ventas SET ${sets.join(', ')} WHERE id = ?`,
-        vals
-      );
+      try {
+        const ahora = new Date().toISOString();
+        const sets: string[] = [];
+        const vals: (string | number | null)[] = [];
+        if (data.producto !== undefined) { sets.push('producto = ?'); vals.push(data.producto); }
+        if (data.precio !== undefined) { sets.push('precio = ?'); vals.push(data.precio); }
+        if (data.costo !== undefined) { sets.push('costo = ?'); vals.push(data.costo); }
+        if (data.cliente !== undefined) { sets.push('cliente = ?'); vals.push(data.cliente); }
+        if (data.moneda !== undefined) { sets.push('moneda = ?'); vals.push(data.moneda); }
+        if (data.tipo_pedido !== undefined) { sets.push('tipo_pedido = ?'); vals.push(data.tipo_pedido); }
+        if (data.metodo_pago !== undefined) { sets.push('metodo_pago = ?'); vals.push(data.metodo_pago); }
+        if (data.nota !== undefined) { sets.push('nota = ?'); vals.push(data.nota); }
+        sets.push('updated_at = ?'); vals.push(ahora);
+        sets.push('sincronizado = 0');
+        vals.push(id);
+        await db.runAsync(
+          `UPDATE ventas SET ${sets.join(', ')} WHERE id = ?`,
+          vals
+        );
+      } catch (e) {
+        console.error('Error al actualizar venta:', e);
+        throw e;
+      }
     },
     [db]
   );
 
   const actualizarEstadoPedido = useCallback(
     async (id: string, nuevoEstado: 'pendiente' | 'entregado' | 'cancelado') => {
-      const ahora = new Date().toISOString();
-      if (nuevoEstado === 'entregado') {
-        await db.runAsync(
-          "UPDATE ventas SET estado_pedido = ?, pagado = 1, saldo_pendiente = 0, updated_at = ?, sincronizado = 0 WHERE id = ?",
-          [nuevoEstado, ahora, id]
-        );
-      } else {
-        await db.runAsync(
-          "UPDATE ventas SET estado_pedido = ?, updated_at = ?, sincronizado = 0 WHERE id = ?",
-          [nuevoEstado, ahora, id]
-        );
+      try {
+        const ahora = new Date().toISOString();
+        if (nuevoEstado === 'entregado') {
+          await db.runAsync(
+            "UPDATE ventas SET estado_pedido = ?, pagado = 1, saldo_pendiente = 0, updated_at = ?, sincronizado = 0 WHERE id = ?",
+            [nuevoEstado, ahora, id]
+          );
+        } else {
+          await db.runAsync(
+            "UPDATE ventas SET estado_pedido = ?, updated_at = ?, sincronizado = 0 WHERE id = ?",
+            [nuevoEstado, ahora, id]
+          );
+        }
+      } catch (e) {
+        console.error('Error al actualizar pedido:', e);
+        throw e;
       }
     },
     [db]
   );
 
   const getVentasDelDia = useCallback(async (): Promise<Venta[]> => {
-    const userId = await getUserId(db, user);
-    if (!userId) return [];
-    return db.getAllAsync<Venta>(
-      'SELECT * FROM ventas WHERE fecha = ? AND user_id = ? AND deleted_at IS NULL ORDER BY created_at DESC',
-      [hoy(), userId]
-    );
+    try {
+      const userId = await getUserId(db, user);
+      if (!userId) return [];
+      return await db.getAllAsync<Venta>(
+        `SELECT * FROM ventas WHERE fecha = ? AND user_id = ? AND deleted_at IS NULL ORDER BY created_at DESC LIMIT ${LISTA_LIMITE}`,
+        [hoy(), userId]
+      );
+    } catch (e) {
+      console.error('Error al obtener ventas del día:', e);
+      return [];
+    }
   }, [db, user]);
 
   const getDeudores = useCallback(async (): Promise<(Venta & { dias_retraso: number })[]> => {
-    const userId = await getUserId(db, user);
-    if (!userId) return [];
-    const rows = await db.getAllAsync<Venta>(
-      "SELECT * FROM ventas WHERE pagado = 0 AND user_id = ? AND deleted_at IS NULL ORDER BY fecha ASC",
-      [userId]
-    );
-    return rows.map((r) => ({ ...r, dias_retraso: daysSince(r.fecha) }));
+    try {
+      const userId = await getUserId(db, user);
+      if (!userId) return [];
+      const rows = await db.getAllAsync<Venta>(
+        `SELECT * FROM ventas WHERE pagado = 0 AND user_id = ? AND deleted_at IS NULL ORDER BY fecha ASC LIMIT ${DEUDORES_LIMITE}`,
+        [userId]
+      );
+      return rows.map((r) => ({ ...r, dias_retraso: daysSince(r.fecha) }));
+    } catch (e) {
+      console.error('Error al obtener deudores:', e);
+      return [];
+    }
   }, [db, user]);
 
   const getVentasEnRango = useCallback(async (inicio: string, fin: string): Promise<Venta[]> => {
-    const userId = await getUserId(db, user);
-    if (!userId) return [];
-    return db.getAllAsync<Venta>(
-      'SELECT * FROM ventas WHERE fecha >= ? AND fecha <= ? AND user_id = ? AND deleted_at IS NULL ORDER BY fecha ASC, created_at ASC',
-      [inicio, fin, userId]
-    );
+    try {
+      const userId = await getUserId(db, user);
+      if (!userId) return [];
+      return await db.getAllAsync<Venta>(
+        `SELECT * FROM ventas WHERE fecha >= ? AND fecha <= ? AND user_id = ? AND deleted_at IS NULL ORDER BY fecha ASC, created_at ASC LIMIT ${LISTA_LIMITE}`,
+        [inicio, fin, userId]
+      );
+    } catch (e) {
+      console.error('Error al obtener ventas en rango:', e);
+      return [];
+    }
   }, [db, user]);
 
   const getPedidos = useCallback(
-    async (estado?: string): Promise<Venta[]> => {
-      const userId = await getUserId(db, user);
-      if (!userId) return [];
-      if (estado) {
-        return db.getAllAsync<Venta>(
-          "SELECT * FROM ventas WHERE tipo_pedido = 'pedido' AND estado_pedido = ? AND user_id = ? AND deleted_at IS NULL ORDER BY fecha DESC, created_at DESC",
-          [estado, userId]
+    async (estado?: string, limit: number = 0, offset: number = 0): Promise<Venta[]> => {
+      try {
+        const userId = await getUserId(db, user);
+        if (!userId) return [];
+        const lim = limit > 0 ? ' LIMIT ? OFFSET ?' : '';
+        if (estado) {
+          return await db.getAllAsync<Venta>(
+            `SELECT * FROM ventas WHERE tipo_pedido = 'pedido' AND estado_pedido = ? AND user_id = ? AND deleted_at IS NULL ORDER BY fecha DESC, created_at DESC${lim}`,
+            limit > 0 ? [estado, userId, limit, offset] : [estado, userId]
+          );
+        }
+        return await db.getAllAsync<Venta>(
+          `SELECT * FROM ventas WHERE tipo_pedido = 'pedido' AND user_id = ? AND deleted_at IS NULL ORDER BY fecha DESC, created_at DESC${lim}`,
+          limit > 0 ? [userId, limit, offset] : [userId]
         );
+      } catch (e) {
+        console.error('Error al obtener pedidos:', e);
+        return [];
       }
-      return db.getAllAsync<Venta>(
-        "SELECT * FROM ventas WHERE tipo_pedido = 'pedido' AND user_id = ? AND deleted_at IS NULL ORDER BY fecha DESC, created_at DESC",
-        [userId]
-      );
     },
     [db, user]
   );
 
   const getCuadre = useCallback(async (): Promise<CuadreResumen> => {
-    const userId = await getUserId(db, user);
-    if (!userId) {
-      return { totalVentas: 0, totalGastos: 0, ganancia: 0, deudores: 0, totalCobrado: 0, totalPendiente: 0, metodosPago: { efectivo: 0, tarjeta: 0, transferencia: 0, sugerencia: '' }, pedidosPendientes: 0, pedidosEntregadosHoy: 0 };
-    }
-    const fecha = hoy();
-
-    const ventasDia = await db.getFirstAsync<{ total: number }>(
-      "SELECT COALESCE(SUM(precio), 0) as total FROM ventas WHERE fecha = ? AND pagado = 1 AND user_id = ? AND tipo_pedido != 'pedido' AND deleted_at IS NULL",
-      [fecha, userId]
-    );
-    const gastosDia = await db.getFirstAsync<{ total: number }>(
-      'SELECT COALESCE(SUM(monto), 0) as total FROM gastos WHERE fecha = ? AND user_id = ?',
-      [fecha, userId]
-    );
-    const deudores = await db.getFirstAsync<{ count: number }>(
-      'SELECT COUNT(*) as count FROM ventas WHERE pagado = 0 AND user_id = ? AND deleted_at IS NULL',
-      [userId]
-    );
-    const cobrado = await db.getFirstAsync<{ total: number }>(
-      "SELECT COALESCE(SUM(precio), 0) as total FROM ventas WHERE pagado = 1 AND user_id = ? AND tipo_pedido != 'pedido' AND deleted_at IS NULL",
-      [userId]
-    );
-    const pendiente = await db.getFirstAsync<{ total: number }>(
-      "SELECT COALESCE(SUM(precio), 0) as total FROM ventas WHERE pagado = 0 AND user_id = ? AND tipo_pedido != 'pedido' AND deleted_at IS NULL",
-      [userId]
-    );
-
-    const pedidosPendientes = (await db.getFirstAsync<{ total: number }>(
-      "SELECT COALESCE(SUM(saldo_pendiente), 0) as total FROM ventas WHERE tipo_pedido = 'pedido' AND estado_pedido = 'pendiente' AND user_id = ? AND deleted_at IS NULL",
-      [userId]
-    ))?.total ?? 0;
-
-    const pedidosEntregadosHoy = (await db.getFirstAsync<{ total: number }>(
-      "SELECT COALESCE(SUM(precio), 0) as total FROM ventas WHERE tipo_pedido = 'pedido' AND estado_pedido = 'entregado' AND fecha = ? AND user_id = ? AND deleted_at IS NULL",
-      [fecha, userId]
-    ))?.total ?? 0;
-
-    const efectivo = (await db.getFirstAsync<{ total: number }>(
-      "SELECT COALESCE(SUM(precio), 0) as total FROM ventas WHERE fecha = ? AND metodo_pago = 'efectivo' AND user_id = ? AND tipo_pedido != 'pedido' AND deleted_at IS NULL", [fecha, userId]
-    ))?.total ?? 0;
-    const tarjeta = (await db.getFirstAsync<{ total: number }>(
-      "SELECT COALESCE(SUM(precio), 0) as total FROM ventas WHERE fecha = ? AND metodo_pago = 'tarjeta' AND user_id = ? AND tipo_pedido != 'pedido' AND deleted_at IS NULL", [fecha, userId]
-    ))?.total ?? 0;
-    const transferencia = (await db.getFirstAsync<{ total: number }>(
-      "SELECT COALESCE(SUM(precio), 0) as total FROM ventas WHERE fecha = ? AND metodo_pago = 'transferencia' AND user_id = ? AND tipo_pedido != 'pedido' AND deleted_at IS NULL", [fecha, userId]
-    ))?.total ?? 0;
-
-    const totalMetodos = efectivo + tarjeta + transferencia;
-    let sugerencia = '';
-    if (totalMetodos > 0) {
-      const pctEfectivo = (efectivo / totalMetodos) * 100;
-      if (pctEfectivo > 60) {
-        sugerencia = '💡 La mayoría paga en efectivo. Ofrece descuento por transferencia para reducir efectivo en caja.';
-      } else if ((transferencia / totalMetodos) * 100 > 50) {
-        sugerencia = '💡 Tus clientes prefieren transferencia. ¡Menos efectivo = más seguro!';
-      } else if ((tarjeta / totalMetodos) * 100 > 50) {
-        sugerencia = '💡 Las tarjetas son lo más usado. Asegúrate de tener el POS siempre listo.';
-      } else {
-        sugerencia = '💡 Tus métodos de pago están balanceados. Buenos hábitos de cobro.';
+    const vacio: CuadreResumen = { totalVentas: 0, totalGastos: 0, ganancia: 0, deudores: 0, totalCobrado: 0, totalPendiente: 0, metodosPago: { efectivo: 0, tarjeta: 0, transferencia: 0, sugerencia: '' }, pedidosPendientes: 0, pedidosEntregadosHoy: 0 };
+    try {
+      const userId = await getUserId(db, user);
+      if (!userId) {
+        return vacio;
       }
-    }
+      const fecha = hoy();
 
-    return {
-      totalVentas: ventasDia?.total ?? 0,
-      totalGastos: gastosDia?.total ?? 0,
-      ganancia: (ventasDia?.total ?? 0) - (gastosDia?.total ?? 0),
-      deudores: deudores?.count ?? 0,
-      totalCobrado: cobrado?.total ?? 0,
-      totalPendiente: pendiente?.total ?? 0,
-      metodosPago: { efectivo, tarjeta, transferencia, sugerencia },
-      pedidosPendientes,
-      pedidosEntregadosHoy,
-    };
+      const ventasDia = await db.getFirstAsync<{ total: number }>(
+        "SELECT COALESCE(SUM(precio), 0) as total FROM ventas WHERE fecha = ? AND pagado = 1 AND user_id = ? AND tipo_pedido != 'pedido' AND deleted_at IS NULL",
+        [fecha, userId]
+      );
+      const gastosDia = await db.getFirstAsync<{ total: number }>(
+        'SELECT COALESCE(SUM(monto), 0) as total FROM gastos WHERE fecha = ? AND user_id = ?',
+        [fecha, userId]
+      );
+      const deudores = await db.getFirstAsync<{ count: number }>(
+        'SELECT COUNT(*) as count FROM ventas WHERE pagado = 0 AND user_id = ? AND deleted_at IS NULL',
+        [userId]
+      );
+      const cobrado = await db.getFirstAsync<{ total: number }>(
+        "SELECT COALESCE(SUM(precio), 0) as total FROM ventas WHERE pagado = 1 AND user_id = ? AND tipo_pedido != 'pedido' AND deleted_at IS NULL",
+        [userId]
+      );
+      const pendiente = await db.getFirstAsync<{ total: number }>(
+        "SELECT COALESCE(SUM(precio), 0) as total FROM ventas WHERE pagado = 0 AND user_id = ? AND tipo_pedido != 'pedido' AND deleted_at IS NULL",
+        [userId]
+      );
+
+      const pedidosPendientes = (await db.getFirstAsync<{ total: number }>(
+        "SELECT COALESCE(SUM(saldo_pendiente), 0) as total FROM ventas WHERE tipo_pedido = 'pedido' AND estado_pedido = 'pendiente' AND user_id = ? AND deleted_at IS NULL",
+        [userId]
+      ))?.total ?? 0;
+
+      const pedidosEntregadosHoy = (await db.getFirstAsync<{ total: number }>(
+        "SELECT COALESCE(SUM(precio), 0) as total FROM ventas WHERE tipo_pedido = 'pedido' AND estado_pedido = 'entregado' AND fecha = ? AND user_id = ? AND deleted_at IS NULL",
+        [fecha, userId]
+      ))?.total ?? 0;
+
+      const efectivo = (await db.getFirstAsync<{ total: number }>(
+        "SELECT COALESCE(SUM(precio), 0) as total FROM ventas WHERE fecha = ? AND metodo_pago = 'efectivo' AND user_id = ? AND tipo_pedido != 'pedido' AND deleted_at IS NULL", [fecha, userId]
+      ))?.total ?? 0;
+      const tarjeta = (await db.getFirstAsync<{ total: number }>(
+        "SELECT COALESCE(SUM(precio), 0) as total FROM ventas WHERE fecha = ? AND metodo_pago = 'tarjeta' AND user_id = ? AND tipo_pedido != 'pedido' AND deleted_at IS NULL", [fecha, userId]
+      ))?.total ?? 0;
+      const transferencia = (await db.getFirstAsync<{ total: number }>(
+        "SELECT COALESCE(SUM(precio), 0) as total FROM ventas WHERE fecha = ? AND metodo_pago = 'transferencia' AND user_id = ? AND tipo_pedido != 'pedido' AND deleted_at IS NULL", [fecha, userId]
+      ))?.total ?? 0;
+
+      const totalMetodos = efectivo + tarjeta + transferencia;
+      let sugerencia = '';
+      if (totalMetodos > 0) {
+        const pctEfectivo = (efectivo / totalMetodos) * 100;
+        if (pctEfectivo > 60) {
+          sugerencia = '💡 La mayoría paga en efectivo. Ofrece descuento por transferencia para reducir efectivo en caja.';
+        } else if ((transferencia / totalMetodos) * 100 > 50) {
+          sugerencia = '💡 Tus clientes prefieren transferencia. ¡Menos efectivo = más seguro!';
+        } else if ((tarjeta / totalMetodos) * 100 > 50) {
+          sugerencia = '💡 Las tarjetas son lo más usado. Asegúrate de tener el POS siempre listo.';
+        } else {
+          sugerencia = '💡 Tus métodos de pago están balanceados. Buenos hábitos de cobro.';
+        }
+      }
+
+      return {
+        totalVentas: ventasDia?.total ?? 0,
+        totalGastos: gastosDia?.total ?? 0,
+        ganancia: (ventasDia?.total ?? 0) - (gastosDia?.total ?? 0),
+        deudores: deudores?.count ?? 0,
+        totalCobrado: cobrado?.total ?? 0,
+        totalPendiente: pendiente?.total ?? 0,
+        metodosPago: { efectivo, tarjeta, transferencia, sugerencia },
+        pedidosPendientes,
+        pedidosEntregadosHoy,
+      };
+    } catch (e) {
+      console.error('Error al obtener cuadre:', e);
+      return vacio;
+    }
   }, [db, user]);
 
   const actualizarCliente = useCallback(async (id: string, nuevoCliente: string) => {
-    const ahora = new Date().toISOString();
-    await db.runAsync(
-      'UPDATE ventas SET cliente = ?, updated_at = ?, sincronizado = 0 WHERE id = ?',
-      [nuevoCliente, ahora, id]
-    );
+    try {
+      const ahora = new Date().toISOString();
+      await db.runAsync(
+        'UPDATE ventas SET cliente = ?, updated_at = ?, sincronizado = 0 WHERE id = ?',
+        [nuevoCliente, ahora, id]
+      );
+    } catch (e) {
+      console.error('Error al actualizar cliente:', e);
+      throw e;
+    }
   }, [db]);
 
   return { addVenta, pagarVenta, deleteVenta, updateVenta, actualizarEstadoPedido, actualizarCliente, getVentasDelDia, getVentasEnRango, getDeudores, getPedidos, getCuadre, loading };

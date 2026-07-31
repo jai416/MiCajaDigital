@@ -1,12 +1,10 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useColorScheme } from '@/components/useColorScheme';
-import { colors } from '@/src/theme/colors';
+import { useAccentColors } from '@/src/context/AccentContext';
 
 export default function PasoDos() {
-  const scheme = useColorScheme();
-  const c = colors[scheme ?? 'light'];
+  const { theme: c } = useAccentColors();
   const insets = useSafeAreaInsets();
 
   return (

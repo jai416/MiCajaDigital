@@ -13,15 +13,13 @@ import {
 import * as Clipboard from 'expo-clipboard';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from 'expo-router';
-import { useColorScheme } from '@/components/useColorScheme';
-import { colors } from '@/src/theme/colors';
+import { useAccentColors } from '@/src/context/AccentContext';
 import { useVentas } from '@/src/hooks/useVentas';
 import { type Venta } from '@/src/types';
 import SwipeableRow from '@/src/components/SwipeableRow';
 
 export default function ClientesScreen() {
-  const scheme = useColorScheme();
-  const c = colors[scheme ?? 'light'];
+  const { theme: c } = useAccentColors();
   const insets = useSafeAreaInsets();
   const { getDeudores, pagarVenta, deleteVenta, actualizarCliente } = useVentas();
   const [deudores, setDeudores] = useState<(Venta & { dias_retraso: number })[]>([]);

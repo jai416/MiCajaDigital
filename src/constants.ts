@@ -12,3 +12,5 @@ export const DEUDOR_REMINDER_HORA = 10;
 export const DECIMAL_PLACES = 100;
 export const GRAPH_MAX_HEIGHT = 160;
 export const TAB_ICON_SIZE = 22;
+export const LISTA_LIMITE = 200;
+export const DEUDORES_LIMITE = 100;

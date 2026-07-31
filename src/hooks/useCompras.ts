@@ -4,6 +4,8 @@ import { Alert } from 'react-native';
 import { type Compra } from '@/src/types';
 import { generarUUID } from '@/src/utils/uuid';
 import { useAuth } from '@/src/context/AuthContext';
+import { registrarEvento } from '@/src/services/analytics';
+import { LISTA_LIMITE } from '@/src/constants';
 
 import { getUserId } from '@/src/utils/user';
 export function useCompras() {
@@ -11,23 +13,18 @@ export function useCompras() {
   const { user } = useAuth();
   const [loading, setLoading] = useState(false);
 
-  const getUserId = useCallback(async (): Promise<string> => {
-    if (user?.id) return user.id;
-    const row = await db.getFirstAsync<{ valor: string }>(
-      "SELECT valor FROM app_config WHERE clave = 'user_id'"
-    );
-    return row?.valor ?? '';
-  }, [db, user]);
-
-  const getAll = useCallback(async (): Promise<Compra[]> => {
+  const getAll = useCallback(async (limit: number = 0, offset: number = 0): Promise<Compra[]> => {
     try {
       const userId = await getUserId(db, user);
       if (!userId) return [];
-      return await db.getAllAsync<Compra>(
-        'SELECT * FROM compras WHERE user_id = ? ORDER BY fecha DESC, created_at DESC',
-        [userId]
-      );
-    } catch { return []; }
+      const sql = `SELECT * FROM compras WHERE user_id = ? ORDER BY fecha DESC, created_at DESC` +
+        (limit > 0 ? ' LIMIT ? OFFSET ?' : limit === 0 ? ` LIMIT ${LISTA_LIMITE}` : '');
+      const params = limit > 0 ? [userId, limit, offset] : [userId];
+      return await db.getAllAsync<Compra>(sql, params);
+    } catch (e) {
+      console.error('Error al obtener compras:', e);
+      return [];
+    }
   }, [db, user]);
 
   const addCompra = useCallback(
@@ -44,6 +41,7 @@ export function useCompras() {
           'INSERT INTO compras (id, user_id, producto, costo_unitario, cantidad, costo_total, proveedor, fecha, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
           [id, userId, producto, costoUnitario, cantidad, costoTotal, proveedor, fecha, ahora]
         );
+        registrarEvento(db, userId, { nombre: 'compra_registrada', valor: producto });
       } catch {
         Alert.alert('Error', 'No se pudo registrar la compra.');
       } finally {
@@ -56,7 +54,7 @@ export function useCompras() {
   const deleteCompra = useCallback(async (id: string) => {
     try {
       await db.runAsync('DELETE FROM compras WHERE id = ?', [id]);
-    } catch { /* error silencioso */ }
+    } catch (e) { console.error('Error al eliminar compra:', e); }
   }, [db]);
 
   return { getAll, addCompra, deleteCompra, loading };

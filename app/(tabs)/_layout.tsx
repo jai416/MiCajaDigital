@@ -1,11 +1,10 @@
 import { Tabs } from 'expo-router';
 import { useColorScheme } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { colors } from '@/src/theme/colors';
+import { useAccentColors } from '@/src/context/AccentContext';
 
 export default function TabLayout() {
-  const scheme = useColorScheme();
-  const c = colors[scheme ?? 'light'];
+  const { theme: c } = useAccentColors();
 
   return (
     <Tabs

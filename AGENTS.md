@@ -26,18 +26,43 @@
 Cada hook usa `useSQLiteContext()` y `useAuth()` para obtener `db` y `user`.
 Ejemplo:
 ```
-useVentas()    → addVenta, pagarVenta, deleteVenta, getVentasDelDia, getDeudores, getCuadre
-useGastos()    → addGasto, getGastosDelDia, getGastosTodos
+useVentas()    → addVenta, pagarVenta, deleteVenta, getVentasDelDia, getDeudores, getCuadre, getPedidos, getVentasEnRango, actualizarEstadoPedido, actualizarCliente, updateVenta
+useGastos()    → addGasto, getGastosDelDia, getGastosTodos, getGastosEnRango
 useCatalogo()  → getAll, buscar, buscarPorCodigo, getCategorias, buscarPorCategoria, addProducto, updateProducto, deleteProducto, getByNombre, deductStock
 useCompras()   → getAll, addCompra, deleteCompra
+useNotificaciones() → toggle, toggleDeudores, registerPushToken, rescheduleDaily, rescheduleDeudor
+useBiometrica() → available, enabled, toggle
+useSync()      → syncing, lastSync, sincronizar
+useExport()    → exportTable, exportTodo, exportToPDF, exporting
+useAccentColor()/AccentContext → theme, primary, accent, setAccentColor
 ```
+
+TODAS las consultas SQL dentro de hooks deben estar en `try/catch/finally` con
+`console.error` y retorno de valores por defecto seguros (arrays vacíos u objetos vacíos).
+IMPORTANTE: dentro de un `try`, devolver con `return await db.getAllAsync(...)` (NO `return db.getAllAsync(...)`),
+de lo contrario el `catch` nunca captura el rechazo del promise y se vuelve un unhandled rejection.
+
+Números: usar `parseNumero()` de `src/utils/numero.ts` (normaliza coma decimal de locales hispanos)
+en vez de `parseFloat()` directo en inputs del usuario.
 
 ### Sync
 Bidireccional con estrategia "last-write-wins" basada en `updated_at`:
 1. **PUSH:** Registros con `sincronizado = 0` → upsert a Supabase → marcar `sincronizado = 1`
 2. **PULL:** Registros en Supabase con `updated_at > last_sync_at` → insertar o actualizar local si remote es más nuevo
 
-Ejecutado cada 5 minutos + al cambiar AppState a 'active', solo si hay conexión (NetInfo). Se inicializa en `app/_layout.tsx` via componente `<SyncInit />` — corre globalmente, no por pantalla.
+Detalles:
+- Borrado suave: `deleted_at` se propaga local→cloud (delete en cloud) y cloud→local (marca `deleted_at` local)
+- Fotos: si la subida a storage falla, el registro NO se marca como sincronizado para reintentar
+- El log se guarda en `sync_log` (también en errores)
+- Ejecutado cada 5 minutos + al cambiar AppState a 'active', solo si hay conexión (NetInfo),
+  diferido con `InteractionManager.runAfterInteractions` para no bloquear la UI.
+  Se inicializa en `app/_layout.tsx` via componente `<SyncInit />` — corre globalmente, no por pantalla.
+
+### Tests
+Jest + jest-expo + @testing-library/react-native. Correr con `npm test` o `npm run test:watch`.
+Los tests viven en `__tests__/`. Mocks manuales para `expo-sqlite`, `expo-secure-store`,
+`@supabase/supabase-js`, `expo-file-system` y `expo-image-manipulator`.
+`npm run typecheck` (tsc) excluye `admin/` y `__tests__/`.
 
 ### Pantallas (app/ exports default)
 ```
@@ -86,7 +111,16 @@ compras:
 
 app_config:
   clave TEXT PK, valor TEXT
-  -- claves: tutorial_visto, user_id, last_sync_at, biometrica, notif_recordatorio
+  -- claves: tutorial_visto, user_id, last_sync_at, biometrica, notif_recordatorio,
+  --         notif_recordatorio_hora, notif_recordatorio_minuto, notif_deudores,
+  --         notif_deudor_hora, notif_deudor_minuto, accent_color, auto_backup, push_token
+
+sync_log:
+  id TEXT PK, user_id TEXT, timestamp TEXT, ventas INTEGER, gastos INTEGER,
+  catalogo INTEGER, compras INTEGER, error TEXT
+
+analytics_events:
+  id TEXT PK, user_id TEXT, nombre TEXT, valor TEXT, timestamp TEXT
 ```
 
 ## Database Supabase (docs/supabase-schema.sql)
@@ -103,13 +137,28 @@ SIN `sincronizado` (es local-only — Supabase usa `updated_at` para sync). Colu
 
 | Archivo | Propósito |
 |---------|-----------|
-| `src/services/supabase.ts` | Cliente Supabase con anon key (SOLO anon key aquí) |
+| `src/services/supabase.ts` | Cliente Supabase con anon key + timeout 15s (AbortController) |
 | `src/services/sync.ts` | Motor de sync bidireccional |
-| `src/hooks/useSync.ts` | Hook que dispara sync cada 5 min + AppState |
+| `src/hooks/useSync.ts` | Hook que dispara sync cada 5 min + AppState (InteractionManager) |
+| `src/services/analytics.ts` | Registro de eventos en tabla `analytics_events` |
+| `src/services/backup.ts` | Backup automático CSV cada 12h (expo-background-task) |
 | `src/context/AuthContext.tsx` | AuthProvider con login/register/logout + persistencia en app_config |
+| `src/context/AccentContext.tsx` | Colores de acento personalizables (persistidos en app_config) |
 | `src/components/SwipeableRow.tsx` | Componente swipeable (ReanimatedSwipeable) |
 | `src/theme/colors.ts` | Paleta light/dark |
+| `src/theme/accents.ts` | Paletas de acento (ACCENT_COLORS) |
+| `src/utils/numero.ts` | `parseNumero()` normaliza comas decimales |
+| `src/utils/user.ts` | `getUserId()` resuelve id desde auth → app_config → secure-store |
 | `admin/lib/supabase.ts` | Cliente Supabase con service_role key (server-side only) |
+
+## Observaciones de Rendimiento
+
+- Índices SQLite en `schema.ts`: `idx_ventas_user_fecha`, `idx_ventas_user_pagado`,
+  `idx_ventas_user_pedido`, `idx_gastos_user_fecha`, `idx_catalogo_user_nombre`,
+  `idx_compras_user_fecha`, `idx_sync_user_ts`
+- Límites: `LISTA_LIMITE = 200`, `DEUDORES_LIMITE = 100`, `BUSCAR_LIMIT = 20` en `src/constants.ts`
+- `getVentasDelDia`, `getDeudores`, `getGastosDelDia`, `getGastosTodos`, `getVentasEnRango`,
+  `getGastosEnRango` usan `LIMIT` para evitar escaneos completos
 
 ## Tareas Comunes
 

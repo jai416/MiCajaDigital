@@ -1,12 +1,10 @@
 import { useEffect, useRef } from 'react';
 import { Animated, StyleSheet, Text } from 'react-native';
 import NetInfo from '@react-native-community/netinfo';
-import { useColorScheme } from '@/components/useColorScheme';
-import { colors } from '@/src/theme/colors';
+import { useAccentColors } from '@/src/context/AccentContext';
 
 export default function OfflineBanner() {
-  const scheme = useColorScheme();
-  const c = colors[scheme ?? 'light'];
+  const { theme: c } = useAccentColors();
   const opacity = useRef(new Animated.Value(0)).current;
   const isOffline = useRef(false);
 

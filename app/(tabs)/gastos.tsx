@@ -1,18 +1,18 @@
 import { useCallback, useState } from 'react';
 import * as Haptics from 'expo-haptics';
+import { Image } from 'expo-image';
 import {
-  Alert, Image, KeyboardAvoidingView, Platform, Pressable,
+  Alert, KeyboardAvoidingView, Platform, Pressable,
   ScrollView, StyleSheet, Text, TextInput, View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
-import { useColorScheme } from '@/components/useColorScheme';
-import { colors } from '@/src/theme/colors';
+import { useAccentColors } from '@/src/context/AccentContext';
 import { useGastos } from '@/src/hooks/useGastos';
+import { parseNumero } from '@/src/utils/numero';
 
 export default function GastosScreen() {
-  const scheme = useColorScheme();
-  const c = colors[scheme ?? 'light'];
+  const { theme: c } = useAccentColors();
   const insets = useSafeAreaInsets();
   const { addGasto, loading } = useGastos();
   const [concepto, setConcepto] = useState('');
@@ -36,7 +36,7 @@ export default function GastosScreen() {
   const handleGuardar = useCallback(async () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     if (!concepto.trim()) { Alert.alert('Error', 'El concepto es obligatorio'); return; }
-    const numMonto = parseFloat(monto);
+    const numMonto = parseNumero(monto);
     if (isNaN(numMonto) || numMonto <= 0) { Alert.alert('Error', 'Monto inválido'); return; }
     try {
       await addGasto(concepto.trim(), numMonto, foto);
@@ -68,7 +68,7 @@ export default function GastosScreen() {
           <Text style={[styles.label, { color: c.textSecondary }]}>Foto del recibo (opcional)</Text>
           {foto ? (
             <View style={{ alignItems: 'center', marginVertical: 8 }}>
-              <Image source={{ uri: foto }} style={styles.fotoPreview} />
+              <Image source={{ uri: foto }} style={styles.fotoPreview} cachePolicy="memory-disk" />
               <Pressable onPress={() => setFoto('')}><Text style={{ color: c.danger, fontWeight: '600', marginTop: 4 }}>Eliminar foto</Text></Pressable>
             </View>
           ) : (

@@ -1,7 +1,7 @@
 import { useSQLiteContext } from 'expo-sqlite';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import NetInfo from '@react-native-community/netinfo';
-import { AppState, type AppStateStatus } from 'react-native';
+import { AppState, InteractionManager, type AppStateStatus } from 'react-native';
 import { syncToSupabase } from '@/src/services/sync';
 import { useAuth } from '@/src/context/AuthContext';
 import { SYNC_MIN_INTERVAL_MS } from '@/src/constants';
@@ -38,12 +38,24 @@ export function useSync() {
   useEffect(() => {
     if (!user) return;
 
-    doSync();
+    InteractionManager.runAfterInteractions(() => {
+      doSync();
+    });
 
-    intervalRef.current = setInterval(doSync, 300000);
+    const intervalo = setInterval(() => {
+      InteractionManager.runAfterInteractions(() => {
+        doSync();
+      });
+    }, 300000);
+
+    intervalRef.current = intervalo;
 
     const sub = AppState.addEventListener('change', (nextState: AppStateStatus) => {
-      if (nextState === 'active') doSync();
+      if (nextState === 'active') {
+        InteractionManager.runAfterInteractions(() => {
+          doSync();
+        });
+      }
     });
 
     return () => {

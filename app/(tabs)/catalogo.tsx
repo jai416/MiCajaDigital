@@ -1,21 +1,21 @@
 import { useCallback, useState } from 'react';
+import { Image } from 'expo-image';
 import {
-  Alert, FlatList, Image, Modal, Pressable, RefreshControl,
+  Alert, FlatList, Linking, Modal, Pressable, RefreshControl,
   ScrollView, StyleSheet, Text, TextInput, View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
-import { useColorScheme } from '@/components/useColorScheme';
-import { colors } from '@/src/theme/colors';
+import { useAccentColors } from '@/src/context/AccentContext';
 import { useCatalogo } from '@/src/hooks/useCatalogo';
 import { useCompras } from '@/src/hooks/useCompras';
 import { type CatalogoItem, type Compra } from '@/src/types';
 import BarcodeScanner from '@/src/components/BarcodeScanner';
+import { parseNumero } from '@/src/utils/numero';
 
 export default function CatalogoScreen() {
-  const scheme = useColorScheme();
-  const c = colors[scheme ?? 'light'];
+  const { theme: c } = useAccentColors();
   const insets = useSafeAreaInsets();
   const { getAll, getCategorias, buscarPorCategoria, addProducto, updateProducto, deleteProducto, loading } = useCatalogo();
   const { getAll: getCompras, addCompra, deleteCompra } = useCompras();
@@ -23,6 +23,9 @@ export default function CatalogoScreen() {
   const [categorias, setCategorias] = useState<string[]>([]);
   const [categoriaFiltro, setCategoriaFiltro] = useState('');
   const [refreshing, setRefreshing] = useState(false);
+  const [paginando, setPaginando] = useState(false);
+  const [finAlcanzado, setFinAlcanzado] = useState(false);
+  const PAGE_SIZE = 30;
   const [modalVisible, setModalVisible] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [nombre, setNombre] = useState('');
@@ -35,6 +38,7 @@ export default function CatalogoScreen() {
   // compras
   const [showCompras, setShowCompras] = useState(false);
   const [compras, setCompras] = useState<Compra[]>([]);
+  const [paginandoCompras, setPaginandoCompras] = useState(false);
   const [showAddCompra, setShowAddCompra] = useState(false);
   const [showScanner, setShowScanner] = useState(false);
   const [compraProducto, setCompraProducto] = useState('');
@@ -43,9 +47,22 @@ export default function CatalogoScreen() {
   const [compraProv, setCompraProv] = useState('');
 
   const load = useCallback(async () => {
-    setItems(await getAll());
+    setFinAlcanzado(false);
+    setItems(await getAll(PAGE_SIZE, 0));
     setCategorias(await getCategorias());
   }, [getAll, getCategorias]);
+
+  const cargarMas = useCallback(async () => {
+    if (paginando || finAlcanzado) return;
+    setPaginando(true);
+    try {
+      const mas = await getAll(PAGE_SIZE, items.length);
+      if (mas.length === 0) setFinAlcanzado(true);
+      else setItems(prev => [...prev, ...mas]);
+    } finally {
+      setPaginando(false);
+    }
+  }, [getAll, paginando, finAlcanzado, items.length]);
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
@@ -69,7 +86,8 @@ export default function CatalogoScreen() {
 
   const filtrar = useCallback(async (cat: string) => {
     setCategoriaFiltro(cat);
-    setItems(cat ? await buscarPorCategoria(cat) : await getAll());
+    setFinAlcanzado(false);
+    setItems(cat ? await buscarPorCategoria(cat) : await getAll(PAGE_SIZE, 0));
   }, [buscarPorCategoria, getAll]);
 
   const openAdd = () => {
@@ -88,7 +106,7 @@ export default function CatalogoScreen() {
 
   const handleGuardar = async () => {
     if (!nombre.trim()) { Alert.alert('Error', 'El nombre es obligatorio'); return; }
-    const p = parseFloat(precio);
+    const p = parseNumero(precio);
     if (isNaN(p) || p <= 0) { Alert.alert('Error', 'Precio inválido'); return; }
     const s = parseInt(stock, 10) || 0;
     try {
@@ -110,9 +128,10 @@ export default function CatalogoScreen() {
 
   const handleAddCompra = async () => {
     if (!compraProducto.trim()) { Alert.alert('Error', 'Producto obligatorio'); return; }
-    const cu = parseFloat(compraCosto);
+    const cu = parseNumero(compraCosto);
     if (isNaN(cu) || cu <= 0) { Alert.alert('Error', 'Costo inválido'); return; }
-    const cant = parseInt(compraCant, 10) || 1;
+    const cant = parseInt(compraCant, 10);
+    if (isNaN(cant) || cant <= 0) { Alert.alert('Error', 'Cantidad inválida'); return; }
     try {
       await addCompra(compraProducto.trim(), cu, cant, compraProv.trim());
     } catch {
@@ -130,6 +149,8 @@ export default function CatalogoScreen() {
         contentContainerStyle={[styles.container, { paddingTop: insets.top + 16 }]}
         data={items}
         keyExtractor={(item) => item.id}
+        onEndReachedThreshold={0.4}
+        onEndReached={!categoriaFiltro ? cargarMas : undefined}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
         ListHeaderComponent={
           <View>
@@ -159,6 +180,9 @@ export default function CatalogoScreen() {
             {items.length === 0 && (
               <Text style={[styles.empty, { color: c.textSecondary }]}>No hay productos. Agrega tu primer producto.</Text>
             )}
+            {paginando && (
+              <Text style={[styles.empty, { color: c.textSecondary }]}>Cargando más…</Text>
+            )}
           </View>
         }
         renderItem={({ item }) => (
@@ -166,16 +190,25 @@ export default function CatalogoScreen() {
             <View style={styles.cardHeader}>
               <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10 }}>
                 {item.foto ? (
-                  <Image source={{ uri: item.foto }} style={styles.fotoMini} />
+                  <Image source={{ uri: item.foto }} style={styles.fotoMini} cachePolicy="memory-disk" />
                 ) : null}
                 <Text style={[styles.nombre, { color: c.text, flex: 1 }]}>{item.nombre}</Text>
               </View>
               <View style={styles.cardActions}>
                 <Pressable onPress={() => openEdit(item)}><Text style={[styles.actionBtn, { color: c.primary }]}>✏️</Text></Pressable>
                 <Pressable onPress={() => {
+                  const txt = `🛍️ ${item.nombre}\n💰 ${item.precio.toFixed(2)}${item.descripcion ? `\n📝 ${item.descripcion}` : ''}\n🔗 micajadigital://producto/${item.id}`;
+                  Linking.openURL(`https://wa.me/?text=${encodeURIComponent(txt)}`).catch(() =>
+                    Alert.alert('Error', 'No se pudo abrir WhatsApp.')
+                  );
+                }}><Text style={[styles.actionBtn, { color: '#25D366' }]}>📤</Text></Pressable>
+                <Pressable onPress={() => {
                   Alert.alert('Eliminar', '¿Eliminar este producto?', [
                     { text: 'Cancelar', style: 'cancel' },
-                    { text: 'Eliminar', style: 'destructive', onPress: async () => { await deleteProducto(item.id); load(); } },
+                    { text: 'Eliminar', style: 'destructive', onPress: async () => {
+                      try { await deleteProducto(item.id); } catch { Alert.alert('Error', 'No se pudo eliminar.'); }
+                      load();
+                    } },
                   ]);
                 }}><Text style={styles.actionBtn}>🗑️</Text></Pressable>
               </View>
@@ -201,7 +234,7 @@ export default function CatalogoScreen() {
             <Text style={[styles.modalTitle, { color: c.text }]}>{editId ? 'Editar Producto' : 'Nuevo Producto'}</Text>
             {foto ? (
               <View style={{ alignItems: 'center', marginBottom: 12 }}>
-                <Image source={{ uri: foto }} style={styles.fotoPreview} />
+                <Image source={{ uri: foto }} style={styles.fotoPreview} cachePolicy="memory-disk" />
                 <Pressable onPress={() => setFoto('')}><Text style={{ color: c.danger, fontWeight: '600' }}>Eliminar foto</Text></Pressable>
               </View>
             ) : (
@@ -264,12 +297,23 @@ export default function CatalogoScreen() {
               <Text style={styles.botonAgregarTexto}>+ Nueva Compra</Text>
             </Pressable>
             <FlatList data={compras} keyExtractor={(item) => item.id}
+              onEndReachedThreshold={0.4}
+              onEndReached={() => {
+                if (paginandoCompras || compras.length < PAGE_SIZE) return;
+                setPaginandoCompras(true);
+                getCompras(PAGE_SIZE, compras.length)
+                  .then(mas => setCompras(prev => [...prev, ...mas]))
+                  .finally(() => setPaginandoCompras(false));
+              }}
               ListEmptyComponent={<Text style={{ color: c.textSecondary, textAlign: 'center', padding: 20 }}>Sin compras registradas</Text>}
               renderItem={({ item }) => (
                 <View style={[styles.card, { backgroundColor: c.background, borderColor: c.border, marginBottom: 8 }]}>
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
                     <Text style={{ color: c.text, fontWeight: '700' }}>{item.producto}</Text>
-                    <Pressable onPress={() => { Alert.alert('Eliminar', '¿Eliminar esta compra?', [{ text: 'No' }, { text: 'Sí', style: 'destructive', onPress: async () => { await deleteCompra(item.id); setCompras(await getCompras()); } }]); }}>
+                    <Pressable onPress={() => { Alert.alert('Eliminar', '¿Eliminar esta compra?', [{ text: 'No' }, { text: 'Sí', style: 'destructive', onPress: async () => {
+                      try { await deleteCompra(item.id); } catch { Alert.alert('Error', 'No se pudo eliminar.'); }
+                      setCompras(await getCompras());
+                    } }]); }}>
                       <Text style={{ color: c.danger }}>🗑️</Text>
                     </Pressable>
                   </View>

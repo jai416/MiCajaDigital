@@ -6,6 +6,8 @@ import { setSecureValue, SECURE_KEYS } from '@/src/utils/storage';
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
     shouldShowAlert: true,
+    shouldShowBanner: true,
+    shouldShowList: true,
     shouldPlaySound: false,
     shouldSetBadge: false,
   }),
@@ -18,20 +20,25 @@ export function useNotificaciones() {
   const [permitted, setPermitted] = useState(false);
 
   useEffect(() => {
+    let active = true;
     (async () => {
       const { status } = await Notifications.getPermissionsAsync();
+      if (!active) return;
       setPermitted(status === 'granted');
 
       const row = await db.getFirstAsync<{ valor: string }>(
         "SELECT valor FROM app_config WHERE clave = 'notif_recordatorio'"
       );
+      if (!active) return;
       setEnabled(row?.valor === 'si');
 
       const dRow = await db.getFirstAsync<{ valor: string }>(
         "SELECT valor FROM app_config WHERE clave = 'notif_deudores'"
       );
+      if (!active) return;
       setDeudorEnabled(dRow?.valor === 'si');
     })();
+    return () => { active = false; };
   }, [db]);
 
   const requestPermissions = useCallback(async (): Promise<boolean> => {
@@ -40,8 +47,20 @@ export function useNotificaciones() {
     return status === 'granted';
   }, []);
 
-  const scheduleDaily = useCallback(async (hora: number = 20, minuto: number = 0) => {
+  const scheduleDaily = useCallback(async () => {
+    try { await Notifications.cancelScheduledNotificationAsync('daily-reminder'); } catch {}
+
+    const horaRow = await db.getFirstAsync<{ valor: string }>(
+      "SELECT valor FROM app_config WHERE clave = 'notif_recordatorio_hora'"
+    );
+    const minRow = await db.getFirstAsync<{ valor: string }>(
+      "SELECT valor FROM app_config WHERE clave = 'notif_recordatorio_minuto'"
+    );
+    const hora = parseInt(horaRow?.valor ?? '20');
+    const minuto = parseInt(minRow?.valor ?? '0');
+
     await Notifications.scheduleNotificationAsync({
+      identifier: 'daily-reminder',
       content: {
         title: '📊 Mi Caja Digital',
         body: '¿Ya hiciste tu cuadre de hoy? Revisa tus ventas y deudores pendientes.',
@@ -52,7 +71,7 @@ export function useNotificaciones() {
         minute: minuto,
       },
     });
-  }, []);
+  }, [db]);
 
   const registerPushToken = useCallback(async () => {
     try {
@@ -75,14 +94,23 @@ export function useNotificaciones() {
     );
     if (!userId?.valor) return;
 
-    const deudores = await db.getAllAsync<{ cliente: string; precio: number; fecha: string }>(
-      `SELECT cliente, precio, fecha FROM ventas WHERE user_id = ? AND pagado = 0 AND cliente != '' AND deleted_at IS NULL ORDER BY fecha ASC LIMIT 3`,
+    const deudores = await db.getAllAsync<{ cliente: string; saldo_pendiente: number; fecha: string }>(
+      `SELECT cliente, saldo_pendiente, fecha FROM ventas WHERE user_id = ? AND pagado = 0 AND tipo_pedido != 'pedido' AND cliente != '' AND deleted_at IS NULL ORDER BY fecha ASC LIMIT 3`,
       [userId.valor]
     );
     if (deudores.length === 0) return;
 
-    const total = deudores.reduce((s, d) => s + d.precio, 0);
+    const total = deudores.reduce((s, d) => s + d.saldo_pendiente, 0);
     const nombres = deudores.map(d => d.cliente).join(', ');
+
+    const horaRow = await db.getFirstAsync<{ valor: string }>(
+      "SELECT valor FROM app_config WHERE clave = 'notif_deudor_hora'"
+    );
+    const minRow = await db.getFirstAsync<{ valor: string }>(
+      "SELECT valor FROM app_config WHERE clave = 'notif_deudor_minuto'"
+    );
+    const hora = parseInt(horaRow?.valor ?? '10');
+    const minuto = parseInt(minRow?.valor ?? '0');
 
     await Notifications.scheduleNotificationAsync({
       identifier: 'deudor-reminder',
@@ -92,8 +120,8 @@ export function useNotificaciones() {
       },
       trigger: {
         type: Notifications.SchedulableTriggerInputTypes.DAILY,
-        hour: 10,
-        minute: 0,
+        hour: hora,
+        minute: minuto,
       },
     });
   }, [db]);
@@ -119,9 +147,12 @@ export function useNotificaciones() {
     if (on) {
       await scheduleDaily();
     } else {
-      await Notifications.cancelAllScheduledNotificationsAsync();
+      try { await Notifications.cancelScheduledNotificationAsync('daily-reminder'); } catch {}
+      if (deudorEnabled) {
+        await scheduleDeudorCheck();
+      }
     }
-  }, [db, permitted, requestPermissions, scheduleDaily]);
+  }, [db, permitted, requestPermissions, scheduleDaily, deudorEnabled, scheduleDeudorCheck]);
 
   const toggleDeudores = useCallback(async (on: boolean) => {
     if (on && !permitted) {
@@ -148,5 +179,17 @@ export function useNotificaciones() {
     }
   }, [db, permitted, requestPermissions, scheduleDeudorCheck]);
 
-  return { enabled, deudorEnabled, permitted, toggle, toggleDeudores, registerPushToken };
+  const rescheduleDaily = useCallback(async () => {
+    if (enabled) {
+      await scheduleDaily();
+    }
+  }, [enabled, scheduleDaily]);
+
+  const rescheduleDeudor = useCallback(async () => {
+    if (deudorEnabled) {
+      await scheduleDeudorCheck();
+    }
+  }, [deudorEnabled, scheduleDeudorCheck]);
+
+  return { enabled, deudorEnabled, permitted, toggle, toggleDeudores, registerPushToken, rescheduleDaily, rescheduleDeudor };
 }

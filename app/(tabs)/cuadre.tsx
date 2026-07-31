@@ -1,19 +1,17 @@
 import { memo, useCallback, useState } from 'react';
 import {
-  Alert, Modal, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View,
+  ActivityIndicator, Alert, Modal, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router, useFocusEffect } from 'expo-router';
-import { useColorScheme } from '@/components/useColorScheme';
-import { colors } from '@/src/theme/colors';
+import { useAccentColors } from '@/src/context/AccentContext';
 import { useVentas } from '@/src/hooks/useVentas';
 import { useGastos } from '@/src/hooks/useGastos';
 import { type CuadreResumen, type Venta, type Gasto } from '@/src/types';
 import { useAuth } from '@/src/context/AuthContext';
 
 function BarChart({ ventas, gastos, maxH = 160 }: { ventas: number; gastos: number; maxH?: number }) {
-  const scheme = useColorScheme();
-  const c = colors[scheme ?? 'light'];
+  const { theme: c } = useAccentColors();
   const max = Math.max(ventas, gastos, 1);
   const hV = (ventas / max) * maxH;
   const hG = (gastos / max) * maxH;
@@ -35,14 +33,14 @@ function BarChart({ ventas, gastos, maxH = 160 }: { ventas: number; gastos: numb
 }
 
 export default function CuadreScreen() {
-  const scheme = useColorScheme();
-  const c = colors[scheme ?? 'light'];
+  const { theme: c } = useAccentColors();
   const insets = useSafeAreaInsets();
   const { getCuadre, getVentasDelDia, updateVenta, deleteVenta } = useVentas();
   const { getGastosDelDia } = useGastos();
   const { user, logout } = useAuth();
   const [cuadre, setCuadre] = useState<CuadreResumen | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [cargando, setCargando] = useState(true);
   const [gastos, setGastos] = useState<Gasto[]>([]);
   const [ventasDia, setVentasDia] = useState<Venta[]>([]);
   const [editVenta, setEditVenta] = useState<Venta | null>(null);
@@ -52,10 +50,17 @@ export default function CuadreScreen() {
   const [editCosto, setEditCosto] = useState('');
 
   const load = useCallback(async () => {
-    const [c, g, v] = await Promise.all([getCuadre(), getGastosDelDia(), getVentasDelDia()]);
-    setCuadre(c);
-    setGastos(g);
-    setVentasDia(v);
+    setCargando(true);
+    try {
+      const [c, g, v] = await Promise.all([getCuadre(), getGastosDelDia(), getVentasDelDia()]);
+      setCuadre(c);
+      setGastos(g);
+      setVentasDia(v);
+    } catch (e) {
+      console.error('Error al cargar cuadre:', e);
+    } finally {
+      setCargando(false);
+    }
   }, [getCuadre, getGastosDelDia, getVentasDelDia]);
 
   useFocusEffect(
@@ -139,6 +144,13 @@ export default function CuadreScreen() {
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
     >
       <Text style={[styles.title, { color: c.text }]}>📊 Cuadre del Día</Text>
+
+      {cargando && (
+        <View style={{ paddingVertical: 40, alignItems: 'center' }}>
+          <ActivityIndicator size="large" color={c.primary} />
+          <Text style={{ color: c.textSecondary, marginTop: 10 }}>Cargando cuadre…</Text>
+        </View>
+      )}
 
       {cuadre && (
         <>

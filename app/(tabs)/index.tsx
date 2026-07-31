@@ -1,21 +1,21 @@
 import { useCallback, useRef, useState } from 'react';
 import * as Haptics from 'expo-haptics';
+import { Image } from 'expo-image';
 import {
-  Alert, FlatList, Image, KeyboardAvoidingView, Linking, Modal, Platform,
+  Alert, FlatList, KeyboardAvoidingView, Linking, Modal, Platform,
   Pressable, ScrollView, StyleSheet, Text, TextInput, View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useColorScheme } from '@/components/useColorScheme';
-import { colors } from '@/src/theme/colors';
+import { useAccentColors } from '@/src/context/AccentContext';
 import { useVentas } from '@/src/hooks/useVentas';
 import { useCatalogo } from '@/src/hooks/useCatalogo';
 import { type CatalogoItem } from '@/src/types';
 import Calculadora from '@/src/components/Calculadora';
 import BarcodeScanner from '@/src/components/BarcodeScanner';
+import { parseNumero } from '@/src/utils/numero';
 
 export default function VentasScreen() {
-  const scheme = useColorScheme();
-  const c = colors[scheme ?? 'light'];
+  const { theme: c } = useAccentColors();
   const insets = useSafeAreaInsets();
   const { addVenta, loading } = useVentas();
   const { getAll: getCatalogo, buscar: buscarCatalogo, buscarPorCodigo, getCategorias, buscarPorCategoria, addProducto: addProdCatalogo } = useCatalogo();
@@ -73,7 +73,7 @@ export default function VentasScreen() {
 
   const handleQuickAdd = useCallback(async () => {
     if (!quickNombre.trim() || !quickPrecio.trim()) return;
-    const p = parseFloat(quickPrecio);
+    const p = parseNumero(quickPrecio);
     if (isNaN(p) || p <= 0) return;
     await addProdCatalogo(quickNombre.trim(), p, 0, '', '');
     setQuickNombre(''); setQuickPrecio('');
@@ -84,14 +84,14 @@ export default function VentasScreen() {
   const handleVender = useCallback(async () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     if (!producto.trim()) { Alert.alert('Error', 'El producto es obligatorio'); return; }
-    const numPrecio = parseFloat(precio);
+    const numPrecio = parseNumero(precio);
     if (isNaN(numPrecio) || numPrecio <= 0) { Alert.alert('Error', 'Precio inválido'); return; }
     if (tipoPedido !== 'contado' && !cliente.trim()) {
       Alert.alert('Error', 'El cliente es obligatorio para fiado o pedido');
       return;
     }
     if (tipoPedido === 'pedido') {
-      const numAnticipo = parseFloat(anticipo) || 0;
+      const numAnticipo = parseNumero(anticipo) || 0;
       if (numAnticipo >= numPrecio) {
         Alert.alert('Anticipo inválido', 'El anticipo no puede ser mayor o igual al precio total.');
         return;
@@ -100,10 +100,10 @@ export default function VentasScreen() {
 
     try {
       await addVenta({
-        producto: producto.trim(), precio: numPrecio, costo: parseFloat(costo) || 0,
+        producto: producto.trim(), precio: numPrecio, costo: parseNumero(costo) || 0,
         cliente: cliente.trim(), moneda,
         tipo_pedido: tipoPedido, catalogo_id: catalogoId, metodo_pago: metodoPago,
-        anticipo: parseFloat(anticipo) || 0, fecha_entrega: fechaEntrega.trim() || undefined,
+        anticipo: parseNumero(anticipo) || 0, fecha_entrega: fechaEntrega.trim() || undefined,
       });
     } catch (e) {
       Alert.alert('Error', e instanceof Error ? e.message : 'No se pudo guardar la venta.');
@@ -286,7 +286,7 @@ export default function VentasScreen() {
                 <Pressable style={[styles.itemCatalogo, { borderBottomColor: c.border, flexDirection: 'row', alignItems: 'center' }]}
                   onPress={() => seleccionarCatalogo(item)}>
                   {item.foto ? (
-                    <Image source={{ uri: item.foto }} style={{ width: 40, height: 40, borderRadius: 8, marginRight: 10 }} />
+                    <Image source={{ uri: item.foto }} style={{ width: 40, height: 40, borderRadius: 8, marginRight: 10 }} cachePolicy="memory-disk" />
                   ) : null}
                   <View style={{ flex: 1 }}>
                     <Text style={[styles.itemNombre, { color: c.text }]}>{item.nombre}</Text>

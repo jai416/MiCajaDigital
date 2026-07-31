@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
-import { useColorScheme } from '@/components/useColorScheme';
-import { colors } from '@/src/theme/colors';
+import { useAccentColors } from '@/src/context/AccentContext';
 
 const BOTONES = [
   ['7', '8', '9', '/'],
@@ -12,8 +11,7 @@ const BOTONES = [
 ];
 
 export default function Calculadora({ visible, onClose, onResult }: { visible: boolean; onClose: () => void; onResult: (val: number) => void }) {
-  const scheme = useColorScheme();
-  const c = colors[scheme ?? 'light'];
+  const { theme: c } = useAccentColors();
   const [display, setDisplay] = useState('0');
   const [operador, setOperador] = useState<string | null>(null);
   const [prev, setPrev] = useState<number | null>(null);
@@ -80,7 +78,11 @@ export default function Calculadora({ visible, onClose, onResult }: { visible: b
               ))}
             </View>
           ))}
-          <Pressable style={[styles.botonAceptar, { borderColor: c.primary }]} onPress={() => { onResult(parseFloat(display) || 0); onClose(); }}>
+          <Pressable
+            style={[styles.botonAceptar, { borderColor: c.primary, opacity: display === 'Error' || display === 'NaN' ? 0.4 : 1 }]}
+            disabled={display === 'Error' || display === 'NaN'}
+            onPress={() => { onResult(parseFloat(display) || 0); onClose(); }}
+          >
             <Text style={{ color: c.primary, fontWeight: '800' }}>✅ Aceptar</Text>
           </Pressable>
         </Pressable>

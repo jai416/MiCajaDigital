@@ -10,8 +10,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from 'expo-router';
-import { useColorScheme } from '@/components/useColorScheme';
-import { colors } from '@/src/theme/colors';
+import { useAccentColors } from '@/src/context/AccentContext';
 import { useVentas } from '@/src/hooks/useVentas';
 import { type Venta } from '@/src/types';
 import SwipeableRow from '@/src/components/SwipeableRow';
@@ -19,8 +18,7 @@ import SwipeableRow from '@/src/components/SwipeableRow';
 const FILTROS = ['pendiente', 'entregado', 'cancelado'] as const;
 
 export default function PedidosScreen() {
-  const scheme = useColorScheme();
-  const c = colors[scheme ?? 'light'];
+  const { theme: c } = useAccentColors();
   const insets = useSafeAreaInsets();
   const { getPedidos, actualizarEstadoPedido, deleteVenta } = useVentas();
   const [pedidos, setPedidos] = useState<Venta[]>([]);
@@ -28,10 +26,26 @@ export default function PedidosScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [seleccionando, setSeleccionando] = useState(false);
   const [seleccionados, setSeleccionados] = useState<Set<string>>(new Set());
+  const [paginando, setPaginando] = useState(false);
+  const [finAlcanzado, setFinAlcanzado] = useState(false);
+  const PAGE_SIZE = 30;
 
   const load = useCallback(async () => {
-    setPedidos(await getPedidos(filtro === 'todos' ? undefined : filtro));
+    setFinAlcanzado(false);
+    setPedidos(await getPedidos(filtro === 'todos' ? undefined : filtro, PAGE_SIZE, 0));
   }, [getPedidos, filtro]);
+
+  const cargarMas = useCallback(async () => {
+    if (paginando || finAlcanzado) return;
+    setPaginando(true);
+    try {
+      const mas = await getPedidos(filtro === 'todos' ? undefined : filtro, PAGE_SIZE, pedidos.length);
+      if (mas.length === 0) setFinAlcanzado(true);
+      else setPedidos(prev => [...prev, ...mas]);
+    } finally {
+      setPaginando(false);
+    }
+  }, [getPedidos, filtro, paginando, finAlcanzado, pedidos.length]);
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
@@ -123,6 +137,9 @@ export default function PedidosScreen() {
         getItemLayout={(_, index) => ({ length: 80, offset: 80 * index, index })}
         windowSize={10}
         removeClippedSubviews={true}
+        onEndReachedThreshold={0.4}
+        onEndReached={cargarMas}
+        ListFooterComponent={paginando ? <Text style={{ color: c.textSecondary, textAlign: 'center', padding: 16 }}>Cargando más…</Text> : null}
         ListHeaderComponent={
           <View>
             <View style={styles.headerRow}>

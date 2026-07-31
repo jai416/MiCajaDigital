@@ -8,7 +8,9 @@ import { StatusBar } from 'expo-status-bar';
 import { useColorScheme } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { AuthProvider } from '@/src/context/AuthContext';
+import { AccentProvider } from '@/src/context/AccentContext';
 import { useSync } from '@/src/hooks/useSync';
+import OfflineBanner from '@/src/components/OfflineBanner';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -48,14 +50,17 @@ function RootLayoutNav() {
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SQLiteProvider databaseName="micajadigital.db" onInit={initDatabase}>
         <AuthProvider>
-          <SyncInit />
-          <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
-          <Stack screenOptions={{ headerShown: false }}>
-            <Stack.Screen name="index" />
-            <Stack.Screen name="tutorial" />
-            <Stack.Screen name="auth" />
-            <Stack.Screen name="(tabs)" />
-          </Stack>
+          <AccentProvider>
+            <SyncInit />
+            <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
+            <OfflineBanner />
+            <Stack screenOptions={{ headerShown: false }}>
+              <Stack.Screen name="index" />
+              <Stack.Screen name="tutorial" />
+              <Stack.Screen name="auth" />
+              <Stack.Screen name="(tabs)" />
+            </Stack>
+          </AccentProvider>
         </AuthProvider>
       </SQLiteProvider>
     </GestureHandlerRootView>

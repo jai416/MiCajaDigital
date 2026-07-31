@@ -1,11 +1,10 @@
 import { useCallback, useState } from 'react';
 import {
-  Pressable, RefreshControl, ScrollView, StyleSheet, Text, View,
+  ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from 'expo-router';
-import { useColorScheme } from '@/components/useColorScheme';
-import { colors } from '@/src/theme/colors';
+import { useAccentColors } from '@/src/context/AccentContext';
 import { useVentas } from '@/src/hooks/useVentas';
 import { useGastos } from '@/src/hooks/useGastos';
 import type { Venta, Gasto } from '@/src/types';
@@ -35,22 +34,29 @@ function hoy(): string {
 type Periodo = 'semanal' | 'mensual' | 'anual';
 
 export default function ReportesScreen() {
-  const scheme = useColorScheme();
-  const c = colors[scheme ?? 'light'];
+  const { theme: c } = useAccentColors();
   const insets = useSafeAreaInsets();
   const { getVentasEnRango } = useVentas();
   const { getGastosEnRango } = useGastos();
   const [periodo, setPeriodo] = useState<Periodo>('semanal');
   const [refreshing, setRefreshing] = useState(false);
+  const [cargando, setCargando] = useState(true);
   const [ventas, setVentas] = useState<Venta[]>([]);
   const [gastos, setGastos] = useState<Gasto[]>([]);
 
   const load = useCallback(async (p: Periodo) => {
-    const fin = hoy();
-    const inicio = p === 'semanal' ? inicioSemana() : p === 'mensual' ? inicioMes() : inicioAno();
-    const [v, g] = await Promise.all([getVentasEnRango(inicio, fin), getGastosEnRango(inicio, fin)]);
-    setVentas(v);
-    setGastos(g);
+    setCargando(true);
+    try {
+      const fin = hoy();
+      const inicio = p === 'semanal' ? inicioSemana() : p === 'mensual' ? inicioMes() : inicioAno();
+      const [v, g] = await Promise.all([getVentasEnRango(inicio, fin), getGastosEnRango(inicio, fin)]);
+      setVentas(v);
+      setGastos(g);
+    } catch (e) {
+      console.error('Error al cargar reportes:', e);
+    } finally {
+      setCargando(false);
+    }
   }, [getVentasEnRango, getGastosEnRango]);
 
   useFocusEffect(useCallback(() => { load(periodo); }, [load, periodo]));
@@ -87,6 +93,13 @@ export default function ReportesScreen() {
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
     >
       <Text style={[styles.title, { color: c.text }]}>📊 Reportes</Text>
+
+      {cargando && (
+        <View style={{ paddingVertical: 40, alignItems: 'center' }}>
+          <ActivityIndicator size="large" color={c.primary} />
+          <Text style={{ color: c.textSecondary, marginTop: 10 }}>Cargando reportes…</Text>
+        </View>
+      )}
 
       <View style={styles.periodoRow}>
         <Pressable style={[styles.periodoBtn, { backgroundColor: periodo === 'semanal' ? c.primary : c.surface, borderColor: c.primary }]}

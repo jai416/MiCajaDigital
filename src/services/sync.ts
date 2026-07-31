@@ -1,11 +1,25 @@
 import { type SQLiteDatabase } from 'expo-sqlite';
 import * as FileSystem from 'expo-file-system';
+import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
 import { supabase } from './supabase';
+import { generarUUID } from '@/src/utils/uuid';
+
+type SQLiteRow = Record<string, string | number | null | boolean | Uint8Array>;
+
+async function compressImage(uri: string): Promise<string> {
+  try {
+    const result = await manipulateAsync(uri, [{ resize: { width: 1024 } }], { compress: 0.7, format: SaveFormat.JPEG });
+    return result.uri;
+  } catch {
+    return uri;
+  }
+}
 
 async function uploadPhotoToStorage(uri: string, userId: string, prefix: string): Promise<string> {
   if (!uri || uri.startsWith('http')) return uri;
   try {
-    const base64 = await FileSystem.readAsStringAsync(uri, { encoding: FileSystem.EncodingType.Base64 });
+    const compressedUri = await compressImage(uri);
+    const base64 = await FileSystem.readAsStringAsync(compressedUri, { encoding: FileSystem.EncodingType.Base64 });
     const ext = uri.split('.').pop()?.toLowerCase() || 'jpg';
     const fileName = `${prefix}/${userId}/${Date.now()}.${ext}`;
     const { data } = await supabase.storage.from('fotos').upload(fileName, decodeBase64(base64), {
@@ -59,18 +73,20 @@ async function setLastSync(db: SQLiteDatabase, ts: string) {
 }
 
 export async function syncToSupabase(db: SQLiteDatabase) {
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return { ventas: 0, gastos: 0 };
-
-  const userId = user.id;
   const syncStart = new Date().toISOString();
+  let userId = '';
   let ventasCount = 0;
   let gastosCount = 0;
   let catalogoCount = 0;
   let comprasCount = 0;
 
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return { ventas: 0, gastos: 0, catalogo: 0, compras: 0 };
+    userId = user.id;
+
   // ---- PUSH: local → cloud ----
-  const unsyncedVentas = await db.getAllAsync<Record<string, unknown>>(
+  const unsyncedVentas = await db.getAllAsync<SQLiteRow>(
     'SELECT * FROM ventas WHERE (sincronizado = 0 OR deleted_at IS NOT NULL) AND user_id = ?',
     [userId]
   );
@@ -121,7 +137,7 @@ export async function syncToSupabase(db: SQLiteDatabase) {
     }
   }
 
-  const unsyncedGastos = await db.getAllAsync<Record<string, unknown>>(
+  const unsyncedGastos = await db.getAllAsync<SQLiteRow>(
     'SELECT * FROM gastos WHERE sincronizado = 0 AND user_id = ?',
     [userId]
   );
@@ -151,11 +167,15 @@ export async function syncToSupabase(db: SQLiteDatabase) {
     if (error) {
       /* error pushing gasto */
     } else {
-      await db.runAsync(
-        'UPDATE gastos SET sincronizado = 1, updated_at = ? WHERE id = ?',
-        [syncStart, g.id]
-      );
-      gastosCount++;
+      if (fotoUrl === g.foto && typeof g.foto === 'string' && g.foto && !g.foto.startsWith('http')) {
+        /* la foto no se pudo subir: dejar sin sincronizar para reintentar */
+      } else {
+        await db.runAsync(
+          'UPDATE gastos SET sincronizado = 1, updated_at = ? WHERE id = ?',
+          [syncStart, g.id]
+        );
+        gastosCount++;
+      }
     }
   }
 
@@ -179,7 +199,13 @@ export async function syncToSupabase(db: SQLiteDatabase) {
       const tipoPedido = rv.tipo_pedido ?? rv.tipo ?? 'contado';
 
       if (rv.deleted_at) {
-        // Skip soft-deleted records from cloud
+        if (local && !localUpdated.startsWith('2000')) {
+          await db.runAsync(
+            'UPDATE ventas SET deleted_at = ?, sincronizado = 1, updated_at = ? WHERE id = ?',
+            [rv.deleted_at, remoteUpdated, rv.id]
+          );
+          ventasCount++;
+        }
         continue;
       }
       if (!local) {
@@ -251,7 +277,7 @@ export async function syncToSupabase(db: SQLiteDatabase) {
   }
 
   // ---- PUSH: catalogo local → cloud ----
-  const unsyncedCatalogo = await db.getAllAsync<Record<string, unknown>>(
+  const unsyncedCatalogo = await db.getAllAsync<SQLiteRow>(
     'SELECT * FROM catalogo WHERE sincronizado = 0 AND user_id = ?',
     [userId]
   );
@@ -279,11 +305,15 @@ export async function syncToSupabase(db: SQLiteDatabase) {
     if (error) {
       /* error pushing catalogo */
     } else {
-      await db.runAsync(
-        'UPDATE catalogo SET foto = ?, sincronizado = 1, updated_at = ? WHERE id = ?',
-        [fotoUrl, syncStart, c.id]
-      );
-      catalogoCount++;
+      if (fotoUrl === c.foto && typeof c.foto === 'string' && c.foto && !c.foto.startsWith('http')) {
+        /* la foto no se pudo subir: dejar sin sincronizar para reintentar */
+      } else {
+        await db.runAsync(
+          'UPDATE catalogo SET foto = ?, sincronizado = 1, updated_at = ? WHERE id = ?',
+          [fotoUrl, syncStart, c.id]
+        );
+        catalogoCount++;
+      }
     }
   }
 
@@ -321,7 +351,7 @@ export async function syncToSupabase(db: SQLiteDatabase) {
   }
 
   // ---- PUSH: compras local → cloud ----
-  const unsyncedCompras = await db.getAllAsync<Record<string, unknown>>(
+  const unsyncedCompras = await db.getAllAsync<SQLiteRow>(
     'SELECT * FROM compras WHERE sincronizado = 0 AND user_id = ?', [userId]
   );
   for (const c of unsyncedCompras) {
@@ -364,5 +394,21 @@ export async function syncToSupabase(db: SQLiteDatabase) {
 
   await setLastSync(db, syncStart);
 
+  try {
+    await db.runAsync(
+      'INSERT INTO sync_log (id, user_id, timestamp, ventas, gastos, catalogo, compras, error) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+      [generarUUID(), userId, syncStart, ventasCount, gastosCount, catalogoCount, comprasCount, null]
+    );
+  } catch { /* si falla el log no detiene el sync */ }
+
   return { ventas: ventasCount, gastos: gastosCount, catalogo: catalogoCount, compras: comprasCount };
+  } catch (e) {
+    try {
+      await db.runAsync(
+        'INSERT INTO sync_log (id, user_id, timestamp, ventas, gastos, catalogo, compras, error) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+        [generarUUID(), userId, syncStart, 0, 0, 0, 0, e instanceof Error ? e.message : 'Unknown error']
+      );
+    } catch { /* silencioso */ }
+    return { ventas: 0, gastos: 0, catalogo: 0, compras: 0 };
+  }
 }
