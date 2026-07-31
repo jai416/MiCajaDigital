@@ -21,6 +21,19 @@
 
 ---
 
+## 1.1 Periodo de prueba y suscripción
+
+- Al crear tu cuenta empiezas con **15 días de prueba gratis**.
+- En la parte de arriba de la app verás un aviso: **«Te quedan X días de prueba»**.
+- Para **renovar tu suscripción** (o si ya terminó la prueba), escribe a Jaison:
+  - **WhatsApp:** https://wa.me/5351819744
+  - **Telegram:** https://t.me/+5351819744
+- La suscripción cuesta **$15 USD/mes**.
+- Cuando renueves, la app se desbloquea sola. Si la dejaste abierta, pulsa
+  **«Ya renové mi suscripción — verificar de nuevo»** en la pantalla de aviso.
+
+---
+
 ## 2. Vender (pantalla principal)
 
 Es la primera pantalla que ves al abrir la app.

@@ -68,6 +68,20 @@ export default function NegociosTable({ negocios }: { negocios: Negocio[] }) {
     if (res.ok) router.refresh();
   };
 
+  const handleRenovar = async (id: string) => {
+    const dias = prompt('¿Cuántos días de renovación? (30 o 90)', '30');
+    if (!dias) return;
+    const n = parseInt(dias, 10);
+    if (isNaN(n) || n <= 0) return;
+    const expiracion = new Date(Date.now() + n * 86400000).toISOString().slice(0, 10);
+    const res = await fetch('/api/negocios', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, activo: true, fecha_expiracion: expiracion }),
+    });
+    if (res.ok) router.refresh();
+  };
+
   return (
     <div>
       <div className="flex flex-col sm:flex-row gap-4 mb-6">
@@ -147,6 +161,12 @@ export default function NegociosTable({ negocios }: { negocios: Negocio[] }) {
                       className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-blue-50 text-blue-600 hover:bg-blue-100 transition"
                     >
                       Editar
+                    </button>
+                    <button
+                      onClick={() => handleRenovar(n.id)}
+                      className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-50 text-emerald-600 hover:bg-emerald-100 transition"
+                    >
+                      Renovar
                     </button>
                     <button
                       onClick={() => handleDelete(n.id)}

@@ -11,6 +11,7 @@ import { AuthProvider } from '@/src/context/AuthContext';
 import { AccentProvider } from '@/src/context/AccentContext';
 import { useSync } from '@/src/hooks/useSync';
 import OfflineBanner from '@/src/components/OfflineBanner';
+import SuscripcionGate from '@/src/components/SuscripcionGate';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -54,6 +55,7 @@ function RootLayoutNav() {
             <SyncInit />
             <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
             <OfflineBanner />
+            <SuscripcionGate />
             <Stack screenOptions={{ headerShown: false }}>
               <Stack.Screen name="index" />
               <Stack.Screen name="tutorial" />

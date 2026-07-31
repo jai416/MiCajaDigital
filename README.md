@@ -23,6 +23,7 @@ App móvil para **control de ventas, gastos, inventario y deudores** para peque�
 | ☁️ Sincronización automática | Cada 5 min + al abrir la app, bidireccional con Supabase |
 | 📤 Backup manual | Botón "Respaldar ahora" en Ajustes |
 | 📤 Exportar CSV | Exportar ventas, gastos o catálogo a CSV para Excel/Sheets |
+| 🎁 Prueba de 15 días | Nuevo negocio en prueba gratis; al vencer, aviso para renovar por WhatsApp/Telegram ($15 USD/mes) |
 
 ## Requisitos
 
@@ -61,11 +62,28 @@ npx eas build -p android --profile preview
 
 ## Panel Admin (Next.js)
 
+El panel admin es un proyecto Next.js independiente en `admin/` (con su propio `package.json`
+y `.env.local`). Puede desplegarse aparte del proyecto principal.
+
 ```bash
 cd admin
-npm install
+NODE_TLS_REJECT_UNAUTHORIZED=0 npm install
 npm run dev
 ```
+
+El panel admin permite **gestionar suscripciones**: activar/desactivar un negocio,
+editar plan y fecha de expiración, o **Renovar** (activo + expiración = hoy + N días)
+en `admin/app/dashboard/negocios/`. Incluye búsqueda por email/nombre y filtros.
+
+### Desplegarlo aparte (para usarlo desde internet/móvil)
+
+- **Vercel** (recomendado): importa el repo y pon `Root Directory = admin`. Las variables
+  de entorno van en Vercel (Supabase URL, anon key, service_role key, ADMIN_EMAIL/ADMIN_PASSWORD).
+- **Railway / Render / Fly.io**: `cd admin && npm run build && npm start`.
+- Es una **PWA**: al abrirlo en Chrome (Android) o Safari (iOS), el navegador ofrece
+  «Instalar aplicación» para tenerlo como app en el móvil.
+- **Health check**: `GET /api/health` o la página `Estado` (menú 🩺) del dashboard
+  verifica env vars + conexión a Supabase.
 
 ## Tecnologías
 

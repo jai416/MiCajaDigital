@@ -1,8 +1,14 @@
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react';
+import { AppState, type AppStateStatus } from 'react-native';
 import { supabase } from '@/src/services/supabase';
 import { useSQLiteContext } from 'expo-sqlite';
 import { type Session, type User } from '@supabase/supabase-js';
 import { setSecureValue, SECURE_KEYS } from '@/src/utils/storage';
+import {
+  calcularEstadoSuscripcion,
+  DIAS_PRUEBA,
+  type EstadoSuscripcion,
+} from '@/src/utils/suscripcion';
 
 interface AuthState {
   user: User | null;
@@ -15,6 +21,9 @@ interface AuthContextType extends AuthState {
   login: (email: string, password: string) => Promise<string | null>;
   register: (email: string, password: string, nombre: string) => Promise<string | null>;
   logout: () => Promise<void>;
+  estadoSuscripcion: EstadoSuscripcion;
+  diasRestantes: number;
+  recheckSuscripcion: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -25,6 +34,9 @@ const AuthContext = createContext<AuthContextType>({
   login: async () => null,
   register: async () => null,
   logout: async () => undefined,
+  estadoSuscripcion: 'activo',
+  diasRestantes: DIAS_PRUEBA,
+  recheckSuscripcion: async () => undefined,
 });
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -35,6 +47,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     loading: true,
     negocioNombre: '',
   });
+  const [estadoSuscripcion, setEstadoSuscripcion] = useState<EstadoSuscripcion>('activo');
+  const [diasRestantes, setDiasRestantes] = useState(DIAS_PRUEBA);
+
+  const verificarSuscripcion = useCallback(async (userId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('negocios')
+        .select('activo, fecha_registro, fecha_expiracion')
+        .eq('id', userId)
+        .single();
+
+      if (error) {
+        throw error;
+      }
+
+      const calculado = calcularEstadoSuscripcion(data);
+      setEstadoSuscripcion(calculado.estado);
+      setDiasRestantes(calculado.diasRestantes);
+    } catch (e) {
+      console.error('Error al verificar suscripción:', e);
+      setEstadoSuscripcion('error');
+    }
+  }, []);
+
+  const recheckSuscripcion = useCallback(async () => {
+    if (state.user) {
+      await verificarSuscripcion(state.user.id);
+    }
+  }, [state.user, verificarSuscripcion]);
 
   const guardarUserId = useCallback(async (userId: string) => {
     try {
@@ -72,11 +113,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }));
       if (session?.user) {
         guardarUserId(session.user.id);
+        verificarSuscripcion(session.user.id);
       }
     });
 
     return () => listener.subscription.unsubscribe();
-  }, [db, guardarUserId]);
+  }, [db, guardarUserId, verificarSuscripcion]);
+
+  useEffect(() => {
+    if (state.user) {
+      verificarSuscripcion(state.user.id);
+    }
+  }, [state.user, verificarSuscripcion]);
+
+  useEffect(() => {
+    const alVolver = (estado: AppStateStatus) => {
+      if (estado === 'active' && state.user) {
+        verificarSuscripcion(state.user.id);
+      }
+    };
+    const sub = AppState.addEventListener('change', alVolver);
+    return () => sub.remove();
+  }, [state.user, verificarSuscripcion]);
 
   const login = async (email: string, password: string): Promise<string | null> => {
     try {
@@ -111,10 +169,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           id: data.user.id,
           email,
           nombre_negocio: nombre,
-          activo: true,
+          activo: false,
           plan: 'gratis',
           fecha_registro: new Date().toISOString(),
-          fecha_expiracion: new Date(Date.now() + 15 * 86400000).toISOString(),
+          fecha_expiracion: new Date(Date.now() + DIAS_PRUEBA * 86400000).toISOString(),
         });
         if (dbError) { /* error silencioso */ }
       }
@@ -141,7 +199,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ ...state, login, register, logout }}>
+    <AuthContext.Provider
+      value={{
+        ...state,
+        login,
+        register,
+        logout,
+        estadoSuscripcion,
+        diasRestantes,
+        recheckSuscripcion,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );

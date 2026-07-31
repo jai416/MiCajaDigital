@@ -149,6 +149,32 @@ SIN `sincronizado` (es local-only — Supabase usa `updated_at` para sync). Colu
 - RLS policies en cada tabla (SELECT/INSERT/UPDATE/DELETE por `user_id = auth.uid()`)
 - Migraciones seguras con `DO $$ BEGIN ... EXCEPTION WHEN duplicate_column THEN NULL; END; $$;`
 
+## Suscripción (plan + expiración)
+
+- **Tabla** `negocios`: `activo BOOLEAN DEFAULT false`, `plan TEXT DEFAULT 'gratis'`,
+  `fecha_registro TIMESTAMPTZ DEFAULT NOW()`, `fecha_expiracion TIMESTAMPTZ DEFAULT (NOW() + INTERVAL '15 days')`.
+  El registro crea la fila con `activo: false` → **prueba gratis de 15 días** desde `fecha_registro`.
+- **Estados** (calculados en `AuthContext` → `estadoSuscripcion`):
+  - `activo`: `activo = true` y `fecha_expiracion` en el futuro → acceso completo
+  - `prueba`: `activo = false` y ≤15 días desde `fecha_registro` → banner «Te quedan X días de prueba»
+  - `expirado`: `activo = true` con expiración pasada, o `activo = false` con >15 días → modal bloqueante
+  - `error`: fallo de red al verificar → NO bloquear (fail-open)
+- **Verificación**: al abrir la app (`AuthContext` hace `SELECT activo, fecha_registro, fecha_expiracion
+  FROM negocios WHERE id = user.id`), al iniciar sesión y al volver a primer plano (AppState 'active').
+- **UI**: `src/components/SuscripcionGate.tsx` (montado en `app/_layout.tsx` tras OfflineBanner).
+  Modal bloqueante: WhatsApp `https://wa.me/5351819744`, Telegram `https://t.me/+5351819744`, **$15 USD/mes**,
+  botón «Ya renové» → `recheckSuscripcion()`.
+- **Panel admin** (`admin/app/dashboard/negocios/NegociosTable.tsx`): toggle Activar/Desactivar,
+  Editar (plan + fecha expiración) y **Renovar** (prompt días → `activo: true` + `fecha_expiracion = hoy + N días`).
+  PATCH vía `admin/app/api/negocios/route.ts` (service_role key, server-side).
+  Ya tiene búsqueda por email/nombre y filtros (todos/activos/inactivos/en prueba).
+- **Health check**: `GET /api/health` (admin) verifica env vars + conexión Supabase y devuelve
+  `{ status, timestamp, checks }`. Página visible en `admin/app/dashboard/health/page.tsx` (menú «Estado»).
+- **PWA admin**: el panel es instalable en el móvil. `admin/public/manifest.webmanifest`,
+  `admin/public/sw.js` (cache-first para GET, excluye `/api/`), iconos en `admin/public/icons/`
+  (generados desde `assets/images/icon.png`), registro vía `admin/components/RegisterSW.tsx`.
+  Metadata en `admin/app/layout.tsx` (manifest, appleWebApp, themeColor).
+
 ## Archivos Clave
 
 | Archivo | Propósito |
@@ -159,7 +185,8 @@ SIN `sincronizado` (es local-only — Supabase usa `updated_at` para sync). Colu
 | `src/services/analytics.ts` | Registro de eventos en tabla `analytics_events` |
 | `src/services/backup.ts` | Backup automático CSV cada 12h (expo-background-task) |
 | `src/services/logger.ts` | Logs locales (app.log) + envío por WhatsApp |
-| `src/context/AuthContext.tsx` | AuthProvider con login/register/logout + persistencia en app_config |
+| `src/context/AuthContext.tsx` | AuthProvider con login/register/logout + `estadoSuscripcion` (activo/prueba/expirado) |
+| `src/components/SuscripcionGate.tsx` | Modal bloqueante de expiración + banner de días de prueba |
 | `src/context/AccentContext.tsx` | Colores de acento personalizables (persistidos en app_config) |
 | `src/components/SwipeableRow.tsx` | Componente swipeable (ReanimatedSwipeable) |
 | `src/theme/colors.ts` | Paleta light/dark |
