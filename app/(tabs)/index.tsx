@@ -278,7 +278,7 @@ export default function VentasScreen() {
                   <Text style={{ color: c.textSecondary, marginBottom: 12 }}>{busqueda.trim() ? 'Sin resultados' : 'Catálogo vacío'}</Text>
                   <Pressable style={[styles.btnQuickAdd, { borderColor: c.primary }]}
                     onPress={() => { setQuickNombre(busqueda); setQuickPrecio(''); setShowQuickAdd(true); }}>
-                    <Text style={{ color: c.primary, fontWeight: '700' }}>➕ Agregar "{busqueda || 'nuevo'}"</Text>
+                    <Text style={{ color: c.primary, fontWeight: '700' }}>➕ Agregar «{busqueda || 'nuevo'}»</Text>
                   </Pressable>
                 </View>
               }

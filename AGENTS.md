@@ -64,6 +64,22 @@ Los tests viven en `__tests__/`. Mocks manuales para `expo-sqlite`, `expo-secure
 `@supabase/supabase-js`, `expo-file-system` y `expo-image-manipulator`.
 `npm run typecheck` (tsc) excluye `admin/` y `__tests__/`.
 
+### Lint y calidad
+- ESLint 9 (flat config) en `eslint.config.js` basado en `eslint-config-expo/flat`.
+  Reglas propias: `@typescript-eslint/no-unused-vars: error`, `react-hooks/exhaustive-deps: error`,
+  `no-console: warn`, `no-empty-function: error`.
+  Desactivadas por falsos positivos: `react-hooks/refs`, `react-hooks/set-state-in-effect`,
+  `react-hooks/preserve-manual-memoization` (patrón canónico RN `useRef(new Animated.Value(0)).current`).
+- Correr: `npm run lint` (eslint src/ app/) y `npm run check` (tsc + eslint + jest).
+- El workflow `.github/workflows/build.yml` ejecuta `typecheck`, `lint` y `test` antes de compilar el APK.
+
+### Logging
+- `src/services/logger.ts`: escribe logs a `documentDirectory/logs/app.log` (acotado a 200k chars).
+- `logError(contexto, error, detalle?)` / `logInfo(contexto, mensaje)`.
+- `enviarLogsWhatsApp()`: envía por WhatsApp (si es corto) o comparte el archivo (expo-sharing).
+- Botón en Ajustes → «Enviar registros de errores». El sync ya registra errores vía `logError`.
+- `expo-sharing` está incluido en `transformIgnorePatterns` de jest.config.js.
+
 ### Pantallas (app/ exports default)
 ```
 app/_layout.tsx        → Root: SQLiteProvider + AuthProvider + GestureHandlerRootView
@@ -142,6 +158,7 @@ SIN `sincronizado` (es local-only — Supabase usa `updated_at` para sync). Colu
 | `src/hooks/useSync.ts` | Hook que dispara sync cada 5 min + AppState (InteractionManager) |
 | `src/services/analytics.ts` | Registro de eventos en tabla `analytics_events` |
 | `src/services/backup.ts` | Backup automático CSV cada 12h (expo-background-task) |
+| `src/services/logger.ts` | Logs locales (app.log) + envío por WhatsApp |
 | `src/context/AuthContext.tsx` | AuthProvider con login/register/logout + persistencia en app_config |
 | `src/context/AccentContext.tsx` | Colores de acento personalizables (persistidos en app_config) |
 | `src/components/SwipeableRow.tsx` | Componente swipeable (ReanimatedSwipeable) |
@@ -191,6 +208,7 @@ npx expo install nombre-paquete
 ## Observaciones
 
 - npm registry tiene certificados CA rotos en la máquina de desarrollo → usar `NODE_TLS_REJECT_UNAUTHORIZED=0`
+- El logo usa diseño «círculo verde #059669 + moneda/billete blanco» (assets en `assets/images/`), nombre de la app + slogan «Tu negocio al día» en la splash. Guía para clientas: `docs/GUIA_USUARIO.md`
 - `react-native-gesture-handler` v3.1.0: `Swipeable` se importa como `import ReanimatedSwipeable from 'react-native-gesture-handler/ReanimatedSwipeable'`
 - El sync es **unidireccional local→cloud** para datos nuevos, **bidireccional** para actualizaciones (last-write-wins por timestamp)
 - Service_role key NUNCA debe estar en el bundle mobile — solo en admin/ (server-side)

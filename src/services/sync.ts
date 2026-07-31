@@ -3,6 +3,7 @@ import * as FileSystem from 'expo-file-system';
 import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
 import { supabase } from './supabase';
 import { generarUUID } from '@/src/utils/uuid';
+import { logError } from '@/src/services/logger';
 
 type SQLiteRow = Record<string, string | number | null | boolean | Uint8Array>;
 
@@ -399,10 +400,11 @@ export async function syncToSupabase(db: SQLiteDatabase) {
       'INSERT INTO sync_log (id, user_id, timestamp, ventas, gastos, catalogo, compras, error) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
       [generarUUID(), userId, syncStart, ventasCount, gastosCount, catalogoCount, comprasCount, null]
     );
-  } catch { /* si falla el log no detiene el sync */ }
+    } catch { /* si falla el log no detiene el sync */ }
 
   return { ventas: ventasCount, gastos: gastosCount, catalogo: catalogoCount, compras: comprasCount };
   } catch (e) {
+    await logError('sync', e, `userId=${userId}`);
     try {
       await db.runAsync(
         'INSERT INTO sync_log (id, user_id, timestamp, ventas, gastos, catalogo, compras, error) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',

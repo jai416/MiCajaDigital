@@ -6,7 +6,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
 import { useColorScheme } from '@/components/useColorScheme';
-import { colors } from '@/src/theme/colors';
 import { ACCENT_COLORS } from '@/src/theme/accents';
 import { useAccentColors } from '@/src/context/AccentContext';
 import { useAuth } from '@/src/context/AuthContext';
@@ -16,6 +15,7 @@ import { useSync } from '@/src/hooks/useSync';
 import { useExport } from '@/src/hooks/useExport';
 import { useVentas } from '@/src/hooks/useVentas';
 import { registrarBackupAutomatico, desregistrarBackupAutomatico, estadoBackupAutomatico } from '@/src/services/backup';
+import { enviarLogsWhatsApp } from '@/src/services/logger';
 
 export default function AjustesScreen() {
   const scheme = useColorScheme();
@@ -29,6 +29,7 @@ export default function AjustesScreen() {
   const { exportTable, exportTodo, exportToPDF, exporting } = useExport();
   const { getCuadre } = useVentas();
   const [compartiendo, setCompartiendo] = useState(false);
+  const [enviandoLogs, setEnviandoLogs] = useState(false);
 
   // Time picker state
   const [notifHora, setNotifHora] = useState(20);
@@ -366,6 +367,19 @@ export default function AjustesScreen() {
         <Pressable style={[styles.botonAccion, { backgroundColor: '#25D366', opacity: compartiendo ? 0.6 : 1 }]}
           onPress={compartirResumen} disabled={compartiendo}>
           <Text style={styles.botonTextoBlanco}>{compartiendo ? 'Obteniendo datos...' : '📊 Compartir resumen del día'}</Text>
+        </Pressable>
+      </View>
+
+      {/* Soporte: enviar logs */}
+      <View style={[styles.card, { backgroundColor: c.surface, borderColor: c.border }]}>
+        <Text style={[styles.cardTitle, { color: c.text }]}>🛠️ Soporte técnico</Text>
+        <Text style={[styles.cardText, { color: c.textSecondary, marginBottom: 10 }]}>
+          Si algo falla, envía los registros de errores a tu técnico o soporte por WhatsApp
+        </Text>
+        <Pressable style={[styles.botonAccion, { backgroundColor: c.primary, opacity: enviandoLogs ? 0.6 : 1 }]}
+          onPress={async () => { setEnviandoLogs(true); await enviarLogsWhatsApp(); setEnviandoLogs(false); }}
+          disabled={enviandoLogs}>
+          <Text style={styles.botonTextoBlanco}>{enviandoLogs ? 'Preparando...' : '📋 Enviar registros de errores'}</Text>
         </Pressable>
       </View>
 

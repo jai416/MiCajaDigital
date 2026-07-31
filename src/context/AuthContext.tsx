@@ -24,7 +24,7 @@ const AuthContext = createContext<AuthContextType>({
   negocioNombre: '',
   login: async () => null,
   register: async () => null,
-  logout: async () => {},
+  logout: async () => undefined,
 });
 
 export function AuthProvider({ children }: { children: ReactNode }) {

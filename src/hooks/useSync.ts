@@ -24,7 +24,7 @@ export function useSync() {
 
     setSyncing(true);
     try {
-      const result = await syncToSupabase(db);
+      await syncToSupabase(db);
       lastSyncTimeRef.current = Date.now();
       setLastSync(new Date());
       return true;

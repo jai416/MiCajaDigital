@@ -3,7 +3,6 @@ import { useCallback, useState } from 'react';
 import { type Gasto } from '@/src/types';
 import { generarUUID } from '@/src/utils/uuid';
 import { useAuth } from '@/src/context/AuthContext';
-import { Alert } from 'react-native';
 import { registrarEvento } from '@/src/services/analytics';
 import { LISTA_LIMITE } from '@/src/constants';
 

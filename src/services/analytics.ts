@@ -14,7 +14,7 @@ export function registrarEvento(db: ReturnType<typeof useSQLiteContext>, userId:
       `INSERT OR REPLACE INTO analytics_events (id, user_id, nombre, valor, timestamp)
        VALUES (?, ?, ?, ?, ?)`,
       [generarUUID(), userId, nombre, valor ?? '', new Date().toISOString()]
-    ).catch(() => {});
+    ).catch(() => undefined);
   } catch {}
 }
 

@@ -1,9 +1,8 @@
-import { useLocalSearchParams, router } from 'expo-router';
+import { useLocalSearchParams, useFocusEffect, router } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
 import { useCallback, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useFocusEffect } from 'expo-router';
 import { useAccentColors } from '@/src/context/AccentContext';
 import { useAuth } from '@/src/context/AuthContext';
 

@@ -17,7 +17,7 @@ import { parseNumero } from '@/src/utils/numero';
 export default function CatalogoScreen() {
   const { theme: c } = useAccentColors();
   const insets = useSafeAreaInsets();
-  const { getAll, getCategorias, buscarPorCategoria, addProducto, updateProducto, deleteProducto, loading } = useCatalogo();
+  const { getAll, getCategorias, buscarPorCategoria, addProducto, updateProducto, deleteProducto } = useCatalogo();
   const { getAll: getCompras, addCompra, deleteCompra } = useCompras();
   const [items, setItems] = useState<CatalogoItem[]>([]);
   const [categorias, setCategorias] = useState<string[]>([]);

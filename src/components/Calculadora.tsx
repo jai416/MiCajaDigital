@@ -65,7 +65,7 @@ export default function Calculadora({ visible, onClose, onResult }: { visible: b
   return (
     <Modal visible={visible} transparent animationType="fade">
       <Pressable style={styles.overlay} onPress={onClose}>
-        <Pressable style={[styles.container, { backgroundColor: c.surface }]} onPress={() => {}}>
+        <Pressable style={[styles.container, { backgroundColor: c.surface }]} onPress={() => undefined}>
           <Text style={[styles.display, { color: c.text, backgroundColor: c.background }]}>{display}</Text>
           {BOTONES.map((fila, i) => (
             <View key={i} style={styles.fila}>

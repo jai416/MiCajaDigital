@@ -30,7 +30,7 @@ function rowsToCSV(rows: Record<string, unknown>[]): string {
 export async function hacerBackup(db: SQLiteDatabase, userId: string): Promise<boolean> {
   try {
     const dir = FileSystem.documentDirectory + 'backups/';
-    await FileSystem.makeDirectoryAsync(dir, { intermediates: true }).catch(() => {});
+    await FileSystem.makeDirectoryAsync(dir, { intermediates: true }).catch(() => undefined);
     const fecha = new Date().toISOString().slice(0, 10);
     let count = 0;
     for (const tabla of TABLAS) {

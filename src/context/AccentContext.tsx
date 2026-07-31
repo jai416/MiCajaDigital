@@ -15,7 +15,7 @@ const AccentContext = createContext<AccentContextValue>({
   theme: colors.light,
   primary: '#059669',
   accent: null,
-  setAccentColor: async () => {},
+  setAccentColor: async () => undefined,
 });
 
 export function AccentProvider({ children }: { children: ReactNode }) {

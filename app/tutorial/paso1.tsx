@@ -13,8 +13,8 @@ export default function PasoUno() {
         <Text style={styles.emojiGrande}>💲</Text>
         <Text style={[styles.titulo, { color: c.text }]}>Vende en 1 Toque</Text>
         <Text style={[styles.desc, { color: c.textSecondary }]}>
-          Escribe el producto, el precio y el cliente. Elige si es "Contado" o "Fiado".
-          Presiona "Vender" y listo. La venta se guarda automáticamente.
+          Escribe el producto, el precio y el cliente. Elige si es «Contado» o «Fiado».
+          Presiona «Vender» y listo. La venta se guarda automáticamente.
         </Text>
         <View style={styles.puntos}>
           <View style={[styles.punto, { backgroundColor: c.primary }]} />
