@@ -1,0 +1,9 @@
+diff --git a/node_modules/expo-sqlite/android/shouldUsePublication.groovy b/node_modules/expo-sqlite/android/shouldUsePublication.groovy
+--- a/node_modules/expo-sqlite/android/shouldUsePublication.groovy
++++ b/node_modules/expo-sqlite/android/shouldUsePublication.groovy
+@@ -3,4 +3,4 @@
+   "expo.sqlite.useLibSQL",
+   "expo.sqlite.enableFTS",
+   "expo.sqlite.customBuildFlags",
+-].any { settings.providers.gradleProperty(it).isPresent() }
++].any { providers.gradleProperty(it).isPresent() }
