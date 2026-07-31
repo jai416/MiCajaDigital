@@ -7,19 +7,19 @@ import { logError } from '@/src/services/logger';
 
 type SQLiteRow = Record<string, string | number | null | boolean | Uint8Array>;
 
-async function compressImage(uri: string): Promise<string> {
+async function compressImage(uri: string, maxWidth: number): Promise<string> {
   try {
-    const result = await manipulateAsync(uri, [{ resize: { width: 1024 } }], { compress: 0.7, format: SaveFormat.JPEG });
+    const result = await manipulateAsync(uri, [{ resize: { width: maxWidth } }], { compress: 0.7, format: SaveFormat.JPEG });
     return result.uri;
   } catch {
     return uri;
   }
 }
 
-async function uploadPhotoToStorage(uri: string, userId: string, prefix: string): Promise<string> {
+async function uploadPhotoToStorage(uri: string, userId: string, prefix: string, maxWidth = 1024): Promise<string> {
   if (!uri || uri.startsWith('http')) return uri;
   try {
-    const compressedUri = await compressImage(uri);
+    const compressedUri = await compressImage(uri, maxWidth);
     const base64 = await FileSystem.readAsStringAsync(compressedUri, { encoding: FileSystem.EncodingType.Base64 });
     const ext = uri.split('.').pop()?.toLowerCase() || 'jpg';
     const fileName = `${prefix}/${userId}/${Date.now()}.${ext}`;
@@ -285,7 +285,7 @@ export async function syncToSupabase(db: SQLiteDatabase) {
 
   for (const c of unsyncedCatalogo) {
     const fotoUrl = typeof c.foto === 'string' && c.foto && !c.foto.startsWith('http')
-      ? await uploadPhotoToStorage(c.foto, userId, 'catalogo')
+      ? await uploadPhotoToStorage(c.foto, userId, 'catalogo', 200)
       : (c.foto ?? '');
       const { error } = await supabase.from('catalogo').upsert(
         {

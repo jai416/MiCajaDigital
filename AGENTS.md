@@ -176,6 +176,23 @@ SIN `sincronizado` (es local-only — Supabase usa `updated_at` para sync). Colu
 - Límites: `LISTA_LIMITE = 200`, `DEUDORES_LIMITE = 100`, `BUSCAR_LIMIT = 20` en `src/constants.ts`
 - `getVentasDelDia`, `getDeudores`, `getGastosDelDia`, `getGastosTodos`, `getVentasEnRango`,
   `getGastosEnRango` usan `LIMIT` para evitar escaneos completos
+- **FlatList**: todas las listas usan `initialNumToRender`, `maxToRenderPerBatch`,
+  `windowSize={10}` y `removeClippedSubviews`; clientes/pedidos además `getItemLayout`.
+  Los items de lista son componentes `React.memo` (DeudorCard, PedidoCard, CatalogoCard, CatalogoRow)
+- **AccentContext**: `theme` y el value del context están memoizados (`useMemo`/`useCallback`)
+  para que `React.memo` en items de lista funcione (antes `theme` se recreaba en cada render)
+- **Cargas de pantalla**: `useFocusEffect` envuelve la carga en `InteractionManager.runAfterInteractions`
+  (cuadre, reportes, catalogo, clientes, pedidos) para no bloquear la UI
+- **Sync**: `useSync` ya difiere con `InteractionManager` (intervalo 5 min + AppState 'active')
+- **Imágenes**: fotos de catálogo se comprimen a 200px de ancho al subir a Supabase
+  (`uploadPhotoToStorage(..., 200)` en `sync.ts`); recibos de gastos a 1024px.
+  `expo-image` se usa en todas las pantallas con `cachePolicy="memory-disk"`
+- **Monitoreo**: `src/utils/perf.ts` mide tiempos de carga con `react-native-performance`
+  (`perfStart`/`perfEnd`, log en dev vía console.warn)
+- **APK release**: `app.json` → `jsEngine: hermes`, `enableProguardInReleaseBuilds: true`,
+  `enableShrinkResourcesInReleaseBuilds: true`. Workflow compila `assembleRelease`.
+  Se eliminaron deps sin uso: `expo-symbols`, `expo-web-browser`
+- **Memorización de pantalla**: en reportes los totales/top productos usan `useMemo`
 
 ## Tareas Comunes
 

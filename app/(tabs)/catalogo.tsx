@@ -1,7 +1,7 @@
-import { useCallback, useState } from 'react';
+import { memo, useCallback, useState } from 'react';
 import { Image } from 'expo-image';
 import {
-  Alert, FlatList, Linking, Modal, Pressable, RefreshControl,
+  Alert, FlatList, InteractionManager, Linking, Modal, Pressable, RefreshControl,
   ScrollView, StyleSheet, Text, TextInput, View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -13,6 +13,7 @@ import { useCompras } from '@/src/hooks/useCompras';
 import { type CatalogoItem, type Compra } from '@/src/types';
 import BarcodeScanner from '@/src/components/BarcodeScanner';
 import { parseNumero } from '@/src/utils/numero';
+import { perfStart, perfEnd } from '@/src/utils/perf';
 
 export default function CatalogoScreen() {
   const { theme: c } = useAccentColors();
@@ -47,9 +48,14 @@ export default function CatalogoScreen() {
   const [compraProv, setCompraProv] = useState('');
 
   const load = useCallback(async () => {
-    setFinAlcanzado(false);
-    setItems(await getAll(PAGE_SIZE, 0));
-    setCategorias(await getCategorias());
+    perfStart('cargar_catalogo');
+    try {
+      setFinAlcanzado(false);
+      setItems(await getAll(PAGE_SIZE, 0));
+      setCategorias(await getCategorias());
+    } finally {
+      perfEnd('cargar_catalogo');
+    }
   }, [getAll, getCategorias]);
 
   const cargarMas = useCallback(async () => {
@@ -64,7 +70,10 @@ export default function CatalogoScreen() {
     }
   }, [getAll, paginando, finAlcanzado, items.length]);
 
-  useFocusEffect(useCallback(() => { load(); }, [load]));
+  useFocusEffect(useCallback(() => {
+    const task = InteractionManager.runAfterInteractions(() => { load(); });
+    return () => task.cancel();
+  }, [load]));
 
   const onRefresh = async () => {
     setRefreshing(true); await load(); setRefreshing(false);
@@ -143,12 +152,28 @@ export default function CatalogoScreen() {
     setCompras(await getCompras());
   };
 
+  const handleDelete = useCallback(async (id: string) => {
+    try { await deleteProducto(id); } catch { Alert.alert('Error', 'No se pudo eliminar.'); }
+    load();
+  }, [deleteProducto, load]);
+
+  const handleCompartir = useCallback((item: CatalogoItem) => {
+    const txt = `🛍️ ${item.nombre}\n💰 ${item.precio.toFixed(2)}${item.descripcion ? `\n📝 ${item.descripcion}` : ''}\n🔗 micajadigital://producto/${item.id}`;
+    Linking.openURL(`https://wa.me/?text=${encodeURIComponent(txt)}`).catch(() =>
+      Alert.alert('Error', 'No se pudo abrir WhatsApp.')
+    );
+  }, []);
+
   return (
     <View style={[styles.flex, { backgroundColor: c.background }]}>
       <FlatList
         contentContainerStyle={[styles.container, { paddingTop: insets.top + 16 }]}
         data={items}
         keyExtractor={(item) => item.id}
+        initialNumToRender={10}
+        maxToRenderPerBatch={10}
+        windowSize={10}
+        removeClippedSubviews={true}
         onEndReachedThreshold={0.4}
         onEndReached={!categoriaFiltro ? cargarMas : undefined}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
@@ -186,44 +211,7 @@ export default function CatalogoScreen() {
           </View>
         }
         renderItem={({ item }) => (
-          <View style={[styles.card, { backgroundColor: c.surface, borderColor: c.border }]}>
-            <View style={styles.cardHeader}>
-              <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                {item.foto ? (
-                  <Image source={{ uri: item.foto }} style={styles.fotoMini} cachePolicy="memory-disk" />
-                ) : null}
-                <Text style={[styles.nombre, { color: c.text, flex: 1 }]}>{item.nombre}</Text>
-              </View>
-              <View style={styles.cardActions}>
-                <Pressable onPress={() => openEdit(item)}><Text style={[styles.actionBtn, { color: c.primary }]}>✏️</Text></Pressable>
-                <Pressable onPress={() => {
-                  const txt = `🛍️ ${item.nombre}\n💰 ${item.precio.toFixed(2)}${item.descripcion ? `\n📝 ${item.descripcion}` : ''}\n🔗 micajadigital://producto/${item.id}`;
-                  Linking.openURL(`https://wa.me/?text=${encodeURIComponent(txt)}`).catch(() =>
-                    Alert.alert('Error', 'No se pudo abrir WhatsApp.')
-                  );
-                }}><Text style={[styles.actionBtn, { color: '#25D366' }]}>📤</Text></Pressable>
-                <Pressable onPress={() => {
-                  Alert.alert('Eliminar', '¿Eliminar este producto?', [
-                    { text: 'Cancelar', style: 'cancel' },
-                    { text: 'Eliminar', style: 'destructive', onPress: async () => {
-                      try { await deleteProducto(item.id); } catch { Alert.alert('Error', 'No se pudo eliminar.'); }
-                      load();
-                    } },
-                  ]);
-                }}><Text style={styles.actionBtn}>🗑️</Text></Pressable>
-              </View>
-            </View>
-            {item.categoria ? (
-              <Text style={[styles.categoriaTag, { backgroundColor: c.primaryLight, color: c.primary }]}>{item.categoria}</Text>
-            ) : null}
-            <Text style={[styles.detalle, { color: c.textSecondary }]}>${item.precio.toFixed(2)}</Text>
-            {item.descripcion ? (
-              <Text style={[styles.detalle, { color: c.textSecondary, marginTop: 2 }]} numberOfLines={2}>{item.descripcion}</Text>
-            ) : null}
-            <Text style={[styles.stock, { color: item.stock < 5 ? c.danger : c.textSecondary }]}>
-              Stock: {item.stock} {item.stock === 0 ? '❌' : item.stock < 5 ? '⚠️' : '✅'}
-            </Text>
-          </View>
+          <CatalogoCard item={item} c={c} onEdit={openEdit} onDelete={handleDelete} onCompartir={handleCompartir} />
         )}
       />
 
@@ -297,6 +285,9 @@ export default function CatalogoScreen() {
               <Text style={styles.botonAgregarTexto}>+ Nueva Compra</Text>
             </Pressable>
             <FlatList data={compras} keyExtractor={(item) => item.id}
+              initialNumToRender={10}
+              maxToRenderPerBatch={10}
+              windowSize={10}
               onEndReachedThreshold={0.4}
               onEndReached={() => {
                 if (paginandoCompras || compras.length < PAGE_SIZE) return;
@@ -360,6 +351,51 @@ export default function CatalogoScreen() {
     </View>
   );
 }
+
+const CatalogoCard = memo(function CatalogoCard({
+  item, c, onEdit, onDelete, onCompartir,
+}: {
+  item: CatalogoItem;
+  c: ReturnType<typeof useAccentColors>['theme'];
+  onEdit: (item: CatalogoItem) => void;
+  onDelete: (id: string) => void;
+  onCompartir: (item: CatalogoItem) => void;
+}) {
+  const eliminar = () => {
+    Alert.alert('Eliminar', '¿Eliminar este producto?', [
+      { text: 'Cancelar', style: 'cancel' },
+      { text: 'Eliminar', style: 'destructive', onPress: () => onDelete(item.id) },
+    ]);
+  };
+
+  return (
+    <View style={[styles.card, { backgroundColor: c.surface, borderColor: c.border }]}>
+      <View style={styles.cardHeader}>
+        <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+          {item.foto ? (
+            <Image source={{ uri: item.foto }} style={styles.fotoMini} cachePolicy="memory-disk" />
+          ) : null}
+          <Text style={[styles.nombre, { color: c.text, flex: 1 }]}>{item.nombre}</Text>
+        </View>
+        <View style={styles.cardActions}>
+          <Pressable onPress={() => onEdit(item)}><Text style={[styles.actionBtn, { color: c.primary }]}>✏️</Text></Pressable>
+          <Pressable onPress={() => onCompartir(item)}><Text style={[styles.actionBtn, { color: '#25D366' }]}>📤</Text></Pressable>
+          <Pressable onPress={eliminar}><Text style={styles.actionBtn}>🗑️</Text></Pressable>
+        </View>
+      </View>
+      {item.categoria ? (
+        <Text style={[styles.categoriaTag, { backgroundColor: c.primaryLight, color: c.primary }]}>{item.categoria}</Text>
+      ) : null}
+      <Text style={[styles.detalle, { color: c.textSecondary }]}>${item.precio.toFixed(2)}</Text>
+      {item.descripcion ? (
+        <Text style={[styles.detalle, { color: c.textSecondary, marginTop: 2 }]} numberOfLines={2}>{item.descripcion}</Text>
+      ) : null}
+      <Text style={[styles.stock, { color: item.stock < 5 ? c.danger : c.textSecondary }]}>
+        Stock: {item.stock} {item.stock === 0 ? '❌' : item.stock < 5 ? '⚠️' : '✅'}
+      </Text>
+    </View>
+  );
+});
 
 const styles = StyleSheet.create({
   flex: { flex: 1 },

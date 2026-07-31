@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useSQLiteContext } from 'expo-sqlite';
 import { useColorScheme } from '@/components/useColorScheme';
 import { colors, type ThemeColors } from '@/src/theme/colors';
@@ -36,7 +36,7 @@ export function AccentProvider({ children }: { children: ReactNode }) {
     })();
   }, [db]);
 
-  const setAccentColor = async (key: AccentKey) => {
+  const setAccentColor = useCallback(async (key: AccentKey) => {
     try {
       await db.runAsync(
         "INSERT OR REPLACE INTO app_config (clave, valor) VALUES ('accent_color', ?)",
@@ -44,14 +44,19 @@ export function AccentProvider({ children }: { children: ReactNode }) {
       );
       setAccent(key);
     } catch { /* error silencioso */ }
-  };
+  }, [db]);
 
   const base = dark ? colors.dark : colors.light;
   const primary = accentColorFor(accent, dark);
-  const theme: ThemeColors = { ...base, primary };
+  const theme = useMemo(() => ({ ...base, primary }), [base, primary]);
+
+  const value = useMemo(
+    () => ({ theme, primary, accent, setAccentColor }),
+    [theme, primary, accent, setAccentColor]
+  );
 
   return (
-    <AccentContext.Provider value={{ theme, primary, accent, setAccentColor }}>
+    <AccentContext.Provider value={value}>
       {children}
     </AccentContext.Provider>
   );

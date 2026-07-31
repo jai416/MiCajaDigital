@@ -18,8 +18,10 @@ jobs:
           cache: npm
           
       - name: Install dependencies
-        run: npm install
-        
+        run: npm ci --legacy-peer-deps
+        env:
+          NODE_TLS_REJECT_UNAUTHORIZED: "0"
+
       - name: TypeScript check
         run: npm run typecheck
 
@@ -35,11 +37,14 @@ jobs:
       - name: Prebuild Android
         run: npx expo prebuild --platform android
         
-      - name: Build APK
-        run: cd android && ./gradlew assembleDebug
+      - name: Build APK (Release, minificado)
+        run: |
+          cd android
+          ./gradlew assembleRelease
+          ls -lh app/build/outputs/apk/release/
         
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: app-debug
-          path: android/app/build/outputs/apk/debug/*.apk
+          name: app-release
+          path: android/app/build/outputs/apk/release/*.apk

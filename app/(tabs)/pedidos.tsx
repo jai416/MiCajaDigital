@@ -1,7 +1,8 @@
-import { useCallback, useState } from 'react';
+import { memo, useCallback, useState } from 'react';
 import {
   Alert,
   FlatList,
+  InteractionManager,
   Pressable,
   RefreshControl,
   StyleSheet,
@@ -14,6 +15,7 @@ import { useAccentColors } from '@/src/context/AccentContext';
 import { useVentas } from '@/src/hooks/useVentas';
 import { type Venta } from '@/src/types';
 import SwipeableRow from '@/src/components/SwipeableRow';
+import { perfStart, perfEnd } from '@/src/utils/perf';
 
 const FILTROS = ['pendiente', 'entregado', 'cancelado'] as const;
 
@@ -31,8 +33,13 @@ export default function PedidosScreen() {
   const PAGE_SIZE = 30;
 
   const load = useCallback(async () => {
-    setFinAlcanzado(false);
-    setPedidos(await getPedidos(filtro === 'todos' ? undefined : filtro, PAGE_SIZE, 0));
+    perfStart('cargar_pedidos');
+    try {
+      setFinAlcanzado(false);
+      setPedidos(await getPedidos(filtro === 'todos' ? undefined : filtro, PAGE_SIZE, 0));
+    } finally {
+      perfEnd('cargar_pedidos');
+    }
   }, [getPedidos, filtro]);
 
   const cargarMas = useCallback(async () => {
@@ -47,7 +54,10 @@ export default function PedidosScreen() {
     }
   }, [getPedidos, filtro, paginando, finAlcanzado, pedidos.length]);
 
-  useFocusEffect(useCallback(() => { load(); }, [load]));
+  useFocusEffect(useCallback(() => {
+    const task = InteractionManager.runAfterInteractions(() => { load(); });
+    return () => task.cancel();
+  }, [load]));
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -55,14 +65,14 @@ export default function PedidosScreen() {
     setRefreshing(false);
   };
 
-  const toggleSeleccion = (id: string) => {
+  const toggleSeleccion = useCallback((id: string) => {
     setSeleccionados(prev => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
       else next.add(id);
       return next;
     });
-  };
+  }, []);
 
   const salirSeleccion = () => {
     setSeleccionando(false);
@@ -106,26 +116,26 @@ export default function PedidosScreen() {
     ]);
   };
 
-  const handleEntregar = (id: string) => {
+  const handleEntregar = useCallback((id: string) => {
     Alert.alert('Entregar', '¿Marcar como entregado y saldar?', [
       { text: 'Cancelar', style: 'cancel' },
       { text: '✅ Entregado', onPress: async () => { await actualizarEstadoPedido(id, 'entregado'); load(); } },
     ]);
-  };
+  }, [actualizarEstadoPedido, load]);
 
-  const handleCancelar = (id: string) => {
+  const handleCancelar = useCallback((id: string) => {
     Alert.alert('Cancelar', '¿Cancelar este pedido?', [
       { text: 'No', style: 'cancel' },
       { text: 'Sí, cancelar', style: 'destructive', onPress: async () => { await actualizarEstadoPedido(id, 'cancelado'); load(); } },
     ]);
-  };
+  }, [actualizarEstadoPedido, load]);
 
-  const handleEliminar = (id: string) => {
+  const handleEliminar = useCallback((id: string) => {
     Alert.alert('Eliminar', '¿Eliminar este pedido permanentemente?', [
       { text: 'Cancelar', style: 'cancel' },
       { text: 'Eliminar', style: 'destructive', onPress: async () => { await deleteVenta(id); load(); } },
     ]);
-  };
+  }, [deleteVenta, load]);
 
   return (
     <View style={[styles.flex, { backgroundColor: c.background }]}>
@@ -134,6 +144,8 @@ export default function PedidosScreen() {
         data={pedidos}
         keyExtractor={(item) => item.id}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+        initialNumToRender={10}
+        maxToRenderPerBatch={10}
         getItemLayout={(_, index) => ({ length: 80, offset: 80 * index, index })}
         windowSize={10}
         removeClippedSubviews={true}
@@ -182,74 +194,18 @@ export default function PedidosScreen() {
             )}
           </View>
         }
-        renderItem={({ item }) => {
-          const checked = seleccionados.has(item.id);
-          return (
-            <SwipeableRow
-              onSwipe={() => { if (!seleccionando) handleEliminar(item.id); }}
-            >
-              <Pressable
-                onPress={() => { if (seleccionando) toggleSeleccion(item.id); }}
-                style={[styles.card, {
-                  backgroundColor: c.surface,
-                  borderColor: checked ? c.primary : c.border,
-                  borderLeftColor: item.estado_pedido === 'pendiente' ? c.warning
-                    : item.estado_pedido === 'entregado' ? c.primary : c.danger,
-                  borderLeftWidth: 4,
-                }]}
-              >
-                <View style={styles.cardHeader}>
-                  {seleccionando && (
-                    <View style={[styles.checkbox, {
-                      borderColor: c.primary,
-                      backgroundColor: checked ? c.primary : 'transparent',
-                    }]}>
-                      {checked && <Text style={{ color: '#fff', fontSize: 14, fontWeight: '800' }}>✓</Text>}
-                    </View>
-                  )}
-                  <Text style={[styles.cliente, { color: c.text }]}>{item.cliente || 'Sin cliente'}</Text>
-                  <Text style={{
-                    fontSize: 12, fontWeight: '700',
-                    color: item.estado_pedido === 'pendiente' ? c.warning
-                      : item.estado_pedido === 'entregado' ? c.primary : c.danger,
-                  }}>
-                    {item.estado_pedido === 'pendiente' ? '⏳ Pendiente'
-                      : item.estado_pedido === 'entregado' ? '✅ Entregado' : '❌ Cancelado'}
-                  </Text>
-                </View>
-                <Text style={[styles.producto, { color: c.textSecondary }]}>
-                  {item.producto} — ${item.precio.toFixed(2)}
-                </Text>
-                <View style={styles.detalles}>
-                  <Text style={[styles.detalle, { color: c.textSecondary }]}>
-                    Anticipo: ${item.anticipo.toFixed(2)}
-                  </Text>
-                  <Text style={[styles.detalle, { color: c.danger, fontWeight: '700' }]}>
-                    Saldo: ${item.saldo_pendiente.toFixed(2)}
-                  </Text>
-                </View>
-                {item.fecha_entrega && (
-                  <Text style={[styles.detalle, { color: c.textSecondary }]}>
-                    📅 Entrega: {item.fecha_entrega}
-                  </Text>
-                )}
-                <Text style={[styles.detalle, { color: c.textSecondary }]}>
-                  📅 Creado: {item.fecha}
-                </Text>
-                {!seleccionando && item.estado_pedido === 'pendiente' && (
-                  <View style={styles.acciones}>
-                    <Pressable style={[styles.btn, { backgroundColor: c.primary }]} onPress={() => handleEntregar(item.id)}>
-                      <Text style={styles.btnTexto}>✅ Entregar</Text>
-                    </Pressable>
-                    <Pressable style={[styles.btn, { backgroundColor: c.danger }]} onPress={() => handleCancelar(item.id)}>
-                      <Text style={styles.btnTexto}>❌ Cancelar</Text>
-                    </Pressable>
-                  </View>
-                )}
-              </Pressable>
-            </SwipeableRow>
-          );
-        }}
+        renderItem={({ item }) => (
+          <PedidoCard
+            item={item}
+            c={c}
+            seleccionando={seleccionando}
+            checked={seleccionados.has(item.id)}
+            onSeleccionar={toggleSeleccion}
+            onEliminar={handleEliminar}
+            onEntregar={handleEntregar}
+            onCancelar={handleCancelar}
+          />
+        )}
       />
       {seleccionando && seleccionados.size > 0 && (
         <View style={[styles.batchBar, { backgroundColor: c.surface, borderTopColor: c.border }]}>
@@ -264,6 +220,85 @@ export default function PedidosScreen() {
     </View>
   );
 }
+
+const PedidoCard = memo(function PedidoCard({
+  item, c, seleccionando, checked, onSeleccionar, onEliminar, onEntregar, onCancelar,
+}: {
+  item: Venta;
+  c: ReturnType<typeof useAccentColors>['theme'];
+  seleccionando: boolean;
+  checked: boolean;
+  onSeleccionar: (id: string) => void;
+  onEliminar: (id: string) => void;
+  onEntregar: (id: string) => void;
+  onCancelar: (id: string) => void;
+}) {
+  return (
+    <SwipeableRow
+      onSwipe={() => { if (!seleccionando) onEliminar(item.id); }}
+    >
+      <Pressable
+        onPress={() => { if (seleccionando) onSeleccionar(item.id); }}
+        style={[styles.card, {
+          backgroundColor: c.surface,
+          borderColor: checked ? c.primary : c.border,
+          borderLeftColor: item.estado_pedido === 'pendiente' ? c.warning
+            : item.estado_pedido === 'entregado' ? c.primary : c.danger,
+          borderLeftWidth: 4,
+        }]}
+      >
+        <View style={styles.cardHeader}>
+          {seleccionando && (
+            <View style={[styles.checkbox, {
+              borderColor: c.primary,
+              backgroundColor: checked ? c.primary : 'transparent',
+            }]}>
+              {checked && <Text style={{ color: '#fff', fontSize: 14, fontWeight: '800' }}>✓</Text>}
+            </View>
+          )}
+          <Text style={[styles.cliente, { color: c.text }]}>{item.cliente || 'Sin cliente'}</Text>
+          <Text style={{
+            fontSize: 12, fontWeight: '700',
+            color: item.estado_pedido === 'pendiente' ? c.warning
+              : item.estado_pedido === 'entregado' ? c.primary : c.danger,
+          }}>
+            {item.estado_pedido === 'pendiente' ? '⏳ Pendiente'
+              : item.estado_pedido === 'entregado' ? '✅ Entregado' : '❌ Cancelado'}
+          </Text>
+        </View>
+        <Text style={[styles.producto, { color: c.textSecondary }]}>
+          {item.producto} — ${item.precio.toFixed(2)}
+        </Text>
+        <View style={styles.detalles}>
+          <Text style={[styles.detalle, { color: c.textSecondary }]}>
+            Anticipo: ${item.anticipo.toFixed(2)}
+          </Text>
+          <Text style={[styles.detalle, { color: c.danger, fontWeight: '700' }]}>
+            Saldo: ${item.saldo_pendiente.toFixed(2)}
+          </Text>
+        </View>
+        {item.fecha_entrega && (
+          <Text style={[styles.detalle, { color: c.textSecondary }]}>
+            📅 Entrega: {item.fecha_entrega}
+          </Text>
+        )}
+        <Text style={[styles.detalle, { color: c.textSecondary }]}>
+          📅 Creado: {item.fecha}
+        </Text>
+        {!seleccionando && item.estado_pedido === 'pendiente' && (
+          <View style={styles.acciones}>
+            <Pressable style={[styles.btn, { backgroundColor: c.primary }]} onPress={() => onEntregar(item.id)}>
+              <Text style={styles.btnTexto}>✅ Entregar</Text>
+            </Pressable>
+            <Pressable style={[styles.btn, { backgroundColor: c.danger }]} onPress={() => onCancelar(item.id)}>
+              <Text style={styles.btnTexto}>❌ Cancelar</Text>
+            </Pressable>
+          </View>
+        )}
+      </Pressable>
+    </SwipeableRow>
+  );
+});
 
 const styles = StyleSheet.create({
   flex: { flex: 1 },

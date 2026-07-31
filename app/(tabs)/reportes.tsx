@@ -1,6 +1,6 @@
-import { useCallback, useState } from 'react';
+import { memo, useCallback, useMemo, useState } from 'react';
 import {
-  ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View,
+  ActivityIndicator, InteractionManager, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from 'expo-router';
@@ -8,6 +8,7 @@ import { useAccentColors } from '@/src/context/AccentContext';
 import { useVentas } from '@/src/hooks/useVentas';
 import { useGastos } from '@/src/hooks/useGastos';
 import type { Venta, Gasto } from '@/src/types';
+import { perfStart, perfEnd } from '@/src/utils/perf';
 
 function inicioSemana(): string {
   const d = new Date();
@@ -45,6 +46,7 @@ export default function ReportesScreen() {
   const [gastos, setGastos] = useState<Gasto[]>([]);
 
   const load = useCallback(async (p: Periodo) => {
+    perfStart('cargar_reportes');
     setCargando(true);
     try {
       const fin = hoy();
@@ -55,11 +57,15 @@ export default function ReportesScreen() {
     } catch (e) {
       console.error('Error al cargar reportes:', e);
     } finally {
+      perfEnd('cargar_reportes');
       setCargando(false);
     }
   }, [getVentasEnRango, getGastosEnRango]);
 
-  useFocusEffect(useCallback(() => { load(periodo); }, [load, periodo]));
+  useFocusEffect(useCallback(() => {
+    const task = InteractionManager.runAfterInteractions(() => { load(periodo); });
+    return () => task.cancel();
+  }, [load, periodo]));
 
   const cambiarPeriodo = (p: Periodo) => {
     setPeriodo(p);
@@ -72,20 +78,22 @@ export default function ReportesScreen() {
     setRefreshing(false);
   };
 
-  const totalVentas = ventas.reduce((s, v) => s + (v.pagado ? v.precio : 0), 0);
-  const totalGastos = gastos.reduce((s, g) => s + g.monto, 0);
+  const totalVentas = useMemo(() => ventas.reduce((s, v) => s + (v.pagado ? v.precio : 0), 0), [ventas]);
+  const totalGastos = useMemo(() => gastos.reduce((s, g) => s + g.monto, 0), [gastos]);
   const ganancia = totalVentas - totalGastos;
 
-  const map = new Map<string, { total: number; veces: number }>();
-  for (const v of ventas) {
-    const e = map.get(v.producto) ?? { total: 0, veces: 0 };
-    e.total += v.precio;
-    e.veces++;
-    map.set(v.producto, e);
-  }
-  const topProductos = [...map.entries()]
-    .map(([nombre, data]) => ({ nombre, ...data }))
-    .sort((a, b) => b.total - a.total);
+  const topProductos = useMemo(() => {
+    const map = new Map<string, { total: number; veces: number }>();
+    for (const v of ventas) {
+      const e = map.get(v.producto) ?? { total: 0, veces: 0 };
+      e.total += v.precio;
+      e.veces++;
+      map.set(v.producto, e);
+    }
+    return [...map.entries()]
+      .map(([nombre, data]) => ({ nombre, ...data }))
+      .sort((a, b) => b.total - a.total);
+  }, [ventas]);
 
   return (
     <ScrollView style={[styles.flex, { backgroundColor: c.background }]}
@@ -157,14 +165,14 @@ export default function ReportesScreen() {
   );
 }
 
-function Card({ label, value, bg, color }: { label: string; value: string; bg: string; color: string }) {
+const Card = memo(function Card({ label, value, bg, color }: { label: string; value: string; bg: string; color: string }) {
   return (
     <View style={[styles.cardGrid, { backgroundColor: bg }]}>
       <Text style={[styles.cardLabel, { color }]}>{label}</Text>
       <Text style={[styles.cardValue, { color }]}>{value}</Text>
     </View>
   );
-}
+});
 
 const styles = StyleSheet.create({
   flex: { flex: 1 },

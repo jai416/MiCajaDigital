@@ -18,6 +18,9 @@
       },
       "package": "com.tunegocio.micajadigital",
       "versionCode": 2,
+      "jsEngine": "hermes",
+      "enableProguardInReleaseBuilds": true,
+      "enableShrinkResourcesInReleaseBuilds": true,
       "intentFilters": [
         {
           "autoVerify": true,

@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react';
+import { memo, useCallback, useRef, useState } from 'react';
 import * as Haptics from 'expo-haptics';
 import { Image } from 'expo-image';
 import {
@@ -273,6 +273,10 @@ export default function VentasScreen() {
               </ScrollView>
             )}
             <FlatList data={catalogoItems} keyExtractor={(item) => item.id}
+              initialNumToRender={10}
+              maxToRenderPerBatch={10}
+              windowSize={10}
+              removeClippedSubviews={true}
               ListEmptyComponent={
                 <View style={{ alignItems: 'center', paddingVertical: 20 }}>
                   <Text style={{ color: c.textSecondary, marginBottom: 12 }}>{busqueda.trim() ? 'Sin resultados' : 'Catálogo vacío'}</Text>
@@ -283,21 +287,7 @@ export default function VentasScreen() {
                 </View>
               }
               renderItem={({ item }) => (
-                <Pressable style={[styles.itemCatalogo, { borderBottomColor: c.border, flexDirection: 'row', alignItems: 'center' }]}
-                  onPress={() => seleccionarCatalogo(item)}>
-                  {item.foto ? (
-                    <Image source={{ uri: item.foto }} style={{ width: 40, height: 40, borderRadius: 8, marginRight: 10 }} cachePolicy="memory-disk" />
-                  ) : null}
-                  <View style={{ flex: 1 }}>
-                    <Text style={[styles.itemNombre, { color: c.text }]}>{item.nombre}</Text>
-                    <Text style={[styles.itemDetalle, { color: c.textSecondary }]}>
-                      ${item.precio.toFixed(2)} — Stock: {item.stock}
-                      {item.descripcion ? ` — ${item.descripcion}` : ''}
-                      {item.categoria ? ` • ${item.categoria}` : ''}
-                    </Text>
-                  </View>
-                  <Text style={{ color: c.primary, fontSize: 20 }}>›</Text>
-                </Pressable>
+                <CatalogoRow item={item} c={c} onSelect={seleccionarCatalogo} />
               )}
             />
             {!busqueda.trim() && catalogoItems.length > 0 && (
@@ -425,4 +415,30 @@ const styles = StyleSheet.create({
   reciboLinea: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 10, borderBottomWidth: 1 },
   botonWhatsApp: { marginTop: 24, paddingVertical: 16, borderRadius: 14, alignItems: 'center' },
   botonCerrar: { marginTop: 10, paddingVertical: 14, borderRadius: 12, alignItems: 'center', borderWidth: 1 },
+});
+
+const CatalogoRow = memo(function CatalogoRow({
+  item, c, onSelect,
+}: {
+  item: CatalogoItem;
+  c: ReturnType<typeof useAccentColors>['theme'];
+  onSelect: (item: CatalogoItem) => void;
+}) {
+  return (
+    <Pressable style={[styles.itemCatalogo, { borderBottomColor: c.border, flexDirection: 'row', alignItems: 'center' }]}
+      onPress={() => onSelect(item)}>
+      {item.foto ? (
+        <Image source={{ uri: item.foto }} style={{ width: 40, height: 40, borderRadius: 8, marginRight: 10 }} cachePolicy="memory-disk" />
+      ) : null}
+      <View style={{ flex: 1 }}>
+        <Text style={[styles.itemNombre, { color: c.text }]}>{item.nombre}</Text>
+        <Text style={[styles.itemDetalle, { color: c.textSecondary }]}>
+          ${item.precio.toFixed(2)} — Stock: {item.stock}
+          {item.descripcion ? ` — ${item.descripcion}` : ''}
+          {item.categoria ? ` • ${item.categoria}` : ''}
+        </Text>
+      </View>
+      <Text style={{ color: c.primary, fontSize: 20 }}>›</Text>
+    </Pressable>
+  );
 });

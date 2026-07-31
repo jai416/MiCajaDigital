@@ -1,7 +1,8 @@
-import { useCallback, useState } from 'react';
+import { memo, useCallback, useMemo, useState } from 'react';
 import {
   Alert,
   FlatList,
+  InteractionManager,
   Linking,
   Pressable,
   RefreshControl,
@@ -17,6 +18,7 @@ import { useAccentColors } from '@/src/context/AccentContext';
 import { useVentas } from '@/src/hooks/useVentas';
 import { type Venta } from '@/src/types';
 import SwipeableRow from '@/src/components/SwipeableRow';
+import { perfStart, perfEnd } from '@/src/utils/perf';
 
 export default function ClientesScreen() {
   const { theme: c } = useAccentColors();
@@ -28,13 +30,19 @@ export default function ClientesScreen() {
   const [editando, setEditando] = useState<{ id: string; nombre: string } | null>(null);
 
   const load = useCallback(async () => {
-    const d = await getDeudores();
-    setDeudores(d);
+    perfStart('cargar_deudores');
+    try {
+      const d = await getDeudores();
+      setDeudores(d);
+    } finally {
+      perfEnd('cargar_deudores');
+    }
   }, [getDeudores]);
 
   useFocusEffect(
     useCallback(() => {
-      load();
+      const task = InteractionManager.runAfterInteractions(() => { load(); });
+      return () => task.cancel();
     }, [load])
   );
 
@@ -44,7 +52,7 @@ export default function ClientesScreen() {
     setRefreshing(false);
   };
 
-  const handlePagar = (id: string) => {
+  const handlePagar = useCallback((id: string) => {
     Alert.alert('Confirmar', '¿Marcar esta venta como pagada?', [
       { text: 'Cancelar', style: 'cancel' },
       {
@@ -55,18 +63,18 @@ export default function ClientesScreen() {
         },
       },
     ]);
-  };
+  }, [pagarVenta, load]);
 
-  const handleEliminarDeudor = (id: string) => {
+  const handleEliminarDeudor = useCallback((id: string) => {
     Alert.alert('Eliminar', '¿Eliminar esta venta permanentemente?', [
       { text: 'Cancelar', style: 'cancel' },
       { text: 'Eliminar', style: 'destructive', onPress: async () => { await deleteVenta(id); load(); } },
     ]);
-  };
+  }, [deleteVenta, load]);
 
-  const handleEditarCliente = (item: Venta & { dias_retraso: number }) => {
+  const handleEditarCliente = useCallback((item: Venta & { dias_retraso: number }) => {
     setEditando({ id: item.id, nombre: item.cliente });
-  };
+  }, []);
 
   const guardarNombre = async () => {
     if (!editando) return;
@@ -76,7 +84,7 @@ export default function ClientesScreen() {
     finally { setEditando(null); load(); }
   };
 
-  const handleRecordar = async (item: Venta & { dias_retraso: number }) => {
+  const handleRecordar = useCallback(async (item: Venta & { dias_retraso: number }) => {
     const mensaje =
       `Hola ${item.cliente}, tu saldo pendiente es de $${item.precio.toFixed(2)}. ` +
       `Producto: ${item.producto}. Fecha: ${item.fecha}. ` +
@@ -99,10 +107,13 @@ export default function ClientesScreen() {
         [{ text: 'OK' }]
       );
     }
-  };
+  }, []);
 
-  const filtrados = deudores.filter(d =>
-    d.cliente.toLowerCase().includes(busqueda.toLowerCase())
+  const filtrados = useMemo(
+    () => deudores.filter(d =>
+      d.cliente.toLowerCase().includes(busqueda.toLowerCase())
+    ),
+    [deudores, busqueda]
   );
 
   return (
@@ -135,6 +146,8 @@ export default function ClientesScreen() {
         data={filtrados}
         keyExtractor={(item) => item.id.toString()}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+        initialNumToRender={10}
+        maxToRenderPerBatch={10}
         getItemLayout={(_, index) => ({ length: 100, offset: 100 * index, index })}
         windowSize={10}
         removeClippedSubviews={true}
@@ -156,67 +169,89 @@ export default function ClientesScreen() {
           </View>
         }
         renderItem={({ item }) => (
-          <SwipeableRow
-            onSwipe={() => handleEliminarDeudor(item.id)}
-            onEdit={() => handleEditarCliente(item)}
-          >
-            <View
-              style={[
-                styles.card,
-                {
-                  backgroundColor: c.surface,
-                  borderColor: c.border,
-                  borderLeftColor: item.dias_retraso > 7 ? c.danger : item.dias_retraso > 3 ? c.warning : c.primary,
-                  borderLeftWidth: 4,
-                },
-              ]}
-            >
-              <View style={styles.cardHeader}>
-                <Text style={[styles.cliente, { color: c.text }]}>{item.cliente || 'Sin nombre'}</Text>
-                <Text
-                  style={[
-                    styles.dias,
-                    {
-                      color:
-                        item.dias_retraso > 7 ? c.danger : item.dias_retraso > 3 ? c.warning : c.textSecondary,
-                    },
-                  ]}
-                >
-                  {item.dias_retraso === 0 ? 'Hoy' : `${item.dias_retraso} días`}
-                </Text>
-              </View>
-              <Text style={[styles.producto, { color: c.textSecondary }]}>
-                {item.producto} — ${item.precio.toFixed(2)}
-              </Text>
-              <Text style={[styles.fecha, { color: c.textSecondary }]}>📅 {item.fecha}</Text>
-
-              <View style={styles.acciones}>
-                <Pressable
-                  style={[styles.btnPagar, { backgroundColor: c.primary }]}
-                  onPress={() => handlePagar(item.id)}
-                >
-                  <Text style={styles.btnTexto}>✅ Pagó</Text>
-                </Pressable>
-                <Pressable
-                  style={[styles.btnEditar, { borderColor: c.textSecondary }]}
-                  onPress={() => handleEditarCliente(item)}
-                >
-                  <Text style={[styles.btnRecordarTexto, { color: c.textSecondary }]}>✏️ Editar</Text>
-                </Pressable>
-                <Pressable
-                  style={[styles.btnRecordar, { borderColor: c.warning }]}
-                  onPress={() => handleRecordar(item)}
-                >
-                  <Text style={[styles.btnRecordarTexto, { color: c.warning }]}>📤 Recordar</Text>
-                </Pressable>
-              </View>
-            </View>
-          </SwipeableRow>
+          <DeudorCard
+            item={item}
+            c={c}
+            onEliminar={handleEliminarDeudor}
+            onEditar={handleEditarCliente}
+            onPagar={handlePagar}
+            onRecordar={handleRecordar}
+          />
         )}
       />
     </View>
   );
 }
+
+const DeudorCard = memo(function DeudorCard({
+  item, c, onEliminar, onEditar, onPagar, onRecordar,
+}: {
+  item: Venta & { dias_retraso: number };
+  c: ReturnType<typeof useAccentColors>['theme'];
+  onEliminar: (id: string) => void;
+  onEditar: (item: Venta & { dias_retraso: number }) => void;
+  onPagar: (id: string) => void;
+  onRecordar: (item: Venta & { dias_retraso: number }) => void;
+}) {
+  return (
+    <SwipeableRow
+      onSwipe={() => onEliminar(item.id)}
+      onEdit={() => onEditar(item)}
+    >
+      <View
+        style={[
+          styles.card,
+          {
+            backgroundColor: c.surface,
+            borderColor: c.border,
+            borderLeftColor: item.dias_retraso > 7 ? c.danger : item.dias_retraso > 3 ? c.warning : c.primary,
+            borderLeftWidth: 4,
+          },
+        ]}
+      >
+        <View style={styles.cardHeader}>
+          <Text style={[styles.cliente, { color: c.text }]}>{item.cliente || 'Sin nombre'}</Text>
+          <Text
+            style={[
+              styles.dias,
+              {
+                color:
+                  item.dias_retraso > 7 ? c.danger : item.dias_retraso > 3 ? c.warning : c.textSecondary,
+              },
+            ]}
+          >
+            {item.dias_retraso === 0 ? 'Hoy' : `${item.dias_retraso} días`}
+          </Text>
+        </View>
+        <Text style={[styles.producto, { color: c.textSecondary }]}>
+          {item.producto} — ${item.precio.toFixed(2)}
+        </Text>
+        <Text style={[styles.fecha, { color: c.textSecondary }]}>📅 {item.fecha}</Text>
+
+        <View style={styles.acciones}>
+          <Pressable
+            style={[styles.btnPagar, { backgroundColor: c.primary }]}
+            onPress={() => onPagar(item.id)}
+          >
+            <Text style={styles.btnTexto}>✅ Pagó</Text>
+          </Pressable>
+          <Pressable
+            style={[styles.btnEditar, { borderColor: c.textSecondary }]}
+            onPress={() => onEditar(item)}
+          >
+            <Text style={[styles.btnRecordarTexto, { color: c.textSecondary }]}>✏️ Editar</Text>
+          </Pressable>
+          <Pressable
+            style={[styles.btnRecordar, { borderColor: c.warning }]}
+            onPress={() => onRecordar(item)}
+          >
+            <Text style={[styles.btnRecordarTexto, { color: c.warning }]}>📤 Recordar</Text>
+          </Pressable>
+        </View>
+      </View>
+    </SwipeableRow>
+  );
+});
 
 const styles = StyleSheet.create({
   flex: { flex: 1 },
