@@ -5,7 +5,6 @@ import { useAccentColors } from '@/src/context/AccentContext';
 
 const WHATSAPP_URL = 'https://wa.me/5351819744';
 const TELEGRAM_URL = 'https://t.me/+5351819744';
-const PRECIO_MENSUAL = '$15 USD/mes';
 
 export default function SuscripcionGate() {
   const { theme: c } = useAccentColors();
@@ -39,7 +38,6 @@ export default function SuscripcionGate() {
           <Text style={[styles.titulo, { color: c.text }]}>Tu prueba ha terminado</Text>
           <Text style={[styles.subtitulo, { color: c.textSecondary }]}>
             Para seguir usando Mi Caja Digital, contacta a Jaison para renovar tu suscripción.
-            Solo {PRECIO_MENSUAL}.
           </Text>
 
           <Pressable
