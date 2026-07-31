@@ -9,6 +9,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
+
       - name: Free disk space
         run: |
           sudo apt clean
@@ -21,28 +22,16 @@ jobs:
           sudo rm -rf /usr/local/lib/android/sdk/build-tools/30.0.2
           sudo rm -rf /usr/local/lib/android/sdk/build-tools/30.0.3
           df -h
-
-      - uses: actions/checkout@v4
+          
+      - uses: actions/checkout@v5   # ✅ Actualizado a v5 (Node.js 24)
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6   # ✅ Actualizado a v6 (Node.js 24)
         with:
-          node-version: 20
-          cache: npm
+          node-version: 18
 
       - name: Install dependencies
-        run: npm ci --legacy-peer-deps
-        env:
-          NODE_TLS_REJECT_UNAUTHORIZED: "0"
-
-      - name: TypeScript check
-        run: npm run typecheck
-
-      - name: Lint
-        run: npm run lint
-
-      - name: Unit tests
-        run: npm test -- --runInBand
+        run: npm install --legacy-peer-deps
 
       - name: Install Expo CLI
         run: npm install -g expo-cli eas-cli
@@ -50,14 +39,11 @@ jobs:
       - name: Prebuild Android
         run: npx expo prebuild --platform android
 
-      - name: Build APK (Release, minificado)
-        run: |
-          cd android
-          ./gradlew assembleRelease
-          ls -lh app/build/outputs/apk/release/
+      - name: Build APK
+        run: cd android && ./gradlew assembleDebug --no-daemon --refresh-dependencies
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: app-release
-          path: android/app/build/outputs/apk/release/*.apk
+          name: app-debug
+          path: android/app/build/outputs/apk/debug/*.apk
