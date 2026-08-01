@@ -10,6 +10,7 @@ import { useGastos } from '@/src/hooks/useGastos';
 import { type CuadreResumen, type Venta, type Gasto } from '@/src/types';
 import { perfStart, perfEnd } from '@/src/utils/perf';
 import { useAuth } from '@/src/context/AuthContext';
+import { parseNumero } from '@/src/utils/numero';
 
 function BarChart({ ventas, gastos, maxH = 160 }: { ventas: number; gastos: number; maxH?: number }) {
   const { theme: c } = useAccentColors();
@@ -116,11 +117,11 @@ export default function CuadreScreen() {
 
   const guardarEditVenta = async () => {
     if (!editVenta) return;
-    const p = parseFloat(editPrecio);
+    const p = parseNumero(editPrecio);
     if (isNaN(p) || p <= 0) { Alert.alert('Error', 'Precio inválido'); return; }
     if (!editProducto.trim()) { Alert.alert('Error', 'Producto obligatorio'); return; }
     try {
-      const costoVal = parseFloat(editCosto);
+      const costoVal = parseNumero(editCosto);
       await updateVenta(editVenta.id, {
         producto: editProducto.trim(),
         precio: p,
@@ -172,6 +173,22 @@ export default function CuadreScreen() {
               <StatCard label="Pedidos Entregados Hoy" value={`$${cuadre.pedidosEntregadosHoy.toFixed(2)}`} bg="#E8F5E9" color="#16A34A" />
             )}
           </View>
+
+          {cuadre.ventasPorMoneda && (cuadre.ventasPorMoneda.CUP > 0 || cuadre.ventasPorMoneda.USD > 0 || cuadre.ventasPorMoneda.MLC > 0) && (
+            <View style={[styles.card, { backgroundColor: c.surface, borderColor: c.border }]}>
+              <Text style={[styles.cardTitle, { color: c.text }]}>💱 Ventas por moneda</Text>
+              {(['CUP', 'USD', 'MLC'] as const).map((mon) => {
+                const total = cuadre.ventasPorMoneda[mon] ?? 0;
+                if (total <= 0) return null;
+                return (
+                  <View key={mon} style={styles.metodoRow}>
+                    <Text style={{ color: c.text, flex: 1 }}>{mon}</Text>
+                    <Text style={{ color: c.primary, fontWeight: '700' }}>${total.toFixed(2)}</Text>
+                  </View>
+                );
+              })}
+            </View>
+          )}
 
           <View style={[styles.card, { backgroundColor: c.surface, borderColor: c.border }]}>
             <Text style={[styles.cardTitle, { color: c.text }]}>📊 Ventas vs Gastos</Text>

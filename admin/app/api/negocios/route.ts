@@ -1,8 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
+import { getSession } from '@/lib/auth';
 
 export async function PATCH(request: NextRequest) {
   try {
+    if (!(await getSession())) {
+      return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
+    }
     const body = await request.json();
     const { id, ...updates } = body;
 
@@ -24,6 +28,9 @@ export async function PATCH(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
+    if (!(await getSession())) {
+      return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
+    }
     const { id } = await request.json();
 
     if (!id) {

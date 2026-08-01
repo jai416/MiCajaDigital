@@ -1,9 +1,38 @@
+import { useCallback, useState } from 'react';
 import { Tabs } from 'expo-router';
+import { useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { useSQLiteContext } from 'expo-sqlite';
 import { useAccentColors } from '@/src/context/AccentContext';
+import { useAuth } from '@/src/context/AuthContext';
+import { getUserId } from '@/src/utils/user';
 
 export default function TabLayout() {
   const { theme: c } = useAccentColors();
+  const db = useSQLiteContext();
+  const { user } = useAuth();
+  const [pedidosPendientes, setPedidosPendientes] = useState(0);
+
+  const cargarPedidos = useCallback(async () => {
+    try {
+      const userId = await getUserId(db, user);
+      if (!userId) {
+        setPedidosPendientes(0);
+        return;
+      }
+      const row = await db.getFirstAsync<{ count: number }>(
+        "SELECT COUNT(*) as count FROM ventas WHERE tipo_pedido = 'pedido' AND estado_pedido = 'pendiente' AND user_id = ? AND deleted_at IS NULL",
+        [userId]
+      );
+      setPedidosPendientes(row?.count ?? 0);
+    } catch {
+      setPedidosPendientes(0);
+    }
+  }, [db, user]);
+
+  useFocusEffect(useCallback(() => {
+    cargarPedidos();
+  }, [cargarPedidos]));
 
   return (
     <Tabs
@@ -65,7 +94,7 @@ export default function TabLayout() {
         options={{
           title: 'Pedidos',
           tabBarIcon: ({ color }) => <Ionicons name="clipboard" size={22} color={color} />,
-          tabBarBadge: '!',
+          tabBarBadge: pedidosPendientes > 0 ? pedidosPendientes : undefined,
         }}
       />
       <Tabs.Screen

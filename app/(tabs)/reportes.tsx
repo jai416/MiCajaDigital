@@ -82,9 +82,20 @@ export default function ReportesScreen() {
   const totalGastos = useMemo(() => gastos.reduce((s, g) => s + g.monto, 0), [gastos]);
   const ganancia = totalVentas - totalGastos;
 
+  const porMoneda = useMemo(() => {
+    const res: Record<'CUP' | 'USD' | 'MLC', number> = { CUP: 0, USD: 0, MLC: 0 };
+    for (const v of ventas) {
+      if (!v.pagado) continue;
+      const m = (v.moneda || 'CUP') as 'CUP' | 'USD' | 'MLC';
+      res[m] = (res[m] ?? 0) + v.precio;
+    }
+    return res;
+  }, [ventas]);
+
   const topProductos = useMemo(() => {
     const map = new Map<string, { total: number; veces: number }>();
     for (const v of ventas) {
+      if (!v.pagado) continue;
       const e = map.get(v.producto) ?? { total: 0, veces: 0 };
       e.total += v.precio;
       e.veces++;
@@ -132,6 +143,21 @@ export default function ReportesScreen() {
           color={ganancia >= 0 ? c.primary : c.danger} />
         <Card label="Ventas" value={ventas.length.toString()} bg={c.surface} color={c.text} />
       </View>
+
+      {(porMoneda.CUP > 0 || porMoneda.USD > 0 || porMoneda.MLC > 0) && (
+        <View style={[styles.card, { backgroundColor: c.surface, borderColor: c.border }]}>
+          <Text style={[styles.cardTitle, { color: c.text }]}>💱 Ventas por moneda</Text>
+          {(['CUP', 'USD', 'MLC'] as const).map((mon) => {
+            if ((porMoneda[mon] ?? 0) <= 0) return null;
+            return (
+              <View key={mon} style={styles.topRow}>
+                <Text style={{ color: c.text, flex: 1 }}>{mon}</Text>
+                <Text style={{ color: c.primary, fontWeight: '700' }}>${(porMoneda[mon] ?? 0).toFixed(2)}</Text>
+              </View>
+            );
+          })}
+        </View>
+      )}
 
       {topProductos.length > 0 && (
         <View style={[styles.card, { backgroundColor: c.surface, borderColor: c.border }]}>

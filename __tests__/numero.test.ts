@@ -13,6 +13,14 @@ describe('parseNumero', () => {
     expect(parseNumero('1,5')).toBe(1.5);
   });
 
+  it('parsea formato hispano con miles y decimales (1.234,56)', () => {
+    expect(parseNumero('1.234,56')).toBe(1234.56);
+  });
+
+  it('parsea miles con comas sin decimales (1,234)', () => {
+    expect(parseNumero('1,234,567')).toBe(1234567);
+  });
+
   it('normaliza espacios', () => {
     expect(parseNumero('  42  ')).toBe(42);
   });

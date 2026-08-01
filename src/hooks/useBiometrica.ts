@@ -8,16 +8,24 @@ export function useBiometrica() {
   const [enabled, setEnabled] = useState(false);
 
   useEffect(() => {
+    let active = true;
     (async () => {
-      const compat = await LocalAuthentication.hasHardwareAsync();
-      const enrolled = await LocalAuthentication.isEnrolledAsync();
-      setAvailable(compat && enrolled);
+      try {
+        const compat = await LocalAuthentication.hasHardwareAsync();
+        const enrolled = await LocalAuthentication.isEnrolledAsync();
+        if (!active) return;
+        setAvailable(compat && enrolled);
 
-      const row = await db.getFirstAsync<{ valor: string }>(
-        "SELECT valor FROM app_config WHERE clave = 'biometrica'"
-      );
-      setEnabled(row?.valor === 'si');
+        const row = await db.getFirstAsync<{ valor: string }>(
+          "SELECT valor FROM app_config WHERE clave = 'biometrica'"
+        );
+        if (!active) return;
+        setEnabled(row?.valor === 'si');
+      } catch (e) {
+        console.error('Error al leer biometría:', e);
+      }
     })();
+    return () => { active = false; };
   }, [db]);
 
   const authenticate = useCallback(async (): Promise<boolean> => {

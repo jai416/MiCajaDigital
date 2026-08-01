@@ -4,7 +4,7 @@ import NetInfo from '@react-native-community/netinfo';
 import { AppState, InteractionManager, type AppStateStatus } from 'react-native';
 import { syncToSupabase } from '@/src/services/sync';
 import { useAuth } from '@/src/context/AuthContext';
-import { SYNC_MIN_INTERVAL_MS } from '@/src/constants';
+import { SYNC_INTERVAL_MS, SYNC_MIN_INTERVAL_MS } from '@/src/constants';
 
 export function useSync() {
   const db = useSQLiteContext();
@@ -13,15 +13,17 @@ export function useSync() {
   const [lastSync, setLastSync] = useState<Date | null>(null);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const lastSyncTimeRef = useRef(0);
+  const syncingRef = useRef(false);
 
   const doSync = useCallback(async (): Promise<boolean> => {
-    if (!user) return false;
+    if (!user || syncingRef.current) return false;
 
     if (Date.now() - lastSyncTimeRef.current < SYNC_MIN_INTERVAL_MS) return false;
 
     const state = await NetInfo.fetch();
     if (!state.isConnected) return false;
 
+    syncingRef.current = true;
     setSyncing(true);
     try {
       await syncToSupabase(db);
@@ -31,6 +33,7 @@ export function useSync() {
     } catch {
       return false;
     } finally {
+      syncingRef.current = false;
       setSyncing(false);
     }
   }, [db, user]);
@@ -46,7 +49,7 @@ export function useSync() {
       InteractionManager.runAfterInteractions(() => {
         doSync();
       });
-    }, 300000);
+    }, SYNC_INTERVAL_MS);
 
     intervalRef.current = intervalo;
 

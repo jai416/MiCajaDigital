@@ -19,6 +19,15 @@ function escapeCSV(val: unknown): string {
   return s;
 }
 
+function escapeHTML(val: unknown): string {
+  return String(val ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 function rowsToCSV(rows: Record<string, unknown>[]): string {
   if (rows.length === 0) return '';
   const headers = Object.keys(rows[0]);
@@ -126,6 +135,10 @@ export function useExport() {
       Alert.alert('Error', 'Tabla no válida.');
       return;
     }
+    if (table === 'app_config') {
+      Alert.alert('No disponible', 'La configuración no se exporta en PDF.');
+      return;
+    }
     setExporting(true);
     try {
       const userId = user?.id;
@@ -147,9 +160,9 @@ export function useExport() {
   th { background: #16A34A; color: white; font-weight: 700; }
   tr:nth-child(even) { background: #f9f9f9; }
 </style></head><body>
-<h2>${nombre}</h2>
-<table><thead><tr>${headers.map(h => `<th>${h}</th>`).join('')}</tr></thead>
-<tbody>${rows.map(r => `<tr>${headers.map(h => `<td>${String(r[h] ?? '')}</td>`).join('')}</tr>`).join('')}</tbody>
+<h2>${escapeHTML(nombre)}</h2>
+<table><thead><tr>${headers.map(h => `<th>${escapeHTML(h)}</th>`).join('')}</tr></thead>
+<tbody>${rows.map(r => `<tr>${headers.map(h => `<td>${escapeHTML(r[h])}</td>`).join('')}</tr>`).join('')}</tbody>
 </table></body></html>`;
 
       const { uri } = await Print.printToFileAsync({ html });

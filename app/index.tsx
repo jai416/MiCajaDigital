@@ -9,24 +9,29 @@ export default function RootRedirect() {
 
   useEffect(() => {
     (async () => {
-      const tutorialRow = await db.getFirstAsync<{ valor: string }>(
-        "SELECT valor FROM app_config WHERE clave = 'tutorial_visto'"
-      );
-      const tutorialVisto = tutorialRow?.valor === 'si';
+      try {
+        const tutorialRow = await db.getFirstAsync<{ valor: string }>(
+          "SELECT valor FROM app_config WHERE clave = 'tutorial_visto'"
+        );
+        const tutorialVisto = tutorialRow?.valor === 'si';
 
-      if (!tutorialVisto) {
-        router.replace('/tutorial/paso1');
-        return;
-      }
+        if (!tutorialVisto) {
+          router.replace('/tutorial/paso1');
+          return;
+        }
 
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session?.user) {
-        await db.runAsync('INSERT OR REPLACE INTO app_config (clave, valor) VALUES (?, ?)', [
-          'user_id',
-          session.user.id,
-        ]);
-        router.replace('/(tabs)');
-      } else {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.user) {
+          await db.runAsync('INSERT OR REPLACE INTO app_config (clave, valor) VALUES (?, ?)', [
+            'user_id',
+            session.user.id,
+          ]);
+          router.replace('/(tabs)');
+        } else {
+          router.replace('/auth/login');
+        }
+      } catch (e) {
+        console.error('Error al redirigir:', e);
         router.replace('/auth/login');
       }
     })();

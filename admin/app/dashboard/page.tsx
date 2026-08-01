@@ -1,5 +1,7 @@
 import { supabaseAdmin } from '@/lib/supabase';
 
+export const dynamic = 'force-dynamic';
+
 async function getStats() {
   const { count: total } = await supabaseAdmin
     .from('negocios')

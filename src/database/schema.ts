@@ -94,6 +94,8 @@ export async function initDatabase(db: SQLiteDatabase) {
   try { await db.runAsync("ALTER TABLE catalogo ADD COLUMN foto TEXT DEFAULT ''"); } catch {}
   try { await db.runAsync("ALTER TABLE gastos ADD COLUMN foto TEXT DEFAULT ''"); } catch {}
   try { await db.runAsync("ALTER TABLE ventas ADD COLUMN deleted_at TEXT DEFAULT NULL"); } catch {}
+  try { await db.runAsync("ALTER TABLE catalogo ADD COLUMN deleted_at TEXT DEFAULT NULL"); } catch {}
+  try { await db.runAsync("ALTER TABLE compras ADD COLUMN deleted_at TEXT DEFAULT NULL"); } catch {}
 
   await db.execAsync(`
     CREATE TABLE IF NOT EXISTS compras (
@@ -149,4 +151,12 @@ export async function initDatabase(db: SQLiteDatabase) {
   try { await db.execAsync('CREATE INDEX IF NOT EXISTS idx_catalogo_user_nombre ON catalogo (user_id, nombre)'); } catch {}
   try { await db.execAsync('CREATE INDEX IF NOT EXISTS idx_compras_user_fecha ON compras (user_id, fecha)'); } catch {}
   try { await db.execAsync('CREATE INDEX IF NOT EXISTS idx_sync_user_ts ON sync_log (user_id, timestamp)'); } catch {}
+
+  // Purga de registros de sincronización y analítica para no crecer sin límite
+  try {
+    await db.execAsync(`
+      DELETE FROM sync_log WHERE id NOT IN (SELECT id FROM sync_log ORDER BY timestamp DESC LIMIT 50);
+      DELETE FROM analytics_events WHERE timestamp < strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-60 days');
+    `);
+  } catch {}
 }

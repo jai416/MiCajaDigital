@@ -1,6 +1,8 @@
 import { supabaseAdmin } from '@/lib/supabase';
 import NegociosTable from './NegociosTable';
 
+export const dynamic = 'force-dynamic';
+
 async function getNegocios() {
   const { data, error } = await supabaseAdmin
     .from('negocios')

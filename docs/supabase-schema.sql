@@ -3,12 +3,16 @@
 -- ============================================================
 -- Ejecutar TODO esto en: Supabase Dashboard → SQL Editor
 -- ============================================================
--- 
--- ANTES:
--- 1. Authentication → Settings → desmarcar "Confirm email"
--- 2. Settings → API → copiar service_role key para el admin
--- 3. Storage → Create bucket → nombre: "fotos" → público
 --
+-- SEGURIDAD RECOMENDADA:
+-- 1. Authentication → Settings → "Confirm email" ACTIVADO. La app aún no maneja
+--    la confirmación de correo: al activarlo, los usuarios deben confirmar su
+--    email antes de iniciar sesión. Hasta entonces el registro es vulnerable a
+--    cuentas con correos ajenos. Actívalo y añade el flujo de confirmación.
+-- 2. Settings → API → copiar service_role key para el admin (solo server-side)
+-- 3. Storage → Create bucket → nombre: "fotos" → público
+-- 4. Storage → el bucket "fotos" DEBE usar las policies de abajo para que solo
+--    usuarios autenticados suban archivos a su propia carpeta.
 -- ============================================================
 
 -- 1. EXTENSIONES
@@ -81,7 +85,8 @@ CREATE TABLE IF NOT EXISTS catalogo (
   categoria     TEXT DEFAULT '',
   foto          TEXT DEFAULT '',
   created_at    TEXT DEFAULT (to_char(now(), 'YYYY-MM-DD HH24:MI:SS')),
-  updated_at    TIMESTAMPTZ DEFAULT NOW()
+  updated_at    TIMESTAMPTZ DEFAULT NOW(),
+  deleted_at    TIMESTAMPTZ DEFAULT NULL
 );
 
 CREATE INDEX IF NOT EXISTS idx_catalogo_user_id ON catalogo(user_id);
@@ -110,7 +115,8 @@ CREATE TABLE IF NOT EXISTS compras (
   proveedor       TEXT DEFAULT '',
   fecha           TEXT NOT NULL,
   created_at      TEXT DEFAULT (to_char(now(), 'YYYY-MM-DD HH24:MI:SS')),
-  updated_at      TIMESTAMPTZ DEFAULT NOW()
+  updated_at      TIMESTAMPTZ DEFAULT NOW(),
+  deleted_at      TIMESTAMPTZ DEFAULT NULL
 );
 
 CREATE INDEX IF NOT EXISTS idx_compras_user_id ON compras(user_id);
@@ -143,6 +149,8 @@ DO $$ BEGIN ALTER TABLE catalogo ADD COLUMN categoria TEXT DEFAULT '';       EXC
 DO $$ BEGIN ALTER TABLE catalogo ADD COLUMN foto TEXT DEFAULT '';           EXCEPTION WHEN duplicate_column THEN NULL; END; $$;
 DO $$ BEGIN ALTER TABLE gastos ADD COLUMN foto TEXT DEFAULT '';             EXCEPTION WHEN duplicate_column THEN NULL; END; $$;
 DO $$ BEGIN ALTER TABLE ventas ADD COLUMN deleted_at TIMESTAMPTZ DEFAULT NULL; EXCEPTION WHEN duplicate_column THEN NULL; END; $$;
+DO $$ BEGIN ALTER TABLE catalogo ADD COLUMN deleted_at TIMESTAMPTZ DEFAULT NULL; EXCEPTION WHEN duplicate_column THEN NULL; END; $$;
+DO $$ BEGIN ALTER TABLE compras ADD COLUMN deleted_at TIMESTAMPTZ DEFAULT NULL; EXCEPTION WHEN duplicate_column THEN NULL; END; $$;
 
 -- 8. INDICES
 -- ============================================================
@@ -167,22 +175,22 @@ ALTER TABLE gastos   ENABLE ROW LEVEL SECURITY;
 -- Cada usuario solo ve/modifica sus propios datos
 --
 -- negocios
+-- SEGURIDAD (S3): el usuario SOLO puede insertar su fila con activo=false
+-- (prueba gratis). NO puede actualizar ni borrar su negocio, para impedir que
+-- se active la suscripción solo o que se extienda la prueba modificando
+-- fecha_registro / fecha_expiracion. El panel admin usa la service_role key
+-- (bypassa RLS) para activar/renovar.
 CREATE POLICY "SELECT propio negocio"
   ON negocios FOR SELECT
   USING (id = auth.uid());
 
+DROP POLICY IF EXISTS "INSERT propio negocio" ON negocios;
 CREATE POLICY "INSERT propio negocio"
   ON negocios FOR INSERT
-  WITH CHECK (id = auth.uid());
+  WITH CHECK (id = auth.uid() AND activo = false);
 
-CREATE POLICY "UPDATE propio negocio"
-  ON negocios FOR UPDATE
-  USING (id = auth.uid())
-  WITH CHECK (id = auth.uid());
-
-CREATE POLICY "DELETE propio negocio"
-  ON negocios FOR DELETE
-  USING (id = auth.uid());
+DROP POLICY IF EXISTS "UPDATE propio negocio" ON negocios;
+DROP POLICY IF EXISTS "DELETE propio negocio" ON negocios;
 
 -- ventas
 CREATE POLICY "SELECT propias ventas"
@@ -222,7 +230,10 @@ CREATE POLICY "DELETE propios gastos"
 
 -- 9. FUNCION: resumen de cuadre del dia
 -- ============================================================
-CREATE OR REPLACE FUNCTION obtener_cuadre_dia(p_user_id UUID, p_fecha TEXT)
+-- SEGURIDAD (S2): usa auth.uid() internamente (el usuario solo obtiene SUS
+-- datos, imposible el IDOR con user_id ajeno). SECURITY INVOKER: RLS filtra
+-- las filas dentro de la función. Ya no recibe p_user_id.
+CREATE OR REPLACE FUNCTION obtener_cuadre_dia(p_fecha TEXT)
 RETURNS TABLE (
   total_ventas    REAL,
   total_gastos    REAL,
@@ -230,23 +241,34 @@ RETURNS TABLE (
   deudores        BIGINT,
   total_cobrado   REAL,
   total_pendiente REAL
-) LANGUAGE plpgsql SECURITY DEFINER AS $$
+) LANGUAGE plpgsql SECURITY INVOKER AS $$
 BEGIN
   RETURN QUERY
   SELECT
-    COALESCE((SELECT SUM(precio) FROM ventas WHERE user_id = p_user_id AND fecha = p_fecha AND pagado = 1), 0),
-    COALESCE((SELECT SUM(monto)   FROM gastos  WHERE user_id = p_user_id AND fecha = p_fecha), 0),
-    COALESCE((SELECT SUM(precio)  FROM ventas  WHERE user_id = p_user_id AND fecha = p_fecha AND pagado = 1), 0)
-    - COALESCE((SELECT SUM(monto) FROM gastos  WHERE user_id = p_user_id AND fecha = p_fecha), 0),
-    (SELECT COUNT(*)::BIGINT FROM ventas WHERE user_id = p_user_id AND pagado = 0),
-    COALESCE((SELECT SUM(precio) FROM ventas WHERE user_id = p_user_id AND pagado = 1), 0),
-    COALESCE((SELECT SUM(precio) FROM ventas WHERE user_id = p_user_id AND pagado = 0), 0);
+    COALESCE((SELECT SUM(precio) FROM ventas WHERE user_id = auth.uid() AND fecha = p_fecha AND pagado = 1), 0),
+    COALESCE((SELECT SUM(monto)   FROM gastos  WHERE user_id = auth.uid() AND fecha = p_fecha), 0),
+    COALESCE((SELECT SUM(precio)  FROM ventas  WHERE user_id = auth.uid() AND fecha = p_fecha AND pagado = 1), 0)
+    - COALESCE((SELECT SUM(monto) FROM gastos  WHERE user_id = auth.uid() AND fecha = p_fecha), 0),
+    (SELECT COUNT(*)::BIGINT FROM ventas WHERE user_id = auth.uid() AND pagado = 0),
+    COALESCE((SELECT SUM(precio) FROM ventas WHERE user_id = auth.uid() AND pagado = 1), 0),
+    COALESCE((SELECT SUM(precio) FROM ventas WHERE user_id = auth.uid() AND pagado = 0), 0);
 END;
 $$;
 
--- 10. CONSULTAS DE EJEMPLO (comentadas)
+-- 10. STORAGE: policies del bucket "fotos"
 -- ============================================================
--- SELECT * FROM obtener_cuadre_dia('user-uuid', to_char(now(), 'YYYY-MM-DD'));
+-- Solo usuarios autenticados pueden subir/actualizar/borrar archivos dentro
+-- de su propia carpeta (<user_id>/...). La lectura es pública (bucket público).
+DROP POLICY IF EXISTS "Usuarios gestionan sus fotos" ON storage.objects;
+CREATE POLICY "Usuarios gestionan sus fotos"
+  ON storage.objects FOR ALL
+  TO authenticated
+  USING (bucket_id = 'fotos' AND (storage.foldername(name))[1] = auth.uid()::text)
+  WITH CHECK (bucket_id = 'fotos' AND (storage.foldername(name))[1] = auth.uid()::text);
+
+-- 11. CONSULTAS DE EJEMPLO (comentadas)
+-- ============================================================
+-- SELECT * FROM obtener_cuadre_dia(to_char(now(), 'YYYY-MM-DD'));
 --
 -- SELECT producto, COUNT(*) as veces, SUM(precio) as total
 -- FROM ventas WHERE user_id = 'user-uuid'

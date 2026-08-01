@@ -17,7 +17,7 @@ export function useCompras() {
     try {
       const userId = await getUserId(db, user);
       if (!userId) return [];
-      const sql = `SELECT * FROM compras WHERE user_id = ? ORDER BY fecha DESC, created_at DESC` +
+      const sql = `SELECT * FROM compras WHERE user_id = ? AND deleted_at IS NULL ORDER BY fecha DESC, created_at DESC` +
         (limit > 0 ? ' LIMIT ? OFFSET ?' : limit === 0 ? ` LIMIT ${LISTA_LIMITE}` : '');
       const params = limit > 0 ? [userId, limit, offset] : [userId];
       return await db.getAllAsync<Compra>(sql, params);
@@ -29,10 +29,10 @@ export function useCompras() {
 
   const addCompra = useCallback(
     async (producto: string, costoUnitario: number, cantidad: number, proveedor: string = '') => {
-      const userId = await getUserId(db, user);
-      if (!userId) return;
       setLoading(true);
       try {
+        const userId = await getUserId(db, user);
+        if (!userId) return;
         const id = generarUUID();
         const ahora = new Date().toISOString();
         const fecha = new Date().toISOString().slice(0, 10);
@@ -53,7 +53,8 @@ export function useCompras() {
 
   const deleteCompra = useCallback(async (id: string) => {
     try {
-      await db.runAsync('DELETE FROM compras WHERE id = ?', [id]);
+      const ahora = new Date().toISOString();
+      await db.runAsync('UPDATE compras SET deleted_at = ?, updated_at = ?, sincronizado = 0 WHERE id = ?', [ahora, ahora, id]);
     } catch (e) { console.error('Error al eliminar compra:', e); }
   }, [db]);
 

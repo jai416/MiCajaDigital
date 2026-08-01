@@ -25,7 +25,7 @@ export function calcularEstadoSuscripcion(negocio: NegocioSuscripcion, ahora = D
 
   if (negocio.activo) {
     return fechaExpiracion > ahora
-      ? { estado: 'activo', diasRestantes: DIAS_PRUEBA }
+      ? { estado: 'activo', diasRestantes: Math.max(0, Math.ceil((fechaExpiracion - ahora) / MS_DIA)) }
       : { estado: 'expirado', diasRestantes: 0 };
   }
 

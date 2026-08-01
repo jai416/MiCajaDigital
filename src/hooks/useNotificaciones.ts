@@ -22,21 +22,25 @@ export function useNotificaciones() {
   useEffect(() => {
     let active = true;
     (async () => {
-      const { status } = await Notifications.getPermissionsAsync();
-      if (!active) return;
-      setPermitted(status === 'granted');
+      try {
+        const { status } = await Notifications.getPermissionsAsync();
+        if (!active) return;
+        setPermitted(status === 'granted');
 
-      const row = await db.getFirstAsync<{ valor: string }>(
-        "SELECT valor FROM app_config WHERE clave = 'notif_recordatorio'"
-      );
-      if (!active) return;
-      setEnabled(row?.valor === 'si');
+        const row = await db.getFirstAsync<{ valor: string }>(
+          "SELECT valor FROM app_config WHERE clave = 'notif_recordatorio'"
+        );
+        if (!active) return;
+        setEnabled(row?.valor === 'si');
 
-      const dRow = await db.getFirstAsync<{ valor: string }>(
-        "SELECT valor FROM app_config WHERE clave = 'notif_deudores'"
-      );
-      if (!active) return;
-      setDeudorEnabled(dRow?.valor === 'si');
+        const dRow = await db.getFirstAsync<{ valor: string }>(
+          "SELECT valor FROM app_config WHERE clave = 'notif_deudores'"
+        );
+        if (!active) return;
+        setDeudorEnabled(dRow?.valor === 'si');
+      } catch (e) {
+        console.error('Error al leer notificaciones:', e);
+      }
     })();
     return () => { active = false; };
   }, [db]);
@@ -48,29 +52,33 @@ export function useNotificaciones() {
   }, []);
 
   const scheduleDaily = useCallback(async () => {
-    try { await Notifications.cancelScheduledNotificationAsync('daily-reminder'); } catch {}
+    try {
+      try { await Notifications.cancelScheduledNotificationAsync('daily-reminder'); } catch {}
 
-    const horaRow = await db.getFirstAsync<{ valor: string }>(
-      "SELECT valor FROM app_config WHERE clave = 'notif_recordatorio_hora'"
-    );
-    const minRow = await db.getFirstAsync<{ valor: string }>(
-      "SELECT valor FROM app_config WHERE clave = 'notif_recordatorio_minuto'"
-    );
-    const hora = parseInt(horaRow?.valor ?? '20');
-    const minuto = parseInt(minRow?.valor ?? '0');
+      const horaRow = await db.getFirstAsync<{ valor: string }>(
+        "SELECT valor FROM app_config WHERE clave = 'notif_recordatorio_hora'"
+      );
+      const minRow = await db.getFirstAsync<{ valor: string }>(
+        "SELECT valor FROM app_config WHERE clave = 'notif_recordatorio_minuto'"
+      );
+      const hora = parseInt(horaRow?.valor ?? '20');
+      const minuto = parseInt(minRow?.valor ?? '0');
 
-    await Notifications.scheduleNotificationAsync({
-      identifier: 'daily-reminder',
-      content: {
-        title: '📊 Mi Caja Digital',
-        body: '¿Ya hiciste tu cuadre de hoy? Revisa tus ventas y deudores pendientes.',
-      },
-      trigger: {
-        type: Notifications.SchedulableTriggerInputTypes.DAILY,
-        hour: hora,
-        minute: minuto,
-      },
-    });
+      await Notifications.scheduleNotificationAsync({
+        identifier: 'daily-reminder',
+        content: {
+          title: '📊 Mi Caja Digital',
+          body: '¿Ya hiciste tu cuadre de hoy? Revisa tus ventas y deudores pendientes.',
+        },
+        trigger: {
+          type: Notifications.SchedulableTriggerInputTypes.DAILY,
+          hour: hora,
+          minute: minuto,
+        },
+      });
+    } catch (e) {
+      console.error('Error al programar recordatorio diario:', e);
+    }
   }, [db]);
 
   const registerPushToken = useCallback(async () => {
@@ -87,43 +95,47 @@ export function useNotificaciones() {
   }, [db]);
 
   const scheduleDeudorCheck = useCallback(async () => {
-    try { await Notifications.cancelScheduledNotificationAsync('deudor-reminder'); } catch { /* ignore */ }
+    try {
+      try { await Notifications.cancelScheduledNotificationAsync('deudor-reminder'); } catch { /* ignore */ }
 
-    const userId = await db.getFirstAsync<{ valor: string }>(
-      "SELECT valor FROM app_config WHERE clave = 'user_id'"
-    );
-    if (!userId?.valor) return;
+      const userId = await db.getFirstAsync<{ valor: string }>(
+        "SELECT valor FROM app_config WHERE clave = 'user_id'"
+      );
+      if (!userId?.valor) return;
 
-    const deudores = await db.getAllAsync<{ cliente: string; saldo_pendiente: number; fecha: string }>(
-      `SELECT cliente, saldo_pendiente, fecha FROM ventas WHERE user_id = ? AND pagado = 0 AND tipo_pedido != 'pedido' AND cliente != '' AND deleted_at IS NULL ORDER BY fecha ASC LIMIT 3`,
-      [userId.valor]
-    );
-    if (deudores.length === 0) return;
+      const deudores = await db.getAllAsync<{ cliente: string; saldo_pendiente: number; fecha: string }>(
+        `SELECT cliente, saldo_pendiente, fecha FROM ventas WHERE user_id = ? AND pagado = 0 AND tipo_pedido != 'pedido' AND cliente != '' AND deleted_at IS NULL ORDER BY fecha ASC LIMIT 3`,
+        [userId.valor]
+      );
+      if (deudores.length === 0) return;
 
-    const total = deudores.reduce((s, d) => s + d.saldo_pendiente, 0);
-    const nombres = deudores.map(d => d.cliente).join(', ');
+      const total = deudores.reduce((s, d) => s + d.saldo_pendiente, 0);
+      const nombres = deudores.map(d => d.cliente).join(', ');
 
-    const horaRow = await db.getFirstAsync<{ valor: string }>(
-      "SELECT valor FROM app_config WHERE clave = 'notif_deudor_hora'"
-    );
-    const minRow = await db.getFirstAsync<{ valor: string }>(
-      "SELECT valor FROM app_config WHERE clave = 'notif_deudor_minuto'"
-    );
-    const hora = parseInt(horaRow?.valor ?? '10');
-    const minuto = parseInt(minRow?.valor ?? '0');
+      const horaRow = await db.getFirstAsync<{ valor: string }>(
+        "SELECT valor FROM app_config WHERE clave = 'notif_deudor_hora'"
+      );
+      const minRow = await db.getFirstAsync<{ valor: string }>(
+        "SELECT valor FROM app_config WHERE clave = 'notif_deudor_minuto'"
+      );
+      const hora = parseInt(horaRow?.valor ?? '10');
+      const minuto = parseInt(minRow?.valor ?? '0');
 
-    await Notifications.scheduleNotificationAsync({
-      identifier: 'deudor-reminder',
-      content: {
-        title: '🔔 Cobros pendientes',
-        body: `${deudores.length} deudor(es): ${nombres}. Total: $${total.toFixed(2)}`,
-      },
-      trigger: {
-        type: Notifications.SchedulableTriggerInputTypes.DAILY,
-        hour: hora,
-        minute: minuto,
-      },
-    });
+      await Notifications.scheduleNotificationAsync({
+        identifier: 'deudor-reminder',
+        content: {
+          title: '🔔 Cobros pendientes',
+          body: `${deudores.length} deudor(es): ${nombres}. Total: $${total.toFixed(2)}`,
+        },
+        trigger: {
+          type: Notifications.SchedulableTriggerInputTypes.DAILY,
+          hour: hora,
+          minute: minuto,
+        },
+      });
+    } catch (e) {
+      console.error('Error al programar recordatorio de deudores:', e);
+    }
   }, [db]);
 
   const toggle = useCallback(async (on: boolean) => {

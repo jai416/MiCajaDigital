@@ -47,6 +47,7 @@ export interface CatalogoItem {
   sincronizado: number;
   created_at: string;
   updated_at: string;
+  deleted_at?: string | null;
 }
 
 export interface Compra {
@@ -61,6 +62,7 @@ export interface Compra {
   sincronizado: number;
   created_at: string;
   updated_at: string;
+  deleted_at?: string | null;
 }
 
 export interface MetodosPagoDesglose {
@@ -80,6 +82,7 @@ export interface CuadreResumen {
   metodosPago: MetodosPagoDesglose;
   pedidosPendientes: number;
   pedidosEntregadosHoy: number;
+  ventasPorMoneda: Record<'CUP' | 'USD' | 'MLC', number>;
 }
 
 export interface Negocio {

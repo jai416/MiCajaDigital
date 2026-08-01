@@ -36,27 +36,16 @@ async function uploadPhotoToStorage(uri: string, userId: string, prefix: string,
 }
 
 function decodeBase64(str: string): Uint8Array {
-  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=';
-  const bytes: number[] = [];
-  let i = 0;
-  while (i < str.length) {
-    const enc1 = chars.indexOf(str[i++]);
-    const enc2 = chars.indexOf(str[i++]);
-    const enc3 = chars.indexOf(str[i++]);
-    const enc4 = chars.indexOf(str[i++]);
-    if (enc1 === -1 || enc2 === -1) break;
-    const o1 = (enc1 << 2) | (enc2 >> 4);
-    bytes.push(o1);
-    if (enc3 !== -1) {
-      const o2 = ((enc2 & 15) << 4) | (enc3 >> 2);
-      bytes.push(o2);
-    }
-    if (enc4 !== -1) {
-      const o3 = ((enc3 & 3) << 6) | enc4;
-      bytes.push(o3);
-    }
+  const bin = atob(str);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) {
+    bytes[i] = bin.charCodeAt(i);
   }
-  return new Uint8Array(bytes);
+  return bytes;
+}
+
+function esMasNuevo(a: string, b: string): boolean {
+  return new Date(a).getTime() > new Date(b).getTime();
 }
 
 async function getLastSync(db: SQLiteDatabase): Promise<string> {
@@ -144,51 +133,43 @@ export async function syncToSupabase(db: SQLiteDatabase) {
   );
 
   for (const g of unsyncedGastos) {
-    const fotoUrl = typeof g.foto === 'string' && g.foto && !g.foto.startsWith('http')
-      ? await uploadPhotoToStorage(g.foto, userId, 'gastos')
-      : (g.foto ?? '');
-      const { error } = await supabase.from('gastos').upsert(
-        {
-          id: g.id,
-          user_id: g.user_id,
-          concepto: g.concepto,
-          monto: g.monto,
-          fecha: g.fecha,
-          foto: fotoUrl,
-          created_at: g.created_at,
-          updated_at: syncStart,
-        },
-        { onConflict: 'id' }
-      );
-    if (!error && fotoUrl !== g.foto) {
+    let fotoUrl = g.foto ?? '';
+    if (typeof g.foto === 'string' && g.foto && !g.foto.startsWith('http')) {
+      const subida = await uploadPhotoToStorage(g.foto, userId, 'gastos');
+      if (subida === g.foto) {
+        continue;
+      }
+      fotoUrl = subida;
+    }
+    const { error } = await supabase.from('gastos').upsert(
+      {
+        id: g.id,
+        user_id: g.user_id,
+        concepto: g.concepto,
+        monto: g.monto,
+        fecha: g.fecha,
+        foto: fotoUrl,
+        created_at: g.created_at,
+        updated_at: syncStart,
+      },
+      { onConflict: 'id' }
+    );
+    if (!error) {
       await db.runAsync('UPDATE gastos SET foto = ?, sincronizado = 1, updated_at = ? WHERE id = ?', [fotoUrl, syncStart, g.id]);
       gastosCount++;
-      continue;
-    }
-    if (error) {
-      /* error pushing gasto */
-    } else {
-      if (fotoUrl === g.foto && typeof g.foto === 'string' && g.foto && !g.foto.startsWith('http')) {
-        /* la foto no se pudo subir: dejar sin sincronizar para reintentar */
-      } else {
-        await db.runAsync(
-          'UPDATE gastos SET sincronizado = 1, updated_at = ? WHERE id = ?',
-          [syncStart, g.id]
-        );
-        gastosCount++;
-      }
     }
   }
 
   // ---- PULL: cloud → local ----
   const oldLastSync = await getLastSync(db);
 
-  const { data: remoteVentas } = await supabase
+  const { data: remoteVentas, error: pullErrVentas } = await supabase
     .from('ventas')
     .select('*')
     .eq('user_id', userId)
     .gt('updated_at', oldLastSync);
 
+  if (pullErrVentas) throw new Error(`Error PULL ventas: ${pullErrVentas.message}`);
   if (remoteVentas) {
     for (const rv of remoteVentas) {
       const local = await db.getFirstAsync<{ updated_at: string }>(
@@ -225,7 +206,7 @@ export async function syncToSupabase(db: SQLiteDatabase) {
             rv.created_at ?? remoteUpdated, remoteUpdated]
         );
         ventasCount++;
-      } else if (remoteUpdated > localUpdated) {
+      } else if (esMasNuevo(remoteUpdated, localUpdated)) {
         await db.runAsync(
           `UPDATE ventas SET producto=?, precio=?, costo=?, cliente=?, tipo=?, moneda=?, tipo_pedido=?, pagado=?, fecha=?,
            catalogo_id=?, metodo_pago=?, anticipo=?, saldo_pendiente=?, fecha_entrega=?, estado_pedido=?, nota=?,
@@ -243,12 +224,13 @@ export async function syncToSupabase(db: SQLiteDatabase) {
     }
   }
 
-  const { data: remoteGastos } = await supabase
+  const { data: remoteGastos, error: pullErrGastos } = await supabase
     .from('gastos')
     .select('*')
     .eq('user_id', userId)
     .gt('updated_at', oldLastSync);
 
+  if (pullErrGastos) throw new Error(`Error PULL gastos: ${pullErrGastos.message}`);
   if (remoteGastos) {
     for (const rg of remoteGastos) {
       const local = await db.getFirstAsync<{ updated_at: string }>(
@@ -267,7 +249,7 @@ export async function syncToSupabase(db: SQLiteDatabase) {
            rg.created_at ?? remoteUpdated, remoteUpdated]
         );
         gastosCount++;
-      } else if (remoteUpdated > localUpdated) {
+      } else if (esMasNuevo(remoteUpdated, localUpdated)) {
         await db.runAsync(
           `UPDATE gastos SET concepto=?, monto=?, fecha=?, foto=?, sincronizado=1, updated_at=? WHERE id=?`,
           [rg.concepto, rg.monto, rg.fecha, rg.foto ?? '', remoteUpdated, rg.id]
@@ -279,52 +261,63 @@ export async function syncToSupabase(db: SQLiteDatabase) {
 
   // ---- PUSH: catalogo local → cloud ----
   const unsyncedCatalogo = await db.getAllAsync<SQLiteRow>(
-    'SELECT * FROM catalogo WHERE sincronizado = 0 AND user_id = ?',
+    'SELECT * FROM catalogo WHERE (sincronizado = 0 OR deleted_at IS NOT NULL) AND user_id = ?',
     [userId]
   );
 
   for (const c of unsyncedCatalogo) {
-    const fotoUrl = typeof c.foto === 'string' && c.foto && !c.foto.startsWith('http')
-      ? await uploadPhotoToStorage(c.foto, userId, 'catalogo', 200)
-      : (c.foto ?? '');
-      const { error } = await supabase.from('catalogo').upsert(
-        {
-          id: c.id,
-          user_id: c.user_id,
-          nombre: c.nombre,
-          precio: c.precio,
-          stock: c.stock,
-          descripcion: c.descripcion ?? '',
-          codigo_barras: c.codigo_barras ?? '',
-          categoria: c.categoria ?? '',
-          foto: fotoUrl,
-          created_at: c.created_at,
-          updated_at: syncStart,
-        },
-        { onConflict: 'id' }
-      );
+    if (c.deleted_at) {
+      const { error } = await supabase.from('catalogo').delete().eq('id', c.id);
+      if (!error) {
+        await db.runAsync('UPDATE catalogo SET sincronizado = 1, updated_at = ? WHERE id = ?', [syncStart, c.id]);
+        catalogoCount++;
+      }
+      continue;
+    }
+    let fotoUrl = c.foto ?? '';
+    if (typeof c.foto === 'string' && c.foto && !c.foto.startsWith('http')) {
+      const subida = await uploadPhotoToStorage(c.foto, userId, 'catalogo', 200);
+      if (subida === c.foto) {
+        continue;
+      }
+      fotoUrl = subida;
+    }
+    const { error } = await supabase.from('catalogo').upsert(
+      {
+        id: c.id,
+        user_id: c.user_id,
+        nombre: c.nombre,
+        precio: c.precio,
+        stock: c.stock,
+        descripcion: c.descripcion ?? '',
+        codigo_barras: c.codigo_barras ?? '',
+        categoria: c.categoria ?? '',
+        foto: fotoUrl,
+        created_at: c.created_at,
+        updated_at: syncStart,
+        deleted_at: c.deleted_at ?? null,
+      },
+      { onConflict: 'id' }
+    );
     if (error) {
       /* error pushing catalogo */
     } else {
-      if (fotoUrl === c.foto && typeof c.foto === 'string' && c.foto && !c.foto.startsWith('http')) {
-        /* la foto no se pudo subir: dejar sin sincronizar para reintentar */
-      } else {
-        await db.runAsync(
-          'UPDATE catalogo SET foto = ?, sincronizado = 1, updated_at = ? WHERE id = ?',
-          [fotoUrl, syncStart, c.id]
-        );
-        catalogoCount++;
-      }
+      await db.runAsync(
+        'UPDATE catalogo SET foto = ?, sincronizado = 1, updated_at = ? WHERE id = ?',
+        [fotoUrl, syncStart, c.id]
+      );
+      catalogoCount++;
     }
   }
 
   // ---- PULL: catalogo cloud → local ----
-  const { data: remoteCatalogo } = await supabase
+  const { data: remoteCatalogo, error: pullErrCatalogo } = await supabase
     .from('catalogo')
     .select('*')
     .eq('user_id', userId)
     .gt('updated_at', oldLastSync);
 
+  if (pullErrCatalogo) throw new Error(`Error PULL catalogo: ${pullErrCatalogo.message}`);
   if (remoteCatalogo) {
     for (const rc of remoteCatalogo) {
       const local = await db.getFirstAsync<{ updated_at: string }>(
@@ -334,33 +327,54 @@ export async function syncToSupabase(db: SQLiteDatabase) {
       const remoteUpdated = rc.updated_at ?? '2000-01-01T00:00:00.000Z';
       const localUpdated = local?.updated_at ?? '2000-01-01T00:00:00.000Z';
 
+      if (rc.deleted_at) {
+        if (local && !localUpdated.startsWith('2000')) {
+          await db.runAsync(
+            'UPDATE catalogo SET deleted_at = ?, sincronizado = 1, updated_at = ? WHERE id = ?',
+            [rc.deleted_at, remoteUpdated, rc.id]
+          );
+          catalogoCount++;
+        }
+        continue;
+      }
       if (!local) {
         await db.runAsync(
           `INSERT OR REPLACE INTO catalogo
-           (id, user_id, nombre, precio, stock, descripcion, codigo_barras, categoria, foto, sincronizado, created_at, updated_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)`,
+           (id, user_id, nombre, precio, stock, descripcion, codigo_barras, categoria, foto, sincronizado, created_at, updated_at, deleted_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?)`,
           [rc.id, rc.user_id, rc.nombre, rc.precio, rc.stock ?? 0, rc.descripcion ?? '', rc.codigo_barras ?? '', rc.categoria ?? '', rc.foto ?? '',
-           rc.created_at ?? remoteUpdated, remoteUpdated]
+           rc.created_at ?? remoteUpdated, remoteUpdated, rc.deleted_at ?? null]
         );
-      } else if (remoteUpdated > localUpdated) {
+        catalogoCount++;
+      } else if (esMasNuevo(remoteUpdated, localUpdated)) {
         await db.runAsync(
-          `UPDATE catalogo SET nombre=?, precio=?, stock=?, descripcion=?, codigo_barras=?, categoria=?, foto=?, sincronizado=1, updated_at=? WHERE id=?`,
-          [rc.nombre, rc.precio, rc.stock ?? 0, rc.descripcion ?? '', rc.codigo_barras ?? '', rc.categoria ?? '', rc.foto ?? '', remoteUpdated, rc.id]
+          `UPDATE catalogo SET nombre=?, precio=?, stock=?, descripcion=?, codigo_barras=?, categoria=?, foto=?, deleted_at=?, sincronizado=1, updated_at=? WHERE id=?`,
+          [rc.nombre, rc.precio, rc.stock ?? 0, rc.descripcion ?? '', rc.codigo_barras ?? '', rc.categoria ?? '', rc.foto ?? '', rc.deleted_at ?? null, remoteUpdated, rc.id]
         );
+        catalogoCount++;
       }
     }
   }
 
   // ---- PUSH: compras local → cloud ----
   const unsyncedCompras = await db.getAllAsync<SQLiteRow>(
-    'SELECT * FROM compras WHERE sincronizado = 0 AND user_id = ?', [userId]
+    'SELECT * FROM compras WHERE (sincronizado = 0 OR deleted_at IS NOT NULL) AND user_id = ?', [userId]
   );
   for (const c of unsyncedCompras) {
+    if (c.deleted_at) {
+      const { error } = await supabase.from('compras').delete().eq('id', c.id);
+      if (!error) {
+        await db.runAsync('UPDATE compras SET sincronizado = 1, updated_at = ? WHERE id = ?', [syncStart, c.id]);
+        comprasCount++;
+      }
+      continue;
+    }
     const { error } = await supabase.from('compras').upsert({
       id: c.id, user_id: c.user_id, producto: c.producto,
       costo_unitario: c.costo_unitario, cantidad: c.cantidad,
       costo_total: c.costo_total, proveedor: c.proveedor ?? '',
       fecha: c.fecha, created_at: c.created_at, updated_at: syncStart,
+      deleted_at: c.deleted_at ?? null,
     }, { onConflict: 'id' });
     if (!error) {
       await db.runAsync('UPDATE compras SET sincronizado = 1, updated_at = ? WHERE id = ?', [syncStart, c.id]);
@@ -369,26 +383,39 @@ export async function syncToSupabase(db: SQLiteDatabase) {
   }
 
   // ---- PULL: compras cloud → local ----
-  const { data: remoteCompras } = await supabase
+  const { data: remoteCompras, error: pullErrCompras } = await supabase
     .from('compras').select('*').eq('user_id', userId).gt('updated_at', oldLastSync);
+  if (pullErrCompras) throw new Error(`Error PULL compras: ${pullErrCompras.message}`);
   if (remoteCompras) {
     for (const rc of remoteCompras) {
       const local = await db.getFirstAsync<{ updated_at: string }>('SELECT updated_at FROM compras WHERE id = ?', [rc.id]);
       const remoteUpdated = rc.updated_at ?? '2000-01-01T00:00:00.000Z';
       const localUpdated = local?.updated_at ?? '2000-01-01T00:00:00.000Z';
+      if (rc.deleted_at) {
+        if (local && !localUpdated.startsWith('2000')) {
+          await db.runAsync(
+            'UPDATE compras SET deleted_at = ?, sincronizado = 1, updated_at = ? WHERE id = ?',
+            [rc.deleted_at, remoteUpdated, rc.id]
+          );
+          comprasCount++;
+        }
+        continue;
+      }
       if (!local) {
         await db.runAsync(
           `INSERT OR REPLACE INTO compras
-           (id, user_id, producto, costo_unitario, cantidad, costo_total, proveedor, fecha, sincronizado, created_at, updated_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)`,
+           (id, user_id, producto, costo_unitario, cantidad, costo_total, proveedor, fecha, sincronizado, created_at, updated_at, deleted_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?)`,
           [rc.id, rc.user_id, rc.producto, rc.costo_unitario, rc.cantidad, rc.costo_total, rc.proveedor ?? '', rc.fecha,
-           rc.created_at ?? remoteUpdated, remoteUpdated]
+           rc.created_at ?? remoteUpdated, remoteUpdated, rc.deleted_at ?? null]
         );
-      } else if (remoteUpdated > localUpdated) {
+        comprasCount++;
+      } else if (esMasNuevo(remoteUpdated, localUpdated)) {
         await db.runAsync(
-          `UPDATE compras SET producto=?, costo_unitario=?, cantidad=?, costo_total=?, proveedor=?, fecha=?, sincronizado=1, updated_at=? WHERE id=?`,
-          [rc.producto, rc.costo_unitario, rc.cantidad, rc.costo_total, rc.proveedor ?? '', rc.fecha, remoteUpdated, rc.id]
+          `UPDATE compras SET producto=?, costo_unitario=?, cantidad=?, costo_total=?, proveedor=?, fecha=?, deleted_at=?, sincronizado=1, updated_at=? WHERE id=?`,
+          [rc.producto, rc.costo_unitario, rc.cantidad, rc.costo_total, rc.proveedor ?? '', rc.fecha, rc.deleted_at ?? null, remoteUpdated, rc.id]
         );
+        comprasCount++;
       }
     }
   }

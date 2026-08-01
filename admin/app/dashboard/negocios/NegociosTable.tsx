@@ -63,7 +63,7 @@ export default function NegociosTable({ negocios }: { negocios: Negocio[] }) {
     const res = await fetch('/api/negocios', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id, plan, fecha_expiracion: expiracion }),
+      body: JSON.stringify({ id, plan, fecha_expiracion: expiracion + 'T00:00:00Z' }),
     });
     if (res.ok) router.refresh();
   };
@@ -73,7 +73,9 @@ export default function NegociosTable({ negocios }: { negocios: Negocio[] }) {
     if (!dias) return;
     const n = parseInt(dias, 10);
     if (isNaN(n) || n <= 0) return;
-    const expiracion = new Date(Date.now() + n * 86400000).toISOString().slice(0, 10);
+    const fin = new Date();
+    fin.setUTCDate(fin.getUTCDate() + n);
+    const expiracion = fin.toISOString().slice(0, 10) + 'T00:00:00Z';
     const res = await fetch('/api/negocios', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
@@ -136,10 +138,10 @@ export default function NegociosTable({ negocios }: { negocios: Negocio[] }) {
                   </span>
                 </td>
                 <td className="px-4 py-3 text-gray-500 text-xs">
-                  {new Date(n.fecha_registro).toLocaleDateString('es-ES')}
+                  {new Date(n.fecha_registro).toLocaleDateString('es-ES', { timeZone: 'UTC' })}
                 </td>
                 <td className="px-4 py-3 text-gray-500 text-xs">
-                  {new Date(n.fecha_expiracion).toLocaleDateString('es-ES')}
+                  {new Date(n.fecha_expiracion).toLocaleDateString('es-ES', { timeZone: 'UTC' })}
                 </td>
                 <td className="px-4 py-3 text-center">
                   <span className="capitalize text-xs font-medium">{n.plan}</span>

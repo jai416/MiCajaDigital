@@ -1,9 +1,9 @@
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react';
-import { AppState, type AppStateStatus } from 'react-native';
+import { AppState, InteractionManager, type AppStateStatus } from 'react-native';
 import { supabase } from '@/src/services/supabase';
 import { useSQLiteContext } from 'expo-sqlite';
 import { type Session, type User } from '@supabase/supabase-js';
-import { setSecureValue, SECURE_KEYS } from '@/src/utils/storage';
+import { setSecureValue, removeSecureValue, SECURE_KEYS } from '@/src/utils/storage';
 import {
   calcularEstadoSuscripcion,
   DIAS_PRUEBA,
@@ -52,19 +52,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const verificarSuscripcion = useCallback(async (userId: string) => {
     try {
-      const { data, error } = await supabase
-        .from('negocios')
-        .select('activo, fecha_registro, fecha_expiracion')
-        .eq('id', userId)
-        .single();
+      for (let intento = 0; intento < 3; intento++) {
+        const { data, error } = await supabase
+          .from('negocios')
+          .select('activo, fecha_registro, fecha_expiracion')
+          .eq('id', userId)
+          .single();
 
-      if (error) {
-        throw error;
+        if (error && (error as { code?: string }).code === 'PGRST116') {
+          if (intento < 2) {
+            await new Promise((r) => setTimeout(r, 700));
+            continue;
+          }
+          setEstadoSuscripcion('expirado');
+          setDiasRestantes(0);
+          return;
+        }
+
+        if (error) {
+          throw error;
+        }
+
+        const calculado = calcularEstadoSuscripcion(data);
+        setEstadoSuscripcion(calculado.estado);
+        setDiasRestantes(calculado.diasRestantes);
+        return;
       }
-
-      const calculado = calcularEstadoSuscripcion(data);
-      setEstadoSuscripcion(calculado.estado);
-      setDiasRestantes(calculado.diasRestantes);
     } catch (e) {
       console.error('Error al verificar suscripción:', e);
       setEstadoSuscripcion('error');
@@ -113,7 +126,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }));
       if (session?.user) {
         guardarUserId(session.user.id);
-        verificarSuscripcion(session.user.id);
+        InteractionManager.runAfterInteractions(() => {
+          verificarSuscripcion(session.user.id);
+        });
       }
     });
 
@@ -121,8 +136,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [db, guardarUserId, verificarSuscripcion]);
 
   useEffect(() => {
-    if (state.user) {
-      verificarSuscripcion(state.user.id);
+    const userId = state.user?.id;
+    if (userId) {
+      InteractionManager.runAfterInteractions(() => {
+        verificarSuscripcion(userId);
+      });
     }
   }, [state.user, verificarSuscripcion]);
 
@@ -192,10 +210,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     try {
       await db.runAsync("DELETE FROM app_config WHERE clave = 'user_id'");
+      await removeSecureValue(SECURE_KEYS.USER_ID);
     } catch (e) {
       console.error('Error al limpiar user_id:', e);
     }
     setState({ user: null, session: null, loading: false, negocioNombre: '' });
+    setEstadoSuscripcion('activo');
+    setDiasRestantes(DIAS_PRUEBA);
   };
 
   return (

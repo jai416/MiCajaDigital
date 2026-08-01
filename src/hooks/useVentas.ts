@@ -101,7 +101,7 @@ export function useVentas() {
       try {
         const ahora = new Date().toISOString();
         await db.runAsync(
-          "UPDATE ventas SET pagado = 1, updated_at = ?, sincronizado = 0 WHERE id = ?",
+          "UPDATE ventas SET pagado = 1, saldo_pendiente = 0, updated_at = ?, sincronizado = 0 WHERE id = ?",
           [ahora, id]
         );
       } catch (e) {
@@ -127,7 +127,22 @@ export function useVentas() {
   const updateVenta = useCallback(
     async (id: string, data: Partial<AddVentaInput>) => {
       try {
+        const actual = await db.getFirstAsync<Venta>(
+          'SELECT * FROM ventas WHERE id = ?', [id]
+        );
+        if (!actual) throw new Error('Venta no encontrada');
+
         const ahora = new Date().toISOString();
+        const precio = data.precio ?? actual.precio;
+        const tipoPedido = data.tipo_pedido ?? actual.tipo_pedido;
+        const anticipo = tipoPedido === 'pedido'
+          ? (data.anticipo ?? actual.anticipo ?? 0)
+          : tipoPedido === 'contado' ? precio : 0;
+        const saldoPendiente = tipoPedido === 'pedido'
+          ? Math.max(0, precio - anticipo)
+          : tipoPedido === 'fiado' ? (actual.pagado ? 0 : precio) : 0;
+        const pagado = tipoPedido === 'contado' ? 1 : saldoPendiente === 0 ? 1 : (actual.pagado ?? 0);
+
         const sets: string[] = [];
         const vals: (string | number | null)[] = [];
         if (data.producto !== undefined) { sets.push('producto = ?'); vals.push(data.producto); }
@@ -138,6 +153,9 @@ export function useVentas() {
         if (data.tipo_pedido !== undefined) { sets.push('tipo_pedido = ?'); vals.push(data.tipo_pedido); }
         if (data.metodo_pago !== undefined) { sets.push('metodo_pago = ?'); vals.push(data.metodo_pago); }
         if (data.nota !== undefined) { sets.push('nota = ?'); vals.push(data.nota); }
+        sets.push('anticipo = ?'); vals.push(anticipo);
+        sets.push('saldo_pendiente = ?'); vals.push(saldoPendiente);
+        sets.push('pagado = ?'); vals.push(pagado);
         sets.push('updated_at = ?'); vals.push(ahora);
         sets.push('sincronizado = 0');
         vals.push(id);
@@ -195,7 +213,7 @@ export function useVentas() {
       const userId = await getUserId(db, user);
       if (!userId) return [];
       const rows = await db.getAllAsync<Venta>(
-        `SELECT * FROM ventas WHERE pagado = 0 AND user_id = ? AND deleted_at IS NULL ORDER BY fecha ASC LIMIT ${DEUDORES_LIMITE}`,
+        `SELECT * FROM ventas WHERE pagado = 0 AND user_id = ? AND tipo_pedido != 'pedido' AND deleted_at IS NULL ORDER BY fecha ASC LIMIT ${DEUDORES_LIMITE}`,
         [userId]
       );
       return rows.map((r) => ({ ...r, dias_retraso: daysSince(r.fecha) }));
@@ -210,7 +228,7 @@ export function useVentas() {
       const userId = await getUserId(db, user);
       if (!userId) return [];
       return await db.getAllAsync<Venta>(
-        `SELECT * FROM ventas WHERE fecha >= ? AND fecha <= ? AND user_id = ? AND deleted_at IS NULL ORDER BY fecha ASC, created_at ASC LIMIT ${LISTA_LIMITE}`,
+        `SELECT * FROM ventas WHERE fecha >= ? AND fecha <= ? AND user_id = ? AND deleted_at IS NULL ORDER BY fecha ASC, created_at ASC`,
         [inicio, fin, userId]
       );
     } catch (e) {
@@ -244,7 +262,7 @@ export function useVentas() {
   );
 
   const getCuadre = useCallback(async (): Promise<CuadreResumen> => {
-    const vacio: CuadreResumen = { totalVentas: 0, totalGastos: 0, ganancia: 0, deudores: 0, totalCobrado: 0, totalPendiente: 0, metodosPago: { efectivo: 0, tarjeta: 0, transferencia: 0, sugerencia: '' }, pedidosPendientes: 0, pedidosEntregadosHoy: 0 };
+    const vacio: CuadreResumen = { totalVentas: 0, totalGastos: 0, ganancia: 0, deudores: 0, totalCobrado: 0, totalPendiente: 0, metodosPago: { efectivo: 0, tarjeta: 0, transferencia: 0, sugerencia: '' }, pedidosPendientes: 0, pedidosEntregadosHoy: 0, ventasPorMoneda: { CUP: 0, USD: 0, MLC: 0 } };
     try {
       const userId = await getUserId(db, user);
       if (!userId) {
@@ -261,7 +279,7 @@ export function useVentas() {
         [fecha, userId]
       );
       const deudores = await db.getFirstAsync<{ count: number }>(
-        'SELECT COUNT(*) as count FROM ventas WHERE pagado = 0 AND user_id = ? AND deleted_at IS NULL',
+        'SELECT COUNT(*) as count FROM ventas WHERE pagado = 0 AND user_id = ? AND tipo_pedido != \'pedido\' AND deleted_at IS NULL',
         [userId]
       );
       const cobrado = await db.getFirstAsync<{ total: number }>(
@@ -308,6 +326,16 @@ export function useVentas() {
         }
       }
 
+      const porMonedaRows = await db.getAllAsync<{ moneda: string; total: number }>(
+        `SELECT moneda, COALESCE(SUM(precio), 0) as total FROM ventas WHERE fecha = ? AND pagado = 1 AND user_id = ? AND tipo_pedido != 'pedido' AND deleted_at IS NULL GROUP BY moneda`,
+        [fecha, userId]
+      );
+      const ventasPorMoneda: Record<'CUP' | 'USD' | 'MLC', number> = { CUP: 0, USD: 0, MLC: 0 };
+      for (const r of porMonedaRows) {
+        const m = (r.moneda ?? 'CUP') as 'CUP' | 'USD' | 'MLC';
+        if (ventasPorMoneda[m] !== undefined) ventasPorMoneda[m] = r.total;
+      }
+
       return {
         totalVentas: ventasDia?.total ?? 0,
         totalGastos: gastosDia?.total ?? 0,
@@ -318,6 +346,7 @@ export function useVentas() {
         metodosPago: { efectivo, tarjeta, transferencia, sugerencia },
         pedidosPendientes,
         pedidosEntregadosHoy,
+        ventasPorMoneda,
       };
     } catch (e) {
       console.error('Error al obtener cuadre:', e);

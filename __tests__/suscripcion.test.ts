@@ -14,7 +14,9 @@ describe('calcularEstadoSuscripcion', () => {
       fecha_registro: '2026-01-01T00:00:00Z',
       fecha_expiracion: '2026-02-15T00:00:00Z',
     };
-    expect(calcularEstadoSuscripcion(negocio, ahora).estado).toBe('activo');
+    const r = calcularEstadoSuscripcion(negocio, ahora);
+    expect(r.estado).toBe('activo');
+    expect(r.diasRestantes).toBe(30);
   });
 
   it('negocio activo con expiración pasada → expirado', () => {
