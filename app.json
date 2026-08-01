@@ -17,10 +17,10 @@
         "foregroundImage": "./assets/images/android-icon-foreground.png"
       },
       "package": "com.tunegocio.micajadigital",
-      "versionCode": 2,
+      "versionCode": 3,
       "jsEngine": "hermes",
-      "enableProguardInReleaseBuilds": true,
-      "enableShrinkResourcesInReleaseBuilds": true,
+      "enableProguardInReleaseBuilds": false,
+      "enableShrinkResourcesInReleaseBuilds": false,
       "intentFilters": [
         {
           "autoVerify": true,

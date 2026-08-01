@@ -151,4 +151,74 @@ describe('useVentas', () => {
     expect(upd[0]).toContain('pagado = 1');
     expect(upd[0]).toContain('saldo_pendiente = 0');
   });
+
+  it('deleteVenta hace borrado suave (deleted_at + sincronizado=0)', async () => {
+    const { result } = renderHook(() => useVentas());
+    await act(async () => {
+      await result.current.deleteVenta('v1');
+    });
+    const upd = mockDb.runAsync.mock.calls.find((c: any[]) => c[0].includes('SET deleted_at'));
+    expect(upd).toBeDefined();
+    expect(upd[0]).toContain('sincronizado = 0');
+    expect(upd[1][0]).toBeTruthy();
+  });
+
+  it('pagarVenta salda la deuda (pagado=1, saldo=0, sincronizado=0)', async () => {
+    const { result } = renderHook(() => useVentas());
+    await act(async () => {
+      await result.current.pagarVenta('v1');
+    });
+    const upd = mockDb.runAsync.mock.calls.find((c: any[]) => c[0].includes('SET pagado = 1'));
+    expect(upd).toBeDefined();
+    expect(upd[0]).toContain('saldo_pendiente = 0');
+    expect(upd[0]).toContain('sincronizado = 0');
+  });
+
+  it('actualizarCliente actualiza nombre y marca sync pendiente', async () => {
+    const { result } = renderHook(() => useVentas());
+    await act(async () => {
+      await result.current.actualizarCliente('v1', 'María');
+    });
+    const upd = mockDb.runAsync.mock.calls.find((c: any[]) => c[0].includes('cliente = ?'));
+    expect(upd).toBeDefined();
+    expect(upd[1][0]).toBe('María');
+    expect(upd[0]).toContain('sincronizado = 0');
+  });
+
+  it('getPedidos filtra por estado con LIMIT/OFFSET', async () => {
+    mockDb.getAllAsync.mockResolvedValue([{ id: 'p1' }]);
+    const { result } = renderHook(() => useVentas());
+    await act(async () => {
+      const res = await result.current.getPedidos('pendiente', 30, 0);
+      expect(res).toHaveLength(1);
+    });
+    const sql = mockDb.getAllAsync.mock.calls[0][0] as string;
+    expect(sql).toContain("estado_pedido = ?");
+    expect(sql).toContain('LIMIT ? OFFSET ?');
+    expect(mockDb.getAllAsync.mock.calls[0][1]).toEqual(['pendiente', 'u1', 30, 0]);
+  });
+
+  it('updateVenta recalcula anticipo/saldo para pedidos y marca sync', async () => {
+    mockDb.getFirstAsync.mockResolvedValue({
+      id: 'v1', precio: 1000, tipo_pedido: 'pedido', anticipo: 300,
+      pagado: 0, saldo_pendiente: 700,
+    });
+    const { result } = renderHook(() => useVentas());
+    await act(async () => {
+      await result.current.updateVenta('v1', { anticipo: 400 });
+    });
+    const upd = mockDb.runAsync.mock.calls.find((c: any[]) => c[0].includes('UPDATE ventas SET'));
+    expect(upd).toBeDefined();
+    expect(upd[0]).toContain('anticipo = ?');
+    expect(upd[1]).toContain(400);
+    expect(upd[1]).toContain(600);
+  });
+
+  it('updateVenta lanza error si la venta no existe', async () => {
+    mockDb.getFirstAsync.mockResolvedValue(null);
+    const { result } = renderHook(() => useVentas());
+    await expect(
+      act(async () => { await result.current.updateVenta('nope', { precio: 1 }); })
+    ).rejects.toThrow('Venta no encontrada');
+  });
 });

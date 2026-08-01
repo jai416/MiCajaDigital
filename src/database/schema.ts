@@ -1,6 +1,8 @@
 import { type SQLiteDatabase } from 'expo-sqlite';
+import { logError } from '@/src/services/logger';
 
 export async function initDatabase(db: SQLiteDatabase) {
+  try {
   await db.execAsync(`
     CREATE TABLE IF NOT EXISTS ventas (
       id              TEXT PRIMARY KEY,
@@ -109,7 +111,8 @@ export async function initDatabase(db: SQLiteDatabase) {
       fecha           TEXT NOT NULL,
       sincronizado    INTEGER DEFAULT 0,
       created_at      TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
-      updated_at      TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+      updated_at      TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+      deleted_at      TEXT DEFAULT NULL
     );
   `);
 
@@ -159,4 +162,7 @@ export async function initDatabase(db: SQLiteDatabase) {
       DELETE FROM analytics_events WHERE timestamp < strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-60 days');
     `);
   } catch {}
+  } catch (e) {
+    logError('initDatabase', e);
+  }
 }

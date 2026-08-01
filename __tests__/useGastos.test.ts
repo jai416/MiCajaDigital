@@ -85,4 +85,23 @@ describe('useGastos', () => {
     const sql = mockDb.getAllAsync.mock.calls[0][0] as string;
     expect(sql).toContain('LIMIT');
   });
+
+  it('addGasto con monto cero igual inserta (validación está en la pantalla)', async () => {
+    const { result } = renderHook(() => useGastos());
+    await act(async () => {
+      await result.current.addGasto('Propina', 0);
+    });
+    const insert = mockDb.runAsync.mock.calls.find((c: any[]) => c[0].includes('INSERT INTO gastos'));
+    expect(insert).toBeDefined();
+    expect(insert[1][3]).toBe(0);
+  });
+
+  it('getGastosDelDia devuelve filas y no cae con datos vacíos', async () => {
+    mockDb.getAllAsync.mockResolvedValue([]);
+    const { result } = renderHook(() => useGastos());
+    await act(async () => {
+      const res = await result.current.getGastosDelDia();
+      expect(res).toEqual([]);
+    });
+  });
 });

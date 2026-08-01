@@ -93,4 +93,26 @@ describe('useCompras', () => {
     });
     expect(mockDb.runAsync).toHaveBeenCalled();
   });
+
+  it('deleteCompra hace borrado suave y marca sincronizado=0', async () => {
+    const { result } = renderHook(() => useCompras());
+    await act(async () => {
+      await result.current.deleteCompra('c1');
+    });
+    const upd = mockDb.runAsync.mock.calls.find((c: any[]) => c[0].includes('SET deleted_at'));
+    expect(upd).toBeDefined();
+    expect(upd[0]).toContain('sincronizado = 0');
+    expect(upd[1][0]).toBeTruthy();
+  });
+
+  it('getAll excluye borradas (deleted_at IS NULL)', async () => {
+    mockDb.getAllAsync.mockResolvedValue([{ id: 'co1' }]);
+    const { result } = renderHook(() => useCompras());
+    await act(async () => {
+      const res = await result.current.getAll();
+      expect(res).toHaveLength(1);
+    });
+    const sql = mockDb.getAllAsync.mock.calls[0][0] as string;
+    expect(sql).toContain('deleted_at IS NULL');
+  });
 });

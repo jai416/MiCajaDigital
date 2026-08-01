@@ -7,7 +7,13 @@ export function parseNumero(valor: string | number | undefined | null): number {
   const tienePunto = str.includes('.');
 
   if (tieneComa && tienePunto) {
-    str = str.replace(/\./g, '').replace(',', '.');
+    const ultimaComa = str.lastIndexOf(',');
+    const ultimoPunto = str.lastIndexOf('.');
+    if (ultimoPunto > ultimaComa) {
+      str = str.replace(/,/g, '');
+    } else {
+      str = str.replace(/\./g, '').replace(',', '.');
+    }
   } else if (tieneComa && !tienePunto) {
     const partes = str.split(',');
     str = partes.length > 2 ? partes.join('') : str.replace(',', '.');

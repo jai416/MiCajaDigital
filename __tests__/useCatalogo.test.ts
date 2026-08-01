@@ -111,4 +111,47 @@ describe('useCatalogo', () => {
     expect(upd[1][0]).toBe(7);
     expect(upd[0]).toContain('sincronizado = 0');
   });
+
+  it('deleteProducto hace borrado suave y marca sincronizado=0', async () => {
+    const { result } = renderHook(() => useCatalogo());
+    await act(async () => {
+      await result.current.deleteProducto('c1');
+    });
+    const upd = mockDb.runAsync.mock.calls.find((c: any[]) => c[0].includes('SET deleted_at'));
+    expect(upd).toBeDefined();
+    expect(upd[0]).toContain('sincronizado = 0');
+    expect(upd[1][0]).toBeTruthy();
+  });
+
+  it('updateProducto marca sincronizado=0', async () => {
+    const { result } = renderHook(() => useCatalogo());
+    await act(async () => {
+      await result.current.updateProducto('c1', 'Arroz', 150, 10, 'd', 'Granos', '', '0001');
+    });
+    const upd = mockDb.runAsync.mock.calls.find((c: any[]) => c[0].includes('UPDATE catalogo SET'));
+    expect(upd).toBeDefined();
+    expect(upd[0]).toContain('sincronizado = 0');
+    expect(upd[1][0]).toBe('Arroz');
+  });
+
+  it('getCategorias consulta excluyendo categorías vacías en SQL', async () => {
+    mockDb.getAllAsync.mockResolvedValue([{ categoria: 'Granos' }, { categoria: 'Bebidas' }]);
+    const { result } = renderHook(() => useCatalogo());
+    await act(async () => {
+      const cats = await result.current.getCategorias();
+      expect(cats).toEqual(['Granos', 'Bebidas']);
+    });
+    const sql = mockDb.getAllAsync.mock.calls[0][0] as string;
+    expect(sql).toContain("categoria != ''");
+  });
+
+  it('addProducto sin sesión no inserta (retorna sin error)', async () => {
+    const { getUserId } = require('../src/utils/user');
+    getUserId.mockResolvedValueOnce('');
+    const { result } = renderHook(() => useCatalogo());
+    await act(async () => {
+      await result.current.addProducto('X', 1, 0);
+    });
+    expect(mockDb.runAsync).not.toHaveBeenCalled();
+  });
 });

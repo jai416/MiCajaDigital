@@ -107,7 +107,7 @@ describe('syncToSupabase', () => {
     expect(mockDelete).toHaveBeenCalledWith('ventas', 'id', 'v1');
   });
 
-  it('aplica un borrado remoto de venta al local', async () => {
+  it('aplica un borrado remoto de venta al local si remote es más nuevo', async () => {
     const db = makeDb();
     db.getAllAsync.mockResolvedValue([]);
     db.getFirstAsync.mockImplementation(async (sql: string, params: any[]) => {
@@ -130,6 +130,79 @@ describe('syncToSupabase', () => {
 
     const res = await syncToSupabase(db);
     expect(res.ventas).toBe(1);
+    const del = db._queries.find(q => q.includes('SET deleted_at'));
+    expect(del).toBeDefined();
+  });
+
+  it('NO aplica un borrado remoto si el local es más nuevo (last-write-wins)', async () => {
+    const db = makeDb();
+    db.getAllAsync.mockResolvedValue([]);
+    db.getFirstAsync.mockImplementation(async (sql: string, params: any[]) => {
+      if (sql.includes('FROM ventas')) return { updated_at: '2026-07-30T00:00:00.000Z' };
+      if (sql.includes('last_sync_at')) return { valor: '2026-07-01T00:00:00.000Z' };
+      return null;
+    });
+    mockSelect.mockImplementation(async () => ({
+      data: [{
+        id: 'v1', user_id: 'u1', producto: 'Pan', precio: 50, costo: 20,
+        cliente: '', tipo: 'contado', tipo_pedido: 'contado', pagado: 1,
+        fecha: '2026-07-01', created_at: '2026-07-01T00:00:00.000Z',
+        catalogo_id: null, metodo_pago: 'efectivo', moneda: 'CUP',
+        anticipo: 0, saldo_pendiente: 0, fecha_entrega: null,
+        estado_pedido: 'entregado', nota: '', deleted_at: '2026-07-29T00:00:00.000Z',
+        updated_at: '2026-07-29T00:00:00.000Z',
+      }],
+      error: null,
+    }));
+
+    const res = await syncToSupabase(db);
+    expect(res.ventas).toBe(0);
+    const del = db._queries.find(q => q.includes('SET deleted_at'));
+    expect(del).toBeUndefined();
+  });
+
+  it('NO aplica un borrado remoto de catálogo si el local es más nuevo', async () => {
+    const db = makeDb();
+    db.getAllAsync.mockResolvedValue([]);
+    db.getFirstAsync.mockImplementation(async (sql: string, params: any[]) => {
+      if (sql.includes('FROM catalogo')) return { updated_at: '2026-07-30T00:00:00.000Z' };
+      if (sql.includes('last_sync_at')) return { valor: '2026-07-01T00:00:00.000Z' };
+      return null;
+    });
+    mockSelect.mockImplementation(async () => ({
+      data: [{
+        id: 'c1', user_id: 'u1', nombre: 'Pan', precio: 50, stock: 5,
+        descripcion: '', codigo_barras: '', categoria: '', foto: '',
+        deleted_at: '2026-07-29T00:00:00.000Z', updated_at: '2026-07-29T00:00:00.000Z',
+      }],
+      error: null,
+    }));
+
+    const res = await syncToSupabase(db);
+    expect(res.catalogo).toBe(0);
+    const del = db._queries.find(q => q.includes('SET deleted_at'));
+    expect(del).toBeUndefined();
+  });
+
+  it('aplica un borrado remoto de compras si remote es más nuevo', async () => {
+    const db = makeDb();
+    db.getAllAsync.mockResolvedValue([]);
+    db.getFirstAsync.mockImplementation(async (sql: string, params: any[]) => {
+      if (sql.includes('FROM compras')) return { updated_at: '2026-07-01T00:00:00.000Z' };
+      if (sql.includes('last_sync_at')) return { valor: '2026-07-01T00:00:00.000Z' };
+      return null;
+    });
+    mockSelect.mockImplementation(async () => ({
+      data: [{
+        id: 'co1', user_id: 'u1', producto: 'Arroz', costo_unitario: 100,
+        cantidad: 2, costo_total: 200, proveedor: '', fecha: '2026-07-01',
+        deleted_at: '2026-07-29T00:00:00.000Z', updated_at: '2026-07-29T00:00:00.000Z',
+      }],
+      error: null,
+    }));
+
+    const res = await syncToSupabase(db);
+    expect(res.compras).toBe(1);
     const del = db._queries.find(q => q.includes('SET deleted_at'));
     expect(del).toBeDefined();
   });
