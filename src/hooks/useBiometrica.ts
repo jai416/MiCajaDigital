@@ -38,11 +38,15 @@ export function useBiometrica() {
   }, [available, enabled]);
 
   const toggle = useCallback(async (on: boolean) => {
-    await db.runAsync(
-      "INSERT OR REPLACE INTO app_config (clave, valor) VALUES ('biometrica', ?)",
-      [on ? 'si' : 'no']
-    );
-    setEnabled(on);
+    try {
+      await db.runAsync(
+        "INSERT OR REPLACE INTO app_config (clave, valor) VALUES ('biometrica', ?)",
+        [on ? 'si' : 'no']
+      );
+      setEnabled(on);
+    } catch (e) {
+      console.error('Error al guardar biometría:', e);
+    }
   }, [db]);
 
   return { available, enabled, authenticate, toggle };

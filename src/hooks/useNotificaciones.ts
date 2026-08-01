@@ -142,19 +142,28 @@ export function useNotificaciones() {
     if (on && !permitted) {
       const ok = await requestPermissions();
       if (!ok) {
-        await db.runAsync(
-          "INSERT OR REPLACE INTO app_config (clave, valor) VALUES ('notif_recordatorio', 'no')"
-        );
+        try {
+          await db.runAsync(
+            "INSERT OR REPLACE INTO app_config (clave, valor) VALUES ('notif_recordatorio', 'no')"
+          );
+        } catch (e) {
+          console.error('Error al guardar preferencia:', e);
+        }
         setEnabled(false);
         return;
       }
     }
 
-    await db.runAsync(
-      "INSERT OR REPLACE INTO app_config (clave, valor) VALUES ('notif_recordatorio', ?)",
-      [on ? 'si' : 'no']
-    );
-    setEnabled(on);
+    try {
+      await db.runAsync(
+        "INSERT OR REPLACE INTO app_config (clave, valor) VALUES ('notif_recordatorio', ?)",
+        [on ? 'si' : 'no']
+      );
+      setEnabled(on);
+    } catch (e) {
+      console.error('Error al guardar preferencia:', e);
+      return;
+    }
 
     if (on) {
       await scheduleDaily();
@@ -170,19 +179,28 @@ export function useNotificaciones() {
     if (on && !permitted) {
       const ok = await requestPermissions();
       if (!ok) {
-        await db.runAsync(
-          "INSERT OR REPLACE INTO app_config (clave, valor) VALUES ('notif_deudores', 'no')"
-        );
+        try {
+          await db.runAsync(
+            "INSERT OR REPLACE INTO app_config (clave, valor) VALUES ('notif_deudores', 'no')"
+          );
+        } catch (e) {
+          console.error('Error al guardar preferencia:', e);
+        }
         setDeudorEnabled(false);
         return;
       }
     }
 
-    await db.runAsync(
-      "INSERT OR REPLACE INTO app_config (clave, valor) VALUES ('notif_deudores', ?)",
-      [on ? 'si' : 'no']
-    );
-    setDeudorEnabled(on);
+    try {
+      await db.runAsync(
+        "INSERT OR REPLACE INTO app_config (clave, valor) VALUES ('notif_deudores', ?)",
+        [on ? 'si' : 'no']
+      );
+      setDeudorEnabled(on);
+    } catch (e) {
+      console.error('Error al guardar preferencia:', e);
+      return;
+    }
 
     if (on) {
       await scheduleDeudorCheck();

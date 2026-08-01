@@ -11,20 +11,24 @@ export function useAccentColor() {
 
   useEffect(() => {
     (async () => {
-      const row = await db.getFirstAsync<{ valor: string }>(
-        "SELECT valor FROM app_config WHERE clave = 'accent_color'"
-      );
-      setAccent((row?.valor as AccentKey) ?? null);
+      try {
+        const row = await db.getFirstAsync<{ valor: string }>(
+          "SELECT valor FROM app_config WHERE clave = 'accent_color'"
+        );
+        setAccent((row?.valor as AccentKey) ?? null);
+      } catch { /* error silencioso */ }
     })();
   }, [db]);
 
   const setAccentColor = useCallback(
     async (key: AccentKey) => {
-      await db.runAsync(
-        "INSERT OR REPLACE INTO app_config (clave, valor) VALUES ('accent_color', ?)",
-        [key]
-      );
-      setAccent(key);
+      try {
+        await db.runAsync(
+          "INSERT OR REPLACE INTO app_config (clave, valor) VALUES ('accent_color', ?)",
+          [key]
+        );
+        setAccent(key);
+      } catch { /* error silencioso */ }
     },
     [db]
   );
