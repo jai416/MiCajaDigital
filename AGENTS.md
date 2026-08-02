@@ -61,8 +61,21 @@ Detalles:
 ### Tests
 Jest + jest-expo + @testing-library/react-native. Correr con `npm test` o `npm run test:watch`.
 Los tests viven en `__tests__/`. Mocks manuales para `expo-sqlite`, `expo-secure-store`,
-`@supabase/supabase-js`, `expo-file-system` y `expo-image-manipulator`.
+`@supabase/supabase-js`, `expo-file-system` (y `/legacy`), `expo-image-manipulator`.
 `npm run typecheck` (tsc) excluye `admin/` y `__tests__/`.
+
+### Errores y UX
+- **Nunca mostrar `e.message` crudo al usuario** (puede ser 404, SQLITE, etc.). Usar
+  `mensajeErrorAmigable(e)` de `src/utils/mensajes.ts` y SIEMPRE `logError(contexto, e)` antes.
+- `src/services/erroresGlobales.ts` → `instalarManejadorErroresGlobales()` se llama al inicio de
+  `app/_layout.tsx`: captura errores fatales (`ErrorUtils.setGlobalHandler`) y rechazos de promesas
+  no manejados (`unhandledrejection`) y los loguea al archivo. Es la red de seguridad contra
+  cierres de la app en Android release (Hermes mata el proceso ante un unhandled rejection).
+- `src/components/ErrorBoundary.tsx` (clase, `ErrorBoundaryApp`): envuelve el Stack en `_layout.tsx`,
+  loguea con `componentDidCatch` y muestra pantalla amigable con botón Reintentar.
+- Todas las pantallas que cargan datos muestran `ActivityIndicator` + texto (cuadre, reportes,
+  catálogo, clientes, pedidos, producto).
+- `Haptics.impactAsync` SIEMPRE con `.catch(() => undefined)` (dispositivos sin vibración).
 
 ### Lint y calidad
 - ESLint 9 (flat config) en `eslint.config.js` basado en `eslint-config-expo/flat`.
@@ -78,7 +91,13 @@ Los tests viven en `__tests__/`. Mocks manuales para `expo-sqlite`, `expo-secure
 - `logError(contexto, error, detalle?)` / `logInfo(contexto, mensaje)`.
 - `enviarLogsWhatsApp()`: envía por WhatsApp (si es corto) o comparte el archivo (expo-sharing).
 - Botón en Ajustes → «Enviar registros de errores». El sync ya registra errores vía `logError`.
+- Todos los `catch` de UI que muestran Alert llaman `logError` antes de `mensajeErrorAmigable`.
 - `expo-sharing` está incluido en `transformIgnorePatterns` de jest.config.js.
+- **IMPORTANTE:** `expo-file-system` en SDK 57 exporta el API nuevo; los métodos legacy
+  (`readAsStringAsync`, `writeAsStringAsync`, `makeDirectoryAsync`, `EncodingType`, `documentDirectory`)
+  están en `expo-file-system/legacy`. El módulo raíz los re-exporta pero **LANZAN en runtime**
+  (`throw errorOnLegacyMethodUse`). Importar SIEMPRE de `expo-file-system/legacy`
+  (logger, backup, useExport y sync.ts lo hacen correctamente).
 
 ### Pantallas (app/ exports default)
 ```
@@ -185,6 +204,9 @@ SIN `sincronizado` (es local-only — Supabase usa `updated_at` para sync). Colu
 | `src/services/analytics.ts` | Registro de eventos en tabla `analytics_events` |
 | `src/services/backup.ts` | Backup automático CSV cada 12h (expo-background-task) |
 | `src/services/logger.ts` | Logs locales (app.log) + envío por WhatsApp |
+| `src/services/erroresGlobales.ts` | Manejador global de errores fatales + `unhandledrejection` (previene cierres de app) |
+| `src/components/ErrorBoundary.tsx` | ErrorBoundary de clase con log + pantalla amigable + Reintentar |
+| `src/utils/mensajes.ts` | `mensajeErrorAmigable()` traduce errores técnicos a texto claro para el usuario |
 | `src/context/AuthContext.tsx` | AuthProvider con login/register/logout + `estadoSuscripcion` (activo/prueba/expirado) |
 | `src/components/SuscripcionGate.tsx` | Modal bloqueante de expiración + banner de días de prueba |
 | `src/context/AccentContext.tsx` | Colores de acento personalizables (persistidos en app_config) |
@@ -203,9 +225,13 @@ SIN `sincronizado` (es local-only — Supabase usa `updated_at` para sync). Colu
 - Límites: `LISTA_LIMITE = 200`, `DEUDORES_LIMITE = 100`, `BUSCAR_LIMIT = 20` en `src/constants.ts`
 - `getVentasDelDia`, `getDeudores`, `getGastosDelDia`, `getGastosTodos`, `getVentasEnRango`,
   `getGastosEnRango` usan `LIMIT` para evitar escaneos completos
-- **FlatList**: todas las listas usan `initialNumToRender`, `maxToRenderPerBatch`,
-  `windowSize={10}` y `removeClippedSubviews`; clientes/pedidos además `getItemLayout`.
-  Los items de lista son componentes `React.memo` (DeudorCard, PedidoCard, CatalogoCard, CatalogoRow)
+- **FlatList**: todas las listas usan `initialNumToRender`, `maxToRenderPerBatch` y
+  `windowSize={5}` (reducido a 5 para teléfonos de bajos recursos); clientes/pedidos además
+  `getItemLayout`. Los items de lista son componentes `React.memo`
+  (DeudorCard, PedidoCard, CatalogoCard, CatalogoRow).
+  **NO usar `removeClippedSubviews` en listas con `SwipeableRow`** (pedidos, clientes) porque
+  conflictúa con react-native-gesture-handler/Reanimated en Android (vistas que desaparecen o crash).
+  Solo `catalogo.tsx` lo mantiene.
 - **AccentContext**: `theme` y el value del context están memoizados (`useMemo`/`useCallback`)
   para que `React.memo` en items de lista funcione (antes `theme` se recreaba en cada render)
 - **Cargas de pantalla**: `useFocusEffect` envuelve la carga en `InteractionManager.runAfterInteractions`
@@ -220,6 +246,9 @@ SIN `sincronizado` (es local-only — Supabase usa `updated_at` para sync). Colu
   `enableShrinkResourcesInReleaseBuilds: true`. Workflow compila `assembleRelease`.
   Se eliminaron deps sin uso: `expo-symbols`, `expo-web-browser`
 - **Memorización de pantalla**: en reportes los totales/top productos usan `useMemo`
+- **Bajos recursos**: listas con `windowSize={5}` y batches de 5; splash/logo ligero;
+  `enableProguardInReleaseBuilds: false` y `enableShrinkResourcesInReleaseBuilds: false`
+  (evita problemas de ofuscación que rompen el APK en equipos de gama baja); Hermes ya activo.
 
 ## Tareas Comunes
 

@@ -3,6 +3,7 @@ import { ActivityIndicator, View, StyleSheet } from 'react-native';
 import { router } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
 import { supabase } from '@/src/services/supabase';
+import { logError } from '@/src/services/logger';
 
 export default function RootRedirect() {
   const db = useSQLiteContext();
@@ -31,7 +32,7 @@ export default function RootRedirect() {
           router.replace('/auth/login');
         }
       } catch (e) {
-        console.error('Error al redirigir:', e);
+        logError('redirect_inicio', e);
         router.replace('/auth/login');
       }
     })();

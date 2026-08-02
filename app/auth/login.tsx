@@ -10,6 +10,7 @@ import {
   View,
   ActivityIndicator,
 } from 'react-native';
+import { Image } from 'expo-image';
 import { Link, router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAccentColors } from '@/src/context/AccentContext';
@@ -55,7 +56,7 @@ export default function LoginScreen() {
         contentContainerStyle={[styles.container, { paddingTop: insets.top + 60 }]}
         keyboardShouldPersistTaps="handled"
       >
-        <Text style={[styles.logo, { color: c.primary }]}>📦</Text>
+        <Image source={require('../../assets/images/icon.png')} style={styles.logo} contentFit="contain" />
         <Text style={[styles.title, { color: c.text }]}>Mi Caja Digital</Text>
         <Text style={[styles.subtitle, { color: c.textSecondary }]}>
           Inicia sesión para continuar
@@ -113,7 +114,7 @@ export default function LoginScreen() {
 const styles = StyleSheet.create({
   flex: { flex: 1 },
   container: { padding: 24, paddingBottom: 40 },
-  logo: { fontSize: 64, textAlign: 'center', marginBottom: 8 },
+  logo: { width: 120, height: 120, alignSelf: 'center', marginBottom: 12 },
   title: { fontSize: 28, fontWeight: '800', textAlign: 'center' },
   subtitle: { fontSize: 15, textAlign: 'center', marginBottom: 30, marginTop: 4 },
   card: {

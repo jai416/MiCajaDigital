@@ -1,6 +1,7 @@
 import { memo, useCallback, useMemo, useState } from 'react';
 import {
   Alert,
+  ActivityIndicator,
   FlatList,
   InteractionManager,
   Linking,
@@ -26,16 +27,19 @@ export default function ClientesScreen() {
   const { getDeudores, pagarVenta, deleteVenta, actualizarCliente } = useVentas();
   const [deudores, setDeudores] = useState<(Venta & { dias_retraso: number })[]>([]);
   const [refreshing, setRefreshing] = useState(false);
+  const [cargando, setCargando] = useState(true);
   const [busqueda, setBusqueda] = useState('');
   const [editando, setEditando] = useState<{ id: string; nombre: string } | null>(null);
 
   const load = useCallback(async () => {
     perfStart('cargar_deudores');
+    setCargando(true);
     try {
       const d = await getDeudores();
       setDeudores(d);
     } finally {
       perfEnd('cargar_deudores');
+      setCargando(false);
     }
   }, [getDeudores]);
 
@@ -146,11 +150,10 @@ export default function ClientesScreen() {
         data={filtrados}
         keyExtractor={(item) => item.id.toString()}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
-        initialNumToRender={10}
-        maxToRenderPerBatch={10}
+        initialNumToRender={5}
+        maxToRenderPerBatch={5}
         getItemLayout={(_, index) => ({ length: 100, offset: 100 * index, index })}
-        windowSize={10}
-        removeClippedSubviews={true}
+        windowSize={5}
         ListHeaderComponent={
           <View>
             <Text style={[styles.title, { color: c.text }]}>👥 Deudores</Text>
@@ -161,7 +164,13 @@ export default function ClientesScreen() {
               value={busqueda}
               onChangeText={setBusqueda}
             />
-            {filtrados.length === 0 && (
+            {cargando && (
+              <View style={styles.cargando}>
+                <ActivityIndicator size="large" color={c.primary} />
+                <Text style={[styles.empty, { color: c.textSecondary, marginTop: 8 }]}>Cargando deudores…</Text>
+              </View>
+            )}
+            {!cargando && filtrados.length === 0 && (
               <Text style={[styles.empty, { color: c.textSecondary }]}>
                 {busqueda ? 'No hay resultados.' : 'No hay deudores. ¡Buen trabajo!'}
               </Text>
@@ -259,6 +268,7 @@ const styles = StyleSheet.create({
   title: { fontSize: 28, fontWeight: '800', marginBottom: 8, textAlign: 'center' },
   searchInput: { borderWidth: 1, borderRadius: 12, padding: 12, fontSize: 16, marginBottom: 12 },
   empty: { textAlign: 'center', marginTop: 40, fontSize: 16 },
+  cargando: { paddingVertical: 40, alignItems: 'center' },
   card: {
     borderRadius: 14,
     padding: 16,

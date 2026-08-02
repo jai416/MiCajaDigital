@@ -25,6 +25,7 @@ export default function Calculadora({ visible, onClose, onResult }: { visible: b
     if (b === '=') {
       if (prev === null || !operador) return;
       const curr = parseFloat(display);
+      if (isNaN(curr)) return;
       let res = 0;
       switch (operador) {
         case '+': res = prev + curr; break;
@@ -38,6 +39,7 @@ export default function Calculadora({ visible, onClose, onResult }: { visible: b
     }
     if (['+', '-', '*', '/'].includes(b)) {
       const curr = parseFloat(display);
+      if (isNaN(curr)) return;
       if (prev !== null && operador) {
         let res = 0;
         switch (operador) {
@@ -56,8 +58,9 @@ export default function Calculadora({ visible, onClose, onResult }: { visible: b
       return;
     }
     if (reiniciar) {
-      setDisplay(b); setReiniciar(false);
+      setDisplay(b === '.' ? '0.' : b); setReiniciar(false);
     } else {
+      if (b === '.' && display.includes('.')) return;
       setDisplay(display === '0' && b !== '.' ? b : display + b);
     }
   };

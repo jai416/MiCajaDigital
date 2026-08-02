@@ -14,6 +14,10 @@ import { useSync } from '@/src/hooks/useSync';
 import OfflineBanner from '@/src/components/OfflineBanner';
 import SuscripcionGate from '@/src/components/SuscripcionGate';
 import { logError } from '@/src/services/logger';
+import { instalarManejadorErroresGlobales } from '@/src/services/erroresGlobales';
+import { ErrorBoundary as ErrorBoundaryApp } from '@/src/components/ErrorBoundary';
+
+instalarManejadorErroresGlobales();
 
 SplashScreen.preventAutoHideAsync();
 
@@ -70,16 +74,18 @@ function RootLayoutNav() {
       >
         <AuthProvider>
           <AccentProvider>
-            <SyncInit />
-            <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
-            <OfflineBanner />
-            <SuscripcionGate />
-            <Stack screenOptions={{ headerShown: false }}>
-              <Stack.Screen name="index" />
-              <Stack.Screen name="tutorial" />
-              <Stack.Screen name="auth" />
-              <Stack.Screen name="(tabs)" />
-            </Stack>
+            <ErrorBoundaryApp>
+              <SyncInit />
+              <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
+              <OfflineBanner />
+              <SuscripcionGate />
+              <Stack screenOptions={{ headerShown: false }}>
+                <Stack.Screen name="index" />
+                <Stack.Screen name="tutorial" />
+                <Stack.Screen name="auth" />
+                <Stack.Screen name="(tabs)" />
+              </Stack>
+            </ErrorBoundaryApp>
           </AccentProvider>
         </AuthProvider>
       </SQLiteProvider>

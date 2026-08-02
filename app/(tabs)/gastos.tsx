@@ -10,6 +10,8 @@ import * as ImagePicker from 'expo-image-picker';
 import { useAccentColors } from '@/src/context/AccentContext';
 import { useGastos } from '@/src/hooks/useGastos';
 import { parseNumero } from '@/src/utils/numero';
+import { mensajeErrorAmigable } from '@/src/utils/mensajes';
+import { logError } from '@/src/services/logger';
 
 export default function GastosScreen() {
   const { theme: c } = useAccentColors();
@@ -34,14 +36,15 @@ export default function GastosScreen() {
   };
 
   const handleGuardar = useCallback(async () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => undefined);
     if (!concepto.trim()) { Alert.alert('Error', 'El concepto es obligatorio'); return; }
     const numMonto = parseNumero(monto);
     if (isNaN(numMonto) || numMonto <= 0) { Alert.alert('Error', 'Monto inválido'); return; }
     try {
       await addGasto(concepto.trim(), numMonto, foto);
     } catch (e) {
-      Alert.alert('Error', e instanceof Error ? e.message : 'No se pudo guardar el gasto.');
+      logError('guardar_gasto', e);
+      Alert.alert('Error', mensajeErrorAmigable(e));
       return;
     }
     Alert.alert('Guardado', 'Gasto registrado correctamente');

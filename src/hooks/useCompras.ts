@@ -8,6 +8,12 @@ import { registrarEvento } from '@/src/services/analytics';
 import { LISTA_LIMITE } from '@/src/constants';
 
 import { getUserId } from '@/src/utils/user';
+
+function hoy(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
 export function useCompras() {
   const db = useSQLiteContext();
   const { user } = useAuth();
@@ -35,7 +41,7 @@ export function useCompras() {
         if (!userId) return;
         const id = generarUUID();
         const ahora = new Date().toISOString();
-        const fecha = new Date().toISOString().slice(0, 10);
+        const fecha = hoy();
         const costoTotal = costoUnitario * cantidad;
         await db.runAsync(
           'INSERT INTO compras (id, user_id, producto, costo_unitario, cantidad, costo_total, proveedor, fecha, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',

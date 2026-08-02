@@ -10,6 +10,7 @@ import {
   View,
   ActivityIndicator,
 } from 'react-native';
+import { Image } from 'expo-image';
 import { Link, router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAccentColors } from '@/src/context/AccentContext';
@@ -74,6 +75,7 @@ export default function RegisterScreen() {
         contentContainerStyle={[styles.container, { paddingTop: insets.top + 40 }]}
         keyboardShouldPersistTaps="handled"
       >
+        <Image source={require('../../assets/images/icon.png')} style={styles.logo} contentFit="contain" />
         <Text style={[styles.title, { color: c.text }]}>Crear Cuenta</Text>
         <Text style={[styles.subtitle, { color: c.textSecondary }]}>
           Registra tu negocio en Mi Caja Digital
@@ -141,6 +143,7 @@ const styles = StyleSheet.create({
   flex: { flex: 1 },
   container: { padding: 24, paddingBottom: 40 },
   title: { fontSize: 28, fontWeight: '800', textAlign: 'center' },
+  logo: { width: 100, height: 100, alignSelf: 'center', marginBottom: 12 },
   subtitle: { fontSize: 15, textAlign: 'center', marginBottom: 24, marginTop: 4 },
   card: {
     borderRadius: 16,

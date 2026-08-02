@@ -75,6 +75,22 @@ describe('useCompras', () => {
     expect(params[6]).toBe('Proveedor A');
   });
 
+  it('addCompra registra la fecha local (YYYY-MM-DD), no la UTC', async () => {
+    const { result } = renderHook(() => useCompras());
+    await act(async () => {
+      await result.current.addCompra('Harina', 50, 2);
+    });
+    const insert = mockDb.runAsync.mock.calls.find((c: any[]) => c[0].includes('INSERT INTO compras'));
+    const params = insert[1];
+    const d = new Date();
+    const local = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    const utc = new Date().toISOString().slice(0, 10);
+    expect(params[7]).toBe(local);
+    if (local !== utc) {
+      expect(params[7]).not.toBe(utc);
+    }
+  });
+
   it('addCompra no revienta si no hay userId (borde: sin sesión, retorna sin insertar)', async () => {
     const { getUserId } = require('../src/utils/user');
     getUserId.mockResolvedValueOnce('');

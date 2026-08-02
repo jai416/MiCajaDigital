@@ -1,6 +1,7 @@
 import { memo, useCallback, useState } from 'react';
 import {
   Alert,
+  ActivityIndicator,
   FlatList,
   InteractionManager,
   Pressable,
@@ -26,6 +27,7 @@ export default function PedidosScreen() {
   const [pedidos, setPedidos] = useState<Venta[]>([]);
   const [filtro, setFiltro] = useState<string>('pendiente');
   const [refreshing, setRefreshing] = useState(false);
+  const [cargando, setCargando] = useState(true);
   const [seleccionando, setSeleccionando] = useState(false);
   const [seleccionados, setSeleccionados] = useState<Set<string>>(new Set());
   const [paginando, setPaginando] = useState(false);
@@ -34,11 +36,13 @@ export default function PedidosScreen() {
 
   const load = useCallback(async () => {
     perfStart('cargar_pedidos');
+    setCargando(true);
     try {
       setFinAlcanzado(false);
       setPedidos(await getPedidos(filtro === 'todos' ? undefined : filtro, PAGE_SIZE, 0));
     } finally {
       perfEnd('cargar_pedidos');
+      setCargando(false);
     }
   }, [getPedidos, filtro]);
 
@@ -144,11 +148,10 @@ export default function PedidosScreen() {
         data={pedidos}
         keyExtractor={(item) => item.id}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
-        initialNumToRender={10}
-        maxToRenderPerBatch={10}
+        initialNumToRender={5}
+        maxToRenderPerBatch={5}
         getItemLayout={(_, index) => ({ length: 80, offset: 80 * index, index })}
-        windowSize={10}
-        removeClippedSubviews={true}
+        windowSize={5}
         onEndReachedThreshold={0.4}
         onEndReached={cargarMas}
         ListFooterComponent={paginando ? <Text style={{ color: c.textSecondary, textAlign: 'center', padding: 16 }}>Cargando más…</Text> : null}
@@ -187,7 +190,13 @@ export default function PedidosScreen() {
                 </Pressable>
               ))}
             </View>
-            {pedidos.length === 0 && (
+            {cargando && (
+              <View style={styles.cargando}>
+                <ActivityIndicator size="large" color={c.primary} />
+                <Text style={[styles.empty, { color: c.textSecondary, marginTop: 8 }]}>Cargando pedidos…</Text>
+              </View>
+            )}
+            {!cargando && pedidos.length === 0 && (
               <Text style={[styles.empty, { color: c.textSecondary }]}>
                 No hay pedidos {filtro !== 'todos' ? `en "${filtro}"` : ''}.
               </Text>
@@ -307,6 +316,7 @@ const styles = StyleSheet.create({
   headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
   selBtn: { paddingVertical: 6, paddingHorizontal: 12, borderRadius: 16, borderWidth: 2 },
   empty: { textAlign: 'center', marginTop: 40, fontSize: 16 },
+  cargando: { paddingVertical: 40, alignItems: 'center' },
   filtros: { flexDirection: 'row', gap: 8, marginBottom: 16, justifyContent: 'center' },
   filtroBtn: { paddingVertical: 8, paddingHorizontal: 14, borderRadius: 20, borderWidth: 2 },
   card: { borderRadius: 12, padding: 14, marginBottom: 10, borderWidth: 1 },

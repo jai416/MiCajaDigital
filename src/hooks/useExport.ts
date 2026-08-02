@@ -6,9 +6,16 @@ import { useCallback, useRef, useState } from 'react';
 import { Alert } from 'react-native';
 import { useAuth } from '@/src/context/AuthContext';
 import { registrarEvento } from '@/src/services/analytics';
+import { logError } from '@/src/services/logger';
+import { mensajeErrorAmigable } from '@/src/utils/mensajes';
 
 const TABLAS_PERMITIDAS = ['ventas', 'gastos', 'catalogo', 'compras', 'app_config'] as const;
 type TablaPermitida = typeof TABLAS_PERMITIDAS[number];
+
+function hoy(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
 
 function escapeCSV(val: unknown): string {
   if (val == null) return '';
@@ -63,7 +70,7 @@ export function useExport() {
       if (rows.length === 0) { Alert.alert('Sin datos', `No hay registros en "${nombre}".`); return; }
 
       const csv = rowsToCSV(rows);
-      const filename = `${nombre}_${new Date().toISOString().slice(0, 10)}.csv`;
+      const filename = `${nombre}_${hoy()}.csv`;
       const fileUri = FileSystem.documentDirectory + filename;
       await FileSystem.writeAsStringAsync(fileUri, csv, { encoding: FileSystem.EncodingType.UTF8 });
 
@@ -75,7 +82,8 @@ export function useExport() {
       lastExportRef.current = Date.now();
       if (userId) registrarEvento(db, userId, { nombre: 'export_csv', valor: nombre });
     } catch (e) {
-      Alert.alert('Error', 'No se pudo exportar: ' + (e instanceof Error ? e.message : ''));
+      logError('export_csv', e);
+      Alert.alert('Error', mensajeErrorAmigable(e));
     } finally {
       setExporting(false);
     }
@@ -93,7 +101,7 @@ export function useExport() {
         ['gastos', 'Gastos'],
         ['catalogo', 'Catalogo'],
       ];
-      const fecha = new Date().toISOString().slice(0, 10);
+      const fecha = hoy();
 
       let firstUri = '';
       let count = 0;
@@ -120,7 +128,8 @@ export function useExport() {
       }
       lastExportRef.current = Date.now();
     } catch (e) {
-      Alert.alert('Error', (e instanceof Error ? e.message : ''));
+      logError('export_todo', e);
+      Alert.alert('Error', mensajeErrorAmigable(e));
     } finally {
       setExporting(false);
     }
@@ -175,7 +184,8 @@ export function useExport() {
         Alert.alert('Exportado', `PDF guardado en: ${uri}`);
       }
     } catch (e) {
-      Alert.alert('Error', e instanceof Error ? e.message : 'Error al exportar PDF');
+      logError('export_pdf', e);
+      Alert.alert('Error', mensajeErrorAmigable(e));
     } finally {
       setExporting(false);
     }

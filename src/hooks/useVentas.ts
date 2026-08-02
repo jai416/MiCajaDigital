@@ -302,13 +302,13 @@ export function useVentas() {
       ))?.total ?? 0;
 
       const efectivo = (await db.getFirstAsync<{ total: number }>(
-        "SELECT COALESCE(SUM(precio), 0) as total FROM ventas WHERE fecha = ? AND metodo_pago = 'efectivo' AND user_id = ? AND tipo_pedido != 'pedido' AND deleted_at IS NULL", [fecha, userId]
+        "SELECT COALESCE(SUM(precio), 0) as total FROM ventas WHERE fecha = ? AND metodo_pago = 'efectivo' AND pagado = 1 AND user_id = ? AND tipo_pedido != 'pedido' AND deleted_at IS NULL", [fecha, userId]
       ))?.total ?? 0;
       const tarjeta = (await db.getFirstAsync<{ total: number }>(
-        "SELECT COALESCE(SUM(precio), 0) as total FROM ventas WHERE fecha = ? AND metodo_pago = 'tarjeta' AND user_id = ? AND tipo_pedido != 'pedido' AND deleted_at IS NULL", [fecha, userId]
+        "SELECT COALESCE(SUM(precio), 0) as total FROM ventas WHERE fecha = ? AND metodo_pago = 'tarjeta' AND pagado = 1 AND user_id = ? AND tipo_pedido != 'pedido' AND deleted_at IS NULL", [fecha, userId]
       ))?.total ?? 0;
       const transferencia = (await db.getFirstAsync<{ total: number }>(
-        "SELECT COALESCE(SUM(precio), 0) as total FROM ventas WHERE fecha = ? AND metodo_pago = 'transferencia' AND user_id = ? AND tipo_pedido != 'pedido' AND deleted_at IS NULL", [fecha, userId]
+        "SELECT COALESCE(SUM(precio), 0) as total FROM ventas WHERE fecha = ? AND metodo_pago = 'transferencia' AND pagado = 1 AND user_id = ? AND tipo_pedido != 'pedido' AND deleted_at IS NULL", [fecha, userId]
       ))?.total ?? 0;
 
       const totalMetodos = efectivo + tarjeta + transferencia;

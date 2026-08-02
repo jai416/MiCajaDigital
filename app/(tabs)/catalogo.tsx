@@ -1,7 +1,7 @@
 import { memo, useCallback, useState } from 'react';
 import { Image } from 'expo-image';
 import {
-  Alert, FlatList, InteractionManager, Linking, Modal, Pressable, RefreshControl,
+  Alert, ActivityIndicator, FlatList, InteractionManager, Linking, Modal, Pressable, RefreshControl,
   ScrollView, StyleSheet, Text, TextInput, View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -24,6 +24,7 @@ export default function CatalogoScreen() {
   const [categorias, setCategorias] = useState<string[]>([]);
   const [categoriaFiltro, setCategoriaFiltro] = useState('');
   const [refreshing, setRefreshing] = useState(false);
+  const [cargando, setCargando] = useState(true);
   const [paginando, setPaginando] = useState(false);
   const [finAlcanzado, setFinAlcanzado] = useState(false);
   const PAGE_SIZE = 30;
@@ -49,12 +50,14 @@ export default function CatalogoScreen() {
 
   const load = useCallback(async () => {
     perfStart('cargar_catalogo');
+    setCargando(true);
     try {
       setFinAlcanzado(false);
       setItems(await getAll(PAGE_SIZE, 0));
       setCategorias(await getCategorias());
     } finally {
       perfEnd('cargar_catalogo');
+      setCargando(false);
     }
   }, [getAll, getCategorias]);
 
@@ -170,9 +173,9 @@ export default function CatalogoScreen() {
         contentContainerStyle={[styles.container, { paddingTop: insets.top + 16 }]}
         data={items}
         keyExtractor={(item) => item.id}
-        initialNumToRender={10}
-        maxToRenderPerBatch={10}
-        windowSize={10}
+        initialNumToRender={5}
+        maxToRenderPerBatch={5}
+        windowSize={5}
         removeClippedSubviews={true}
         onEndReachedThreshold={0.4}
         onEndReached={!categoriaFiltro ? cargarMas : undefined}
@@ -202,7 +205,13 @@ export default function CatalogoScreen() {
                 ))}
               </ScrollView>
             )}
-            {items.length === 0 && (
+            {cargando && (
+              <View style={styles.cargando}>
+                <ActivityIndicator size="large" color={c.primary} />
+                <Text style={[styles.empty, { color: c.textSecondary, marginTop: 8 }]}>Cargando productos…</Text>
+              </View>
+            )}
+            {!cargando && items.length === 0 && (
               <Text style={[styles.empty, { color: c.textSecondary }]}>No hay productos. Agrega tu primer producto.</Text>
             )}
             {paginando && (
@@ -285,9 +294,9 @@ export default function CatalogoScreen() {
               <Text style={styles.botonAgregarTexto}>+ Nueva Compra</Text>
             </Pressable>
             <FlatList data={compras} keyExtractor={(item) => item.id}
-              initialNumToRender={10}
-              maxToRenderPerBatch={10}
-              windowSize={10}
+              initialNumToRender={5}
+              maxToRenderPerBatch={5}
+              windowSize={5}
               onEndReachedThreshold={0.4}
               onEndReached={() => {
                 if (paginandoCompras || compras.length < PAGE_SIZE) return;
@@ -402,6 +411,7 @@ const styles = StyleSheet.create({
   container: { padding: 20, paddingBottom: 40 },
   title: { fontSize: 26, fontWeight: '800', textAlign: 'center', marginBottom: 16 },
   empty: { textAlign: 'center', marginTop: 40, fontSize: 16 },
+  cargando: { paddingVertical: 40, alignItems: 'center' },
   botonAgregar: { paddingVertical: 14, borderRadius: 12, alignItems: 'center' },
   botonAgregarTexto: { color: '#fff', fontSize: 15, fontWeight: '700' },
   filtrosScroll: { marginBottom: 12 },

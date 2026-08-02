@@ -8,6 +8,11 @@ export const BACKUP_TASK_NAME = 'auto-backup';
 
 const TABLAS = ['ventas', 'gastos', 'catalogo', 'compras'] as const;
 
+function hoy(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
 function escapeCSV(val: unknown): string {
   if (val == null) return '';
   const s = String(val);
@@ -31,7 +36,7 @@ export async function hacerBackup(db: SQLiteDatabase, userId: string): Promise<b
   try {
     const dir = FileSystem.documentDirectory + 'backups/';
     await FileSystem.makeDirectoryAsync(dir, { intermediates: true }).catch(() => undefined);
-    const fecha = new Date().toISOString().slice(0, 10);
+    const fecha = hoy();
     let count = 0;
     for (const tabla of TABLAS) {
       const rows = await db.getAllAsync<Record<string, unknown>>(

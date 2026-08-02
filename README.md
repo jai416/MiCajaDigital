@@ -23,6 +23,8 @@ App móvil para **control de ventas, gastos, inventario y deudores** para peque�
 | ☁️ Sincronización automática | Cada 5 min + al abrir la app, bidireccional con Supabase |
 | 📤 Backup manual | Botón "Respaldar ahora" en Ajustes |
 | 📤 Exportar CSV | Exportar ventas, gastos o catálogo a CSV para Excel/Sheets |
+| 🛡️ Estabilidad | Manejador global de errores + ErrorBoundary con Reintentar; mensajes de error claros (sin códigos técnicos) |
+| ⚡ Optimizado | Rendimiento ajustado para teléfonos de gama baja (listas ligeras, carga diferida) |
 | 🎁 Prueba de 15 días | Nuevo negocio en prueba gratis; al vencer, aviso para renovar por WhatsApp/Telegram ($15 USD/mes) |
 
 ## Requisitos
@@ -85,6 +87,20 @@ en `admin/app/dashboard/negocios/`. Incluye búsqueda por email/nombre y filtros
 - **Health check**: `GET /api/health` o la página `Estado` (menú 🩺) del dashboard
   verifica env vars + conexión a Supabase.
 
+## Estabilidad y errores
+
+- **Causa principal de cierres resuelta**: en Android release (Hermes), cualquier rechazo de
+  promesa no manejado mataba la app. Ahora `src/services/erroresGlobales.ts` captura errores
+  fatales y `unhandledrejection` y los guarda en el log local.
+- **ErrorBoundary** (`src/components/ErrorBoundary.tsx`) envuelve la app: ante un fallo muestra
+  una pantalla amigable («Ups, algo falló») con botón **Reintentar**, sin cerrar la app.
+- **Mensajes claros**: ningún error técnico (404, SQL, etc.) llega al usuario. Todos pasan por
+  `mensajeErrorAmigable()` y se registran en `app.log` antes de mostrarse.
+- **Loading states**: toda pantalla que carga datos muestra un indicador + texto descriptivo.
+- **Optimización bajo rendimiento**: listas con `windowSize={5}` y batches reducidos,
+  `removeClippedSubviews` eliminado en listas swipeable (conflicto conocido con gesture-handler),
+  haptics protegidos con `.catch()`.
+
 ## Tecnologías
 
 - **Framework:** Expo SDK 57 + React Native 0.86
@@ -103,14 +119,14 @@ en `admin/app/dashboard/negocios/`. Incluye búsqueda por email/nombre y filtros
 ```
 app/               → Pantallas (expo-router)
 src/
-├── components/    → Componentes reutilizables
-├── context/       → AuthContext
+├── components/    → Componentes reutilizables (incl. ErrorBoundary, BarcodeScanner)
+├── context/       → AuthContext, AccentContext
 ├── database/      → Schema SQLite
 ├── hooks/         → useVentas, useGastos, useCatalogo, etc.
-├── services/      → Supabase client, sync engine
+├── services/      → Supabase client, sync engine, logger, erroresGlobales, backup
 ├── theme/         → Colores claro/oscuro
 ├── types/         → Interfaces TypeScript
-└── utils/         → UUID, helpers
+└── utils/         → UUID, numero, mensajes, helpers
 docs/              → Documentación y scripts SQL
 ```
 # MiCajaDigital

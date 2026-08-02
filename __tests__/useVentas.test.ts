@@ -66,6 +66,42 @@ describe('useVentas', () => {
     expect(params[14]).toBe('pendiente');
   });
 
+  it('addVenta para fiado deja saldo pendiente igual al precio', async () => {
+    const { result } = renderHook(() => useVentas());
+    await act(async () => {
+      await result.current.addVenta({ producto: 'Fiado', precio: 500, tipo_pedido: 'fiado', cliente: 'Ana' });
+    });
+    const insert = mockDb.runAsync.mock.calls.find((c: any[]) => c[0].includes('INSERT INTO ventas'));
+    const params = insert[1];
+    expect(params[9]).toBe(0);
+    expect(params[11]).toBe(0);
+    expect(params[12]).toBe(500);
+    expect(params[14]).toBe('entregado');
+  });
+
+  it('addVenta con catalogo_id descuenta stock del producto', async () => {
+    mockDb.getFirstAsync.mockResolvedValue({ stock: 8 });
+    const { result } = renderHook(() => useVentas());
+    await act(async () => {
+      await result.current.addVenta({ producto: 'Pan', precio: 100, catalogo_id: 'c1' });
+    });
+    const stockUpd = mockDb.runAsync.mock.calls.find((c: any[]) => c[0].includes('UPDATE catalogo SET stock'));
+    expect(stockUpd).toBeDefined();
+    expect(stockUpd[0]).toContain('MAX(0, stock - 1)');
+    expect(stockUpd[0]).toContain('sincronizado = 0');
+  });
+
+  it('addVenta con fiado registra moneda y método de pago pasados', async () => {
+    const { result } = renderHook(() => useVentas());
+    await act(async () => {
+      await result.current.addVenta({ producto: 'X', precio: 50, moneda: 'USD', metodo_pago: 'tarjeta', tipo_pedido: 'fiado' });
+    });
+    const insert = mockDb.runAsync.mock.calls.find((c: any[]) => c[0].includes('INSERT INTO ventas'));
+    const params = insert[1];
+    expect(params[7]).toBe('USD');
+    expect(params[18]).toBe('tarjeta');
+  });
+
   it('addVenta lanza error si no hay userId', async () => {
     const { getUserId } = require('../src/utils/user');
     getUserId.mockResolvedValueOnce('');
@@ -109,6 +145,9 @@ describe('useVentas', () => {
 
   it('getCuadre suma ventas, gastos y calcula ganancia', async () => {
     mockDb.getFirstAsync.mockImplementation(async (sql: string) => {
+      if (sql.includes("metodo_pago = 'efectivo'")) return { total: 300 };
+      if (sql.includes("metodo_pago = 'tarjeta'")) return { total: 100 };
+      if (sql.includes("metodo_pago = 'transferencia'")) return { total: 100 };
       if (sql.includes('SUM(precio)') && sql.includes('pagado = 1') && sql.includes("tipo_pedido != 'pedido'") && sql.includes('fecha = ?')) {
         return { total: 500 };
       }
@@ -118,9 +157,6 @@ describe('useVentas', () => {
       if (sql.includes('SUM(precio)') && sql.includes('pagado = 0')) return { total: 200 };
       if (sql.includes('SUM(saldo_pendiente)')) return { total: 300 };
       if (sql.includes("SUM(precio)") && sql.includes('estado_pedido = \'entregado\'')) return { total: 400 };
-      if (sql.includes("metodo_pago = 'efectivo'")) return { total: 300 };
-      if (sql.includes("metodo_pago = 'tarjeta'")) return { total: 100 };
-      if (sql.includes("metodo_pago = 'transferencia'")) return { total: 100 };
       return null;
     });
 
@@ -140,6 +176,22 @@ describe('useVentas', () => {
       expect(c.metodosPago.transferencia).toBe(100);
       expect(c.metodosPago.sugerencia.length).toBeGreaterThan(0);
     });
+  });
+
+  it('getCuadre filtra metodo_pago por pagado = 1 (fiados no inflan el desglose)', async () => {
+    mockDb.getFirstAsync.mockImplementation(async (sql: string) => {
+      if (sql.includes("metodo_pago = 'efectivo'") || sql.includes("metodo_pago = 'tarjeta'") || sql.includes("metodo_pago = 'transferencia'")) {
+        return { total: 300 };
+      }
+      return null;
+    });
+    const { result } = renderHook(() => useVentas());
+    await act(async () => {
+      const c = await result.current.getCuadre();
+      expect(c.metodosPago.efectivo).toBe(300);
+    });
+    const efectivoSql = mockDb.getFirstAsync.mock.calls.find((c: any[]) => c[0].includes("metodo_pago = 'efectivo'"));
+    expect(efectivoSql[0]).toContain('pagado = 1');
   });
 
   it('actualizarEstadoPedido marca pagado y saldo en cero al entregar', async () => {
@@ -212,6 +264,70 @@ describe('useVentas', () => {
     expect(upd[0]).toContain('anticipo = ?');
     expect(upd[1]).toContain(400);
     expect(upd[1]).toContain(600);
+  });
+
+  it('updateVenta de fiado a contado marca pagado=1 y saldo=0', async () => {
+    mockDb.getFirstAsync.mockResolvedValue({
+      id: 'v1', precio: 500, tipo_pedido: 'fiado', anticipo: 0,
+      pagado: 0, saldo_pendiente: 500,
+    });
+    const { result } = renderHook(() => useVentas());
+    await act(async () => {
+      await result.current.updateVenta('v1', { tipo_pedido: 'contado' });
+    });
+    const upd = mockDb.runAsync.mock.calls.find((c: any[]) => c[0].includes('UPDATE ventas SET'));
+    expect(upd[1]).toContain(500);
+    expect(upd[1]).toContain(0);
+    expect(upd[1]).toContain(1);
+  });
+
+  it('updateVenta no modifica campos no pasados', async () => {
+    mockDb.getFirstAsync.mockResolvedValue({
+      id: 'v1', precio: 500, tipo_pedido: 'contado', anticipo: 500,
+      pagado: 1, saldo_pendiente: 0,
+    });
+    const { result } = renderHook(() => useVentas());
+    await act(async () => {
+      await result.current.updateVenta('v1', { nota: 'urgente' });
+    });
+    const upd = mockDb.runAsync.mock.calls.find((c: any[]) => c[0].includes('UPDATE ventas SET'));
+    expect(upd[0]).not.toContain('producto = ?');
+    expect(upd[0]).not.toContain('precio = ?');
+    expect(upd[0]).toContain('nota = ?');
+  });
+
+  it('actualizarEstadoPedido a cancelado NO toca pagado ni saldo', async () => {
+    const { result } = renderHook(() => useVentas());
+    await act(async () => {
+      await result.current.actualizarEstadoPedido('v1', 'cancelado');
+    });
+    const upd = mockDb.runAsync.mock.calls.find((c: any[]) => c[0].includes('estado_pedido = ?'));
+    expect(upd[0]).not.toContain('pagado = 1');
+    expect(upd[0]).not.toContain('saldo_pendiente');
+  });
+
+  it('getDeudores excluye pedidos (solo fiados)', async () => {
+    mockDb.getAllAsync.mockResolvedValue([{ id: 'v1', fecha: '2026-07-20', pagado: 0, precio: 10 }]);
+    const { result } = renderHook(() => useVentas());
+    await act(async () => {
+      const res = await result.current.getDeudores();
+      expect(res).toHaveLength(1);
+    });
+    const sql = mockDb.getAllAsync.mock.calls[0][0] as string;
+    expect(sql).toContain("tipo_pedido != 'pedido'");
+    expect(sql).toContain('pagado = 0');
+  });
+
+  it('getVentasEnRango aplica rango de fechas', async () => {
+    mockDb.getAllAsync.mockResolvedValue([{ id: 'v1' }]);
+    const { result } = renderHook(() => useVentas());
+    await act(async () => {
+      const res = await result.current.getVentasEnRango('2026-07-01', '2026-07-31');
+      expect(res).toHaveLength(1);
+    });
+    const sql = mockDb.getAllAsync.mock.calls[0][0] as string;
+    expect(sql).toContain('fecha >= ? AND fecha <= ?');
+    expect(mockDb.getAllAsync.mock.calls[0][1]).toEqual(['2026-07-01', '2026-07-31', 'u1']);
   });
 
   it('updateVenta lanza error si la venta no existe', async () => {

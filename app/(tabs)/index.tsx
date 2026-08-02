@@ -13,6 +13,8 @@ import { type CatalogoItem } from '@/src/types';
 import Calculadora from '@/src/components/Calculadora';
 import BarcodeScanner from '@/src/components/BarcodeScanner';
 import { parseNumero } from '@/src/utils/numero';
+import { mensajeErrorAmigable } from '@/src/utils/mensajes';
+import { logError } from '@/src/services/logger';
 
 export default function VentasScreen() {
   const { theme: c } = useAccentColors();
@@ -82,7 +84,7 @@ export default function VentasScreen() {
   }, [quickNombre, quickPrecio, addProdCatalogo, getCatalogo]);
 
   const handleVender = useCallback(async () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => undefined);
     if (!producto.trim()) { Alert.alert('Error', 'El producto es obligatorio'); return; }
     const numPrecio = parseNumero(precio);
     if (isNaN(numPrecio) || numPrecio <= 0) { Alert.alert('Error', 'Precio inválido'); return; }
@@ -106,7 +108,8 @@ export default function VentasScreen() {
         anticipo: parseNumero(anticipo) || 0, fecha_entrega: fechaEntrega.trim() || undefined,
       });
     } catch (e) {
-      Alert.alert('Error', e instanceof Error ? e.message : 'No se pudo guardar la venta.');
+      logError('vender', e);
+      Alert.alert('Error', mensajeErrorAmigable(e));
       return;
     }
 
@@ -273,9 +276,9 @@ export default function VentasScreen() {
               </ScrollView>
             )}
             <FlatList data={catalogoItems} keyExtractor={(item) => item.id}
-              initialNumToRender={10}
-              maxToRenderPerBatch={10}
-              windowSize={10}
+              initialNumToRender={5}
+              maxToRenderPerBatch={5}
+              windowSize={5}
               removeClippedSubviews={true}
               ListEmptyComponent={
                 <View style={{ alignItems: 'center', paddingVertical: 20 }}>
