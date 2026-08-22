@@ -17,9 +17,21 @@ interface Negocio {
 
 type ModalTipo = 'editar' | 'renovar' | null;
 
+interface Paginacion {
+  pagina: number;
+  totalPaginas: number;
+  q: string;
+}
+
 const PLANES_VALIDOS = ['gratis', 'basico', 'pro', 'premium'];
 
-export default function NegociosTable({ negocios }: { negocios: Negocio[] }) {
+export default function NegociosTable({
+  negocios,
+  paginacion,
+}: {
+  negocios: Negocio[];
+  paginacion?: Paginacion;
+}) {
   const router = useRouter();
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState('todos');
@@ -30,6 +42,11 @@ export default function NegociosTable({ negocios }: { negocios: Negocio[] }) {
   const [dias, setDias] = useState('30');
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState('');
+  // Borrado permanente: modal propio que exige escribir ELIMINAR (los
+  // confirm() nativos se aceptan por inercia con doble click).
+  const [borrando, setBorrando] = useState<Negocio | null>(null);
+  const [textoConfirmar, setTextoConfirmar] = useState('');
+  const [cargandoBorrado, setCargandoBorrado] = useState(false);
 
   const filtered = negocios.filter((n) => {
     const matchSearch =
@@ -99,20 +116,28 @@ export default function NegociosTable({ negocios }: { negocios: Negocio[] }) {
     if (res.ok) router.refresh();
   };
 
-  const handleBorrarPermanente = async (id: string, nombre: string) => {
-    if (
-      !confirm(
-        `⚠️ BORRADO DEFINITIVO de "${nombre}".\n\nSe eliminarán TODOS sus datos (ventas, gastos, catálogo, compras) y no se podrán recuperar.\n\n¿Continuar?`
-      )
-    )
-      return;
-    if (!confirm('Esta acción es irreversible. ¿Seguro que quieres eliminarlo para siempre?')) return;
+  const abrirBorradoPermanente = (n: Negocio) => {
+    setBorrando(n);
+    setTextoConfirmar('');
+  };
+
+  const confirmarBorrado = async () => {
+    if (!borrando || textoConfirmar !== 'ELIMINAR') return;
+    setCargandoBorrado(true);
     const res = await fetch('/api/negocios', {
       method: 'DELETE',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id, permanente: true }),
+      body: JSON.stringify({ id: borrando.id, permanente: true }),
     });
-    if (res.ok) router.refresh();
+    setCargandoBorrado(false);
+    if (!res.ok) {
+      const j = await res.json();
+      setError(j.error || 'Error al eliminar.');
+      setBorrando(null);
+      return;
+    }
+    setBorrando(null);
+    router.refresh();
   };
 
   const handleGuardarEdicion = async () => {
@@ -278,9 +303,10 @@ export default function NegociosTable({ negocios }: { negocios: Negocio[] }) {
                             ♻️ Restaurar
                           </button>
                           <button
-                            onClick={() => handleBorrarPermanente(n.id, n.nombre_negocio)}
+                            onClick={() => abrirBorradoPermanente(n)}
                             className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-red-600 text-white hover:bg-red-700 transition"
                             title="Eliminar definitivamente todos sus datos"
+                            aria-label={`Eliminar permanentemente ${n.nombre_negocio}`}
                           >
                             🗑️ Eliminar
                           </button>
@@ -333,6 +359,38 @@ export default function NegociosTable({ negocios }: { negocios: Negocio[] }) {
         </table>
       </div>
 
+      {paginacion && paginacion.totalPaginas > 1 && (
+        <div className="flex items-center justify-between mt-4">
+          {paginacion.pagina > 1 ? (
+            <a
+              href={`/dashboard/negocios?page=${paginacion.pagina - 1}${
+                paginacion.q ? `&q=${encodeURIComponent(paginacion.q)}` : ''
+              }`}
+              className="px-4 py-2 border border-gray-300 rounded-lg text-sm font-semibold text-gray-700 hover:bg-gray-50 transition"
+            >
+              ← Anterior
+            </a>
+          ) : (
+            <span />
+          )}
+          <span className="text-sm text-gray-500">
+            Página {paginacion.pagina} de {paginacion.totalPaginas}
+          </span>
+          {paginacion.pagina < paginacion.totalPaginas ? (
+            <a
+              href={`/dashboard/negocios?page=${paginacion.pagina + 1}${
+                paginacion.q ? `&q=${encodeURIComponent(paginacion.q)}` : ''
+              }`}
+              className="px-4 py-2 border border-gray-300 rounded-lg text-sm font-semibold text-gray-700 hover:bg-gray-50 transition"
+            >
+              Siguiente →
+            </a>
+          ) : (
+            <span />
+          )}
+        </div>
+      )}
+
       {modal && seleccion && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4"
@@ -358,8 +416,9 @@ export default function NegociosTable({ negocios }: { negocios: Negocio[] }) {
             {modal === 'editar' ? (
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-600 mb-1">Plan</label>
+                  <label htmlFor="modal-plan" className="block text-sm font-medium text-gray-600 mb-1">Plan</label>
                   <select
+                    id="modal-plan"
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
                     value={plan}
                     onChange={(e) => setPlan(e.target.value)}
@@ -372,10 +431,11 @@ export default function NegociosTable({ negocios }: { negocios: Negocio[] }) {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-600 mb-1">
+                  <label htmlFor="modal-expiracion" className="block text-sm font-medium text-gray-600 mb-1">
                     Fecha de expiración <span className="text-gray-400">(dejar vacío para no cambiar)</span>
                   </label>
                   <input
+                    id="modal-expiracion"
                     type="date"
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
                     value={expiracion}
@@ -385,10 +445,11 @@ export default function NegociosTable({ negocios }: { negocios: Negocio[] }) {
               </div>
             ) : (
               <div>
-                <label className="block text-sm font-medium text-gray-600 mb-1">
+                <label htmlFor="modal-dias" className="block text-sm font-medium text-gray-600 mb-1">
                   Días de renovación
                 </label>
                 <input
+                  id="modal-dias"
                   type="number"
                   min={1}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
@@ -415,6 +476,56 @@ export default function NegociosTable({ negocios }: { negocios: Negocio[] }) {
                 className="flex-1 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white rounded-lg transition text-sm font-semibold"
               >
                 {cargando ? 'Guardando...' : 'Guardar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {borrando && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-60 p-4">
+          <div
+            className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Confirmar borrado permanente"
+          >
+            <h3 className="text-lg font-bold text-red-700 mb-1">
+              ⚠️ Borrado definitivo
+            </h3>
+            <p className="text-sm text-gray-600 mb-3">
+              Vas a eliminar <strong>{borrando.nombre_negocio}</strong> ({borrando.email}) para
+              siempre. Se borrarán TODOS sus datos: ventas, gastos, catálogo, compras y pagos.
+              <strong> No se podrá recuperar nada.</strong>
+            </p>
+            <label htmlFor="confirmar-borrar" className="block text-sm font-medium text-gray-700 mb-1">
+              Escribe <span className="font-mono font-bold text-red-600">ELIMINAR</span> para confirmar:
+            </label>
+            <input
+              id="confirmar-borrar"
+              type="text"
+              autoFocus
+              value={textoConfirmar}
+              onChange={(e) => setTextoConfirmar(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Escape') setBorrando(null);
+              }}
+              placeholder="ELIMINAR"
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 outline-none font-mono"
+            />
+            <div className="flex gap-3 mt-5">
+              <button
+                onClick={() => setBorrando(null)}
+                className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition text-sm font-semibold"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={confirmarBorrado}
+                disabled={textoConfirmar !== 'ELIMINAR' || cargandoBorrado}
+                className="flex-1 px-4 py-2 bg-red-600 hover:bg-red-700 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-lg transition text-sm font-semibold"
+              >
+                {cargandoBorrado ? 'Eliminando...' : 'Eliminar para siempre'}
               </button>
             </div>
           </div>

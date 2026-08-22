@@ -40,6 +40,11 @@ export default function CodigosPage() {
   const [error, setError] = useState('');
   const [cargado, setCargado] = useState(false);
   const [filtro, setFiltro] = useState('todos');
+  const [pagina, setPagina] = useState(1);
+  const [totalPaginas, setTotalPaginas] = useState(1);
+  const [total, setTotal] = useState(0);
+  // Feedback del botón Copiar (y fallback si clipboard API falla).
+  const [copiado, setCopiado] = useState('');
 
   const planSel = PLANES.find((p) => p.id === plan)!;
   const durSel = DURACIONES.find((d) => d.id === duracion)!;
@@ -73,10 +78,19 @@ export default function CodigosPage() {
     URL.revokeObjectURL(url);
   };
 
-  const cargar = async () => {
-    const res = await fetch('/api/codigos');
-    const json = await res.json();
-    if (res.ok) setCodigos(json.data ?? []);
+  const cargar = async (paginaNueva: number = 1) => {
+    try {
+      const res = await fetch(`/api/codigos?pagina=${paginaNueva}&porPagina=50`);
+      const json = await res.json();
+      if (res.ok) {
+        setCodigos(json.data ?? []);
+        setPagina(json.pagina ?? 1);
+        setTotalPaginas(json.totalPaginas ?? 1);
+        setTotal(json.total ?? 0);
+      }
+    } catch {
+      // sin red: se mantiene la lista previa
+    }
     setCargado(true);
   };
 
@@ -109,18 +123,45 @@ export default function CodigosPage() {
     }
     setGenerado(json.data);
     setEmail('');
-    await cargar();
+    await cargar(1);
   };
 
-  const copiar = (texto: string) => {
-    navigator.clipboard?.writeText(texto);
+  const copiar = async (texto: string) => {
+    let ok = false;
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(texto);
+        ok = true;
+      }
+    } catch {
+      ok = false;
+    }
+    if (!ok) {
+      // Fallback (contexto no seguro / permiso denegado)
+      const ta = document.createElement('textarea');
+      ta.value = texto;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      try {
+        ok = document.execCommand('copy');
+      } catch {
+        ok = false;
+      }
+      document.body.removeChild(ta);
+    }
+    if (ok) {
+      setCopiado(texto);
+      setTimeout(() => setCopiado(''), 2000);
+    }
   };
 
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold text-gray-800">Códigos de pago</h1>
-        <span className="text-sm text-gray-500">{codigos.length} generados</span>
+        <span className="text-sm text-gray-500">{total} generados</span>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -128,8 +169,9 @@ export default function CodigosPage() {
           <h2 className="text-lg font-bold text-gray-800 mb-4">Generar código</h2>
           <div className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-600 mb-1">Correo de la clienta</label>
+              <label htmlFor="codigo-email" className="block text-sm font-medium text-gray-600 mb-1">Correo de la clienta</label>
               <input
+                id="codigo-email"
                 type="email"
                 placeholder="cliente@correo.com"
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
@@ -138,8 +180,9 @@ export default function CodigosPage() {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-600 mb-1">Plan</label>
+              <label htmlFor="codigo-plan" className="block text-sm font-medium text-gray-600 mb-1">Plan</label>
               <select
+                id="codigo-plan"
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
                 value={plan}
                 onChange={(e) => setPlan(e.target.value)}
@@ -152,8 +195,9 @@ export default function CodigosPage() {
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-600 mb-1">Duración</label>
+              <label htmlFor="codigo-duracion" className="block text-sm font-medium text-gray-600 mb-1">Duración</label>
               <select
+                id="codigo-duracion"
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
                 value={duracion}
                 onChange={(e) => setDuracion(Number(e.target.value))}
@@ -164,8 +208,9 @@ export default function CodigosPage() {
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-600 mb-1">Método de pago</label>
+              <label htmlFor="codigo-metodo" className="block text-sm font-medium text-gray-600 mb-1">Método de pago</label>
               <select
+                id="codigo-metodo"
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
                 value={metodo}
                 onChange={(e) => setMetodo(e.target.value)}
@@ -205,7 +250,7 @@ export default function CodigosPage() {
                   onClick={() => copiar(generado.codigo)}
                   className="px-4 py-2 text-xs font-semibold bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
                 >
-                  Copiar
+                  {copiado === generado.codigo ? '✓ Copiado' : 'Copiar'}
                 </button>
                 <a
                   href={`https://wa.me/?text=${encodeURIComponent(
@@ -324,6 +369,27 @@ export default function CodigosPage() {
               )}
             </tbody>
           </table>
+          {totalPaginas > 1 && (
+            <div className="flex items-center justify-between px-4 py-3 border-t border-gray-200">
+              <button
+                onClick={() => cargar(pagina - 1)}
+                disabled={pagina <= 1}
+                className="px-4 py-2 border border-gray-300 rounded-lg text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition"
+              >
+                ← Anterior
+              </button>
+              <span className="text-xs text-gray-500">
+                Página {pagina} de {totalPaginas} · el CSV exporta esta página
+              </span>
+              <button
+                onClick={() => cargar(pagina + 1)}
+                disabled={pagina >= totalPaginas}
+                className="px-4 py-2 border border-gray-300 rounded-lg text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition"
+              >
+                Siguiente →
+              </button>
+            </div>
+          )}
         </div>
       </div>
     </div>

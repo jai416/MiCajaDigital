@@ -1,4 +1,9 @@
-const CACHE = 'mcd-admin-v1';
+// La versión de la caché viene por query al registrar el SW
+// (?v=NEXT_PUBLIC_APP_VERSION desde RegisterSW): cada release con versión
+// nueva crea una caché nueva y borra las viejas en activate, así el panel no
+// se queda pegado a JS/CSS de un deploy anterior.
+const VERSION = new URLSearchParams(self.location.search).get('v') || 'dev';
+const CACHE = `mcd-admin-v1-${VERSION}`;
 const SHELL = ['/', '/icons/icon-192.png', '/icons/icon-512.png'];
 
 self.addEventListener('install', (event) => {
@@ -38,6 +43,8 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
+  // Assets: stale-while-revalidate. Sirve del caché para ser instantáneo pero
+  // refresca en segundo plano; al cambiar VERSION, la caché vieja se descarta.
   event.respondWith(
     caches.match(request).then((cached) => {
       const network = fetch(request)

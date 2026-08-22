@@ -16,32 +16,44 @@ interface SearchParams {
 }
 
 async function getStats(dias: number) {
-  const { data: negocios } = await supabaseAdmin
-    .from('negocios')
-    .select('id, activo, plan, fecha_registro, fecha_expiracion, deleted_at');
-
-  const { count: codigosGenerados } = await supabaseAdmin
-    .from('codigos_pago')
-    .select('*', { count: 'exact', head: true });
-
-  const { count: codigosUsados } = await supabaseAdmin
-    .from('codigos_pago')
-    .select('*', { count: 'exact', head: true })
-    .eq('usado', true);
-
-  // Códigos por vencer en los próximos 3 días (todavía no canjeados).
+  // Consultas globales independientes: se lanzan en paralelo (una sola tanda)
+  // para que el dashboard cargue en el tiempo de la más lenta, no en la suma.
   const enTresDias = new Date(Date.now() + 3 * 86400000).toISOString();
-  const { count: codigosPorVencer } = await supabaseAdmin
-    .from('codigos_pago')
-    .select('*', { count: 'exact', head: true })
-    .eq('usado', false)
-    .lte('fecha_expiracion', enTresDias);
 
-  // Ingreso real (lo pagado por códigos ya usados).
-  const { data: ingresosReales } = await supabaseAdmin
-    .from('codigos_pago')
-    .select('precio_pagado, metodo_pago')
-    .eq('usado', true);
+  const [
+    rNegocios,
+    rCodigosGenerados,
+    rCodigosUsados,
+    rCodigosPorVencer,
+    rIngresosReales,
+  ] = await Promise.all([
+    supabaseAdmin
+      .from('negocios')
+      .select('id, activo, plan, fecha_registro, fecha_expiracion, deleted_at'),
+    supabaseAdmin
+      .from('codigos_pago')
+      .select('*', { count: 'exact', head: true }),
+    supabaseAdmin
+      .from('codigos_pago')
+      .select('*', { count: 'exact', head: true })
+      .eq('usado', true),
+    // Códigos por vencer en los próximos 3 días (todavía no canjeados).
+    supabaseAdmin
+      .from('codigos_pago')
+      .select('*', { count: 'exact', head: true })
+      .eq('usado', false)
+      .lte('fecha_expiracion', enTresDias),
+    // Ingreso real (lo pagado por códigos ya usados).
+    supabaseAdmin
+      .from('codigos_pago')
+      .select('precio_pagado, metodo_pago')
+      .eq('usado', true),
+  ]);
+  const negocios = rNegocios.data;
+  const codigosGenerados = rCodigosGenerados.count;
+  const codigosUsados = rCodigosUsados.count;
+  const codigosPorVencer = rCodigosPorVencer.count;
+  const ingresosReales = rIngresosReales.data;
 
   const ahora = Date.now();
   const msDia = 86400000;
@@ -110,20 +122,39 @@ async function getStats(dias: number) {
     .reduce((s, n) => s + (PRECIOS_PLAN[n.plan] ?? 0), 0);
 
   // ---- Actividad de la app (métricas de uso) en el rango ----
+  // Segunda tanda paralela: actividad, retención e inactividad juntas.
   const desde = new Date(ahora - (dias - 1) * msDia).toISOString().slice(0, 10);
-  const { count: ventasRango } = await supabaseAdmin
-    .from('ventas')
-    .select('*', { count: 'exact', head: true })
-    .gte('fecha', desde);
-  const { count: gastosRango } = await supabaseAdmin
-    .from('gastos')
-    .select('*', { count: 'exact', head: true })
-    .gte('fecha', desde);
-
-  const { data: ventasPorDia } = await supabaseAdmin
-    .from('ventas')
-    .select('fecha')
-    .gte('fecha', desde);
+  const desde30 = new Date(ahora - 30 * msDia).toISOString().slice(0, 10);
+  const [
+    rVentasRango,
+    rGastosRango,
+    rVentasPorDia,
+    rVentasPorMoneda,
+    rCodigosConNegocio,
+    rVentas30,
+    rGastos30,
+  ] = await Promise.all([
+    supabaseAdmin
+      .from('ventas')
+      .select('*', { count: 'exact', head: true })
+      .gte('fecha', desde),
+    supabaseAdmin
+      .from('gastos')
+      .select('*', { count: 'exact', head: true })
+      .gte('fecha', desde),
+    supabaseAdmin.from('ventas').select('fecha').gte('fecha', desde),
+    supabaseAdmin.from('ventas').select('moneda').gte('fecha', desde),
+    supabaseAdmin
+      .from('codigos_pago')
+      .select('negocio_id')
+      .eq('usado', true)
+      .not('negocio_id', 'is', null),
+    supabaseAdmin.from('ventas').select('user_id').gte('fecha', desde30),
+    supabaseAdmin.from('gastos').select('user_id').gte('fecha', desde30),
+  ]);
+  const ventasRango = rVentasRango.count;
+  const gastosRango = rGastosRango.count;
+  const ventasPorDia = rVentasPorDia.data;
   const ventasPorDiaMap = new Map<string, number>();
   for (const v of ventasPorDia ?? []) {
     const k = String(v.fecha).slice(0, 10);
@@ -139,10 +170,7 @@ async function getStats(dias: number) {
     });
   }
 
-  const { data: ventasPorMoneda } = await supabaseAdmin
-    .from('ventas')
-    .select('moneda')
-    .gte('fecha', desde);
+  const ventasPorMoneda = rVentasPorMoneda.data;
   const monedaResumen: Record<string, number> = {};
   for (const v of ventasPorMoneda ?? []) {
     const m = String(v.moneda ?? 'CUP');
@@ -158,11 +186,7 @@ async function getStats(dias: number) {
   // ---- Retención: clientas que renovaron al menos una vez ----
   // Una "renovación" = negocio con ≥2 códigos canjeados (el primero activa, el
   // resto renueva). La retención es ese grupo sobre quienes pagaron alguna vez.
-  const { data: codigosConNegocio } = await supabaseAdmin
-    .from('codigos_pago')
-    .select('negocio_id')
-    .eq('usado', true)
-    .not('negocio_id', 'is', null);
+  const codigosConNegocio = rCodigosConNegocio.data;
   const pagosPorNegocio = new Map<string, number>();
   for (const c of codigosConNegocio ?? []) {
     const k = String(c.negocio_id);
@@ -175,14 +199,9 @@ async function getStats(dias: number) {
   });
 
   // ---- Inactivas: sin ventas NI gastos sincronizados en los últimos 30 días ----
-  const desde30 = new Date(ahora - 30 * msDia).toISOString().slice(0, 10);
-  const [ventas30, gastos30] = await Promise.all([
-    supabaseAdmin.from('ventas').select('user_id').gte('fecha', desde30),
-    supabaseAdmin.from('gastos').select('user_id').gte('fecha', desde30),
-  ]);
   const activasConDatos = new Set<string>();
-  for (const v of ventas30.data ?? []) activasConDatos.add(String(v.user_id));
-  for (const g of gastos30.data ?? []) activasConDatos.add(String(g.user_id));
+  for (const v of rVentas30.data ?? []) activasConDatos.add(String(v.user_id));
+  for (const g of rGastos30.data ?? []) activasConDatos.add(String(g.user_id));
   const inactivas30 = vivos.filter((n) => !activasConDatos.has(String(n.id))).length;
 
   return {

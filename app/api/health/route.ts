@@ -1,17 +1,20 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
+import { getSession } from '@/lib/auth';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET() {
+  const autenticado = await getSession();
   const checks: Record<string, { ok: boolean; detalle?: string }> = {};
 
+  // HASH o contraseña: se exige una de las dos (el hash es lo recomendado).
   const envOk = Boolean(
     process.env.NEXT_PUBLIC_SUPABASE_URL &&
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY &&
       process.env.SUPABASE_SERVICE_ROLE_KEY &&
       process.env.ADMIN_EMAIL &&
-      process.env.ADMIN_PASSWORD
+      (process.env.ADMIN_PASSWORD_HASH || process.env.ADMIN_PASSWORD)
   );
   checks.env = {
     ok: envOk,
@@ -37,28 +40,41 @@ export async function GET() {
     };
   }
 
-  // Bucket de fotos: se crea automáticamente si falta (idempotente).
-  try {
-    const { ensureFotosBucketExists } = await import('@/lib/supabase');
-    const bucket = await ensureFotosBucketExists();
-    checks.storage = bucket.ok
-      ? { ok: true, detalle: 'Bucket fotos listo' }
-      : { ok: false, detalle: bucket.error ?? 'Bucket fotos no disponible' };
-  } catch (e) {
-    checks.storage = {
-      ok: false,
-      detalle: e instanceof Error ? e.message : 'Error al verificar storage',
-    };
+  // Bucket de fotos y detalles SOLO para sesiones autenticadas. Sin login,
+  // /api/health responde con el mínimo (sin filtrar infraestructura) y sin
+  // efectos secundarios (no intenta crear buckets nadie no autorizado).
+  if (autenticado) {
+    try {
+      const { ensureFotosBucketExists } = await import('@/lib/supabase');
+      const bucket = await ensureFotosBucketExists();
+      checks.storage = bucket.ok
+        ? { ok: true, detalle: 'Bucket fotos listo' }
+        : { ok: false, detalle: bucket.error ?? 'Bucket fotos no disponible' };
+    } catch (e) {
+      checks.storage = {
+        ok: false,
+        detalle: e instanceof Error ? e.message : 'Error al verificar storage',
+      };
+    }
+
+    const healthy = Object.values(checks).every((c) => c.ok);
+    return NextResponse.json(
+      {
+        status: healthy ? 'ok' : 'degraded',
+        timestamp: new Date().toISOString(),
+        checks,
+      },
+      { status: healthy ? 200 : 500 }
+    );
   }
 
-  const healthy = Object.values(checks).every((c) => c.ok);
-
+  // Respuesta pública mínima: solo el estado agregado, sin detalles.
+  const publicoOk = Object.values(checks).every((c) => c.ok);
   return NextResponse.json(
     {
-      status: healthy ? 'ok' : 'degraded',
+      status: publicoOk ? 'ok' : 'degraded',
       timestamp: new Date().toISOString(),
-      checks,
     },
-    { status: healthy ? 200 : 500 }
+    { status: publicoOk ? 200 : 500 }
   );
 }

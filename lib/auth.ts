@@ -1,6 +1,6 @@
 import { cookies } from 'next/headers';
 import { randomBytes, timingSafeEqual, scryptSync } from 'crypto';
-import { SESSION_COOKIE, SESSION_TOKEN_LENGTH, verificarValorSesion } from './session';
+import { SESSION_COOKIE, SESSION_TTL_MS, crearValorSesion, verificarValorSesion } from './session';
 
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL!;
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD!;
@@ -8,6 +8,19 @@ const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD!;
 // scrypt:N:r:p:salt_hex:hash_hex, sin '$' porque @next/env lo expandiría).
 // Si está definido, se prefiere sobre ADMIN_PASSWORD (fallback por compatibilidad).
 const ADMIN_PASSWORD_HASH = process.env.ADMIN_PASSWORD_HASH;
+
+if (
+  process.env.NODE_ENV === 'production' &&
+  ADMIN_PASSWORD &&
+  !ADMIN_PASSWORD_HASH
+) {
+  // No aborta el arranque (evita quedarse fuera del panel en un deploy), pero
+  // deja constancia fuerte de que la contraseña viaja en texto plano.
+  console.warn(
+    '⚠️ SEGURIDAD: ADMIN_PASSWORD en texto plano en producción. Genera ' +
+      'ADMIN_PASSWORD_HASH con `node scripts/hash_password.mjs <clave>` y elimina ADMIN_PASSWORD.'
+  );
+}
 
 function valoresIguales(a: string, b: string): boolean {
   const bufA = Buffer.from(a);
@@ -44,22 +57,14 @@ export function verifyCredentials(email: string, password: string): boolean {
 
 export async function createSession() {
   const cookieStore = cookies();
-  const token = randomBytes(SESSION_TOKEN_LENGTH / 2).toString('hex');
-  const enc = new TextEncoder();
-  const key = await crypto.subtle.importKey(
-    'raw',
-    enc.encode(process.env.ADMIN_SESSION_SECRET || ADMIN_PASSWORD || ''),
-    { name: 'HMAC', hash: 'SHA-256' },
-    false,
-    ['sign']
-  );
-  const sig = await crypto.subtle.sign('HMAC', key, enc.encode(token));
-  const firma = Array.from(new Uint8Array(sig)).map((b) => b.toString(16).padStart(2, '0')).join('');
-  cookieStore.set(SESSION_COOKIE, `${token}.${firma}`, {
+  // El token incluye su fecha de emisión firmada (ver lib/session.ts): caduca
+  // a los SESSION_TTL_MS aunque alguien copie la cookie.
+  const valor = await crearValorSesion();
+  cookieStore.set(SESSION_COOKIE, valor, {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'lax',
-    maxAge: 60 * 60 * 24,
+    maxAge: Math.floor(SESSION_TTL_MS / 1000),
     path: '/',
   });
 }

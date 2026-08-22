@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
 import { getSession } from '@/lib/auth';
+import { registrarAccion } from '@/lib/audit';
 
 export async function PATCH(request: NextRequest) {
   try {
@@ -39,6 +40,10 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
+    await registrarAccion('negocio_actualizado', 'negocio', String(id), {
+      campos: Object.keys(updates),
+      updates,
+    });
     return NextResponse.json({ success: true });
   } catch {
     return NextResponse.json({ error: 'Error interno' }, { status: 500 });
@@ -68,6 +73,7 @@ export async function DELETE(request: NextRequest) {
       if (error) {
         return NextResponse.json({ error: error.message }, { status: 500 });
       }
+      await registrarAccion('negocio_eliminado_permanente', 'negocio', String(id), {});
       return NextResponse.json({ success: true });
     }
 
@@ -80,6 +86,7 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
+    await registrarAccion('negocio_a_papelera', 'negocio', String(id), {});
     return NextResponse.json({ success: true });
   } catch {
     return NextResponse.json({ error: 'Error interno' }, { status: 500 });

@@ -1,34 +1,62 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { randomInt } from 'crypto';
 import { supabaseAdmin } from '@/lib/supabase';
 import { getSession } from '@/lib/auth';
 import precios from '@config/precios.json';
+import { registrarAccion } from '@/lib/audit';
 
 const PRECIOS: Record<string, Record<string, number>> = precios.planes;
 
+// Alfabeto sin caracteres ambiguos (0/O, 1/I/L) para dictar el código por
+// teléfono o WhatsApp sin confusiones.
+const CHARS_CODIGO = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+const LARGO_CODIGO = 8;
+
+/// Genera un código con CSPRNG (randomInt de node:crypto). Los códigos activan
+/// suscripciones pagadas: NO usar Math.random() (predecible).
 function generarCodigo(): string {
-  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
   let code = '';
-  for (let i = 0; i < 6; i++) {
-    code += chars[Math.floor(Math.random() * chars.length)];
+  for (let i = 0; i < LARGO_CODIGO; i++) {
+    code += CHARS_CODIGO[randomInt(CHARS_CODIGO.length)];
   }
   return code;
 }
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
     if (!(await getSession())) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
     }
-    const { data, error } = await supabaseAdmin
-      .from('codigos_pago')
-      .select('*')
-      .order('created_at', { ascending: false })
-      .limit(100);
+
+    // Paginación server-side: sin esto, cuando haya >100 códigos los viejos
+    // desaparecerían silenciosamente del panel.
+    const porPagina = Math.min(
+      200,
+      Math.max(1, Number(request.nextUrl.searchParams.get('porPagina') ?? 50))
+    );
+    const pagina = Math.max(1, Number(request.nextUrl.searchParams.get('pagina') ?? 1));
+    const desde = (pagina - 1) * porPagina;
+
+    const [{ count }, { data, error }] = await Promise.all([
+      supabaseAdmin.from('codigos_pago').select('*', { count: 'exact', head: true }),
+      supabaseAdmin
+        .from('codigos_pago')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .range(desde, desde + porPagina - 1),
+    ]);
 
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
-    return NextResponse.json({ data: data ?? [] });
+    const total = count ?? 0;
+    return NextResponse.json({
+      data: data ?? [],
+      pagina,
+      porPagina,
+      total,
+      totalPaginas: Math.max(1, Math.ceil(total / porPagina)),
+    });
   } catch {
     return NextResponse.json({ error: 'Error interno' }, { status: 500 });
   }
@@ -74,34 +102,48 @@ export async function POST(request: NextRequest) {
     const validez = new Date();
     validez.setUTCDate(validez.getUTCDate() + 30);
 
-    // Reservar un código único sin colisiones
-    let codigo = generarCodigo();
-    let conflict = true;
-    while (conflict) {
-      const { data } = await supabaseAdmin
+    // Unicidad garantizada por la constraint UNIQUE(codigo) de la DB: se
+    // intenta insertar y, si choca (23505 unique_violation), se regenera.
+    // Sin pre-consultas y sin carrera posible entre dos inserts simultáneos.
+    const emailNormalizado = email.trim().toLowerCase();
+    let ultimoError: string | null = null;
+    for (let intento = 0; intento < 5; intento++) {
+      const { data, error } = await supabaseAdmin
         .from('codigos_pago')
-        .select('id')
-        .eq('codigo', codigo)
-        .maybeSingle();
-      if (!data) conflict = false;
-      else codigo = generarCodigo();
-    }
+        .insert({
+          codigo: generarCodigo(),
+          email: emailNormalizado,
+          plan,
+          duracion_meses,
+          precio_pagado: precio,
+          metodo_pago: metodo_pago || 'efectivo',
+          fecha_expiracion: validez.toISOString(),
+          usado: false,
+        })
+        .select()
+        .single();
 
-    const { data, error } = await supabaseAdmin.from('codigos_pago').insert({
-      codigo,
-      email: email.trim().toLowerCase(),
-      plan,
-      duracion_meses,
-      precio_pagado: precio,
-      metodo_pago: metodo_pago || 'efectivo',
-      fecha_expiracion: validez.toISOString(),
-      usado: false,
-    }).select().single();
-
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      if (!error) {
+        await registrarAccion('codigo_creado', 'codigo_pago', String(data.id), {
+          codigo: data.codigo,
+          email: emailNormalizado,
+          plan,
+          duracion_meses,
+          precio_pagado: precio,
+          metodo_pago: data.metodo_pago,
+        });
+        return NextResponse.json({ data });
+      }
+      if (error.code !== '23505') {
+        return NextResponse.json({ error: error.message }, { status: 500 });
+      }
+      ultimoError = error.message;
     }
-    return NextResponse.json({ data });
+    // Prácticamente imposible (32^8 combinaciones), pero respondemos honesto.
+    return NextResponse.json(
+      { error: `No se pudo generar un código único. ${ultimoError ?? ''}` },
+      { status: 500 }
+    );
   } catch {
     return NextResponse.json({ error: 'Error interno' }, { status: 500 });
   }
