@@ -10,6 +10,11 @@ cp .env.example .env.local   # rellenar valores (ver .env.example)
 npm run dev
 ```
 
+> **Precios**: `config/precios.json` (dentro de `admin/`) es una copia
+> vendorizada de la raíz del proyecto Flutter. El alias tsconfig
+> `"@config/*": ["./config/*"]` resuelve dentro del repo para que el CI
+> (clone limpio) compile. Si cambias precios, actualiza AMBAS copias.
+
 Comandos útiles:
 
 ```bash
