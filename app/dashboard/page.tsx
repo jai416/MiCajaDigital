@@ -1,4 +1,5 @@
 import { supabaseAdmin } from '@/lib/supabase';
+import { requireSession } from '@/lib/auth';
 import precios from '@config/precios.json';
 
 export const dynamic = 'force-dynamic';
@@ -51,6 +52,12 @@ async function getStats(dias: number) {
   const enTresDiasIso = new Date(ahora + 3 * MS_DIA).toISOString();
 
   // ---- Tanda 1 paralela: negocio, códigos e ingresos globales ----
+  // fallos: consultas que vinieron con error → el panel muestra un banner
+  // "datos parciales" en vez de presentar ceros como verdad.
+  const fallos: string[] = [];
+  const notaFallo = (nombre: string, r: { error: { message: string } | null }) => {
+    if (r.error) fallos.push(nombre);
+  };
   const [
     rNegocios,
     rCodigosGenerados,
@@ -64,7 +71,10 @@ async function getStats(dias: number) {
       .from('negocios')
       .select(
         'id, activo, plan, fecha_registro, fecha_expiracion, deleted_at, tc_usd, tc_mlc, nombre_negocio, email'
-      ),
+      )
+      // Límite defensivo: sin límite, una tabla gigante satura la memoria del
+      // serverless. 50k filas cubre con holgura cualquier tamaño realista.
+      .limit(50000),
     supabaseAdmin.from('codigos_pago').select('*', { count: 'exact', head: true }),
     supabaseAdmin
       .from('codigos_pago')
@@ -85,13 +95,22 @@ async function getStats(dias: number) {
     supabaseAdmin
       .from('codigos_pago')
       .select('precio_pagado, metodo_pago, duracion_meses, negocio_id, usado_en')
-      .eq('usado', true),
+      .eq('usado', true)
+      .limit(50000),
     supabaseAdmin
       .from('codigos_pago')
       .select('negocio_id')
       .eq('usado', true)
-      .not('negocio_id', 'is', null),
+      .not('negocio_id', 'is', null)
+      .limit(50000),
   ]);
+
+  notaFallo('negocios', rNegocios);
+  notaFallo('conteo de códigos', rCodigosGenerados);
+  notaFallo('códigos usados', rCodigosUsados);
+  notaFallo('códigos por vencer', rCodigosPorVencer);
+  notaFallo('códigos vencidos', rCodigosVencidos);
+  notaFallo('ingresos reales', rIngresosReales);
 
   let negociosData: NegRow[] | null = rNegocios.data;
   if (rNegocios.error || negociosData?.[0]?.tc_usd === undefined) {
@@ -152,13 +171,15 @@ async function getStats(dias: number) {
       .select('fecha, moneda, precio, descuento, user_id')
       .eq('devuelto', 0)
       .is('deleted_at', null)
-      .gte('fecha', desde),
+      .gte('fecha', desde)
+      .limit(50000),
     supabaseAdmin
       .from('ventas')
       .select('user_id, fecha')
       .eq('devuelto', 0)
       .is('deleted_at', null)
-      .gte('fecha', hace7Str),
+      .gte('fecha', hace7Str)
+      .limit(50000),
     supabaseAdmin
       .from('ventas')
       .select('*', { count: 'exact', head: true })
@@ -176,14 +197,26 @@ async function getStats(dias: number) {
       .from('codigos_pago')
       .select('precio_pagado, usado_en')
       .eq('usado', true)
-      .gte('usado_en', hace6mIso),
+      .gte('usado_en', hace6mIso)
+      .limit(50000),
     supabaseAdmin
       .from('app_logs')
       .select('*', { count: 'exact', head: true })
       .gte('created_at', errores7Iso),
-    supabaseAdmin.from('ventas').select('user_id').eq('devuelto', 0).is('deleted_at', null).gte('fecha', hace30),
-    supabaseAdmin.from('gastos').select('user_id').is('deleted_at', null).gte('fecha', hace30),
+    supabaseAdmin.from('ventas').select('user_id').eq('devuelto', 0).is('deleted_at', null).gte('fecha', hace30).limit(50000),
+    supabaseAdmin.from('gastos').select('user_id').is('deleted_at', null).gte('fecha', hace30).limit(50000),
   ]);
+
+  notaFallo('ventas del rango', rVentasRango);
+  notaFallo('gastos del rango', rGastosRango);
+  notaFallo('detalle de ventas', rVentasDetalle);
+  notaFallo('ventas 7 días', rVentas7);
+  notaFallo('rango previo (ventas)', rVentasPrev);
+  notaFallo('rango previo (gastos)', rGastosPrev);
+  notaFallo('ingresos por mes', rIngresosMeses);
+  notaFallo('errores de la app', rErrores7);
+  notaFallo('actividad 30 días', rVentas30u);
+  notaFallo('actividad 30 días (gastos)', rGastos30u);
 
   const ventasRango = rVentasRango.count ?? 0;
   const gastosRango = rGastosRango.count ?? 0;
@@ -409,6 +442,7 @@ async function getStats(dias: number) {
   const inactivas30 = vivos.filter((n) => !activasConDatos.has(String(n.id))).length;
 
   return {
+    fallos,
     dias,
     total,
     activos,
@@ -458,8 +492,9 @@ async function getStats(dias: number) {
 export default async function DashboardPage({
   searchParams,
 }: {
-  searchParams?: SearchParams;
+  searchParams: SearchParams;
 }) {
+  await requireSession();
   const rango = Number(searchParams?.rango);
   const dias = (RANGOS as readonly number[]).includes(rango)
     ? rango
@@ -591,6 +626,22 @@ export default async function DashboardPage({
         </div>
       </div>
 
+      {/* Datos parciales: alguna consulta falló (red/Supabase). Se muestra lo
+          que sí llegó y se avisa — los ceros NO son verdad. */}
+      {stats.fallos.length > 0 && (
+        <div
+          role="alert"
+          className="mb-6 rounded-xl border border-orange-300 bg-orange-50 p-4 text-sm text-orange-900"
+        >
+          <p className="font-bold">⚠️ Datos parciales</p>
+          <p className="mt-1">
+            No se pudieron leer: {stats.fallos.join(', ')}. Las cifras de esas
+            secciones pueden mostrarse como cero. Recarga la página para
+            reintentar.
+          </p>
+        </div>
+      )}
+
       {/* Acciones de hoy: convierte números en tareas con enlace directo */}
       <div className="bg-white rounded-xl shadow-sm border border-orange-200 p-6 mb-8">
         <h2 className="text-lg font-bold text-gray-800 mb-1">🎯 Acciones de hoy</h2>
@@ -641,7 +692,7 @@ export default async function DashboardPage({
           <h2 className="text-lg font-bold text-gray-800 mb-4">Activos por plan (vigentes)</h2>
           <div className="space-y-3">
             {Object.entries(stats.porPlan).length === 0 && (
-              <p className="text-sm text-gray-400">Aún no hay suscriptores activos.</p>
+              <p className="text-sm text-gray-500">Aún no hay suscriptores activos.</p>
             )}
             {Object.entries(stats.porPlan).map(([plan, n]) => (
               <div key={plan} className="flex items-center justify-between">
@@ -653,7 +704,7 @@ export default async function DashboardPage({
             ))}
           </div>
           {stats.enPapelera > 0 && (
-            <p className="text-xs text-gray-400 mt-4">🗑️ {stats.enPapelera} en la papelera.</p>
+            <p className="text-xs text-gray-500 mt-4">🗑️ {stats.enPapelera} en la papelera.</p>
           )}
         </div>
 
@@ -704,7 +755,7 @@ export default async function DashboardPage({
                   <div key={d.dia} className="flex flex-col items-center flex-1 gap-1">
                     <span className="text-xs font-bold text-gray-700">{d.total}</span>
                     <div className="w-full rounded-t bg-indigo-500" style={{ height: `${altura}px` }} />
-                    <span className="text-[10px] text-gray-400">{d.dia}</span>
+                    <span className="text-[10px] text-gray-500">{d.dia}</span>
                   </div>
                 );
               });
@@ -728,7 +779,7 @@ export default async function DashboardPage({
                   <div key={d.dia} className="flex flex-col items-center flex-1 gap-1">
                     <span className="text-xs font-bold text-gray-700">{d.ventas}</span>
                     <div className="w-full rounded-t bg-violet-500" style={{ height: `${altura}px` }} />
-                    <span className="text-[10px] text-gray-400">{d.dia}</span>
+                    <span className="text-[10px] text-gray-500">{d.dia}</span>
                   </div>
                 );
               });
@@ -784,13 +835,13 @@ export default async function DashboardPage({
                       {m.total >= 1000 ? `${(m.total / 1000).toFixed(1)}k` : m.total}
                     </span>
                     <div className="w-full rounded-t bg-purple-500" style={{ height: `${altura}px` }} />
-                    <span className="text-[10px] text-gray-400 capitalize">{m.mes}</span>
+                    <span className="text-[10px] text-gray-500 capitalize">{m.mes}</span>
                   </div>
                 );
               });
             })()}
           </div>
-          <p className="text-xs text-gray-400 mt-3">
+          <p className="text-xs text-gray-500 mt-3">
             Tendencia real de cobros mes a mes (el acumulado siempre sube y no dice nada).
           </p>
         </div>
@@ -802,14 +853,14 @@ export default async function DashboardPage({
           </p>
           <div className="space-y-2 max-h-56 overflow-auto">
             {stats.topClientas.length === 0 && (
-              <p className="text-sm text-gray-400">Todavía no hay canjes registrados.</p>
+              <p className="text-sm text-gray-500">Todavía no hay canjes registrados.</p>
             )}
             {stats.topClientas.map((c, i) => (
               <div key={c.email + i} className="flex items-center justify-between text-sm border-b border-gray-50 pb-1">
                 <span className="truncate mr-2">
-                  <span className="font-bold text-gray-400 mr-2">#{i + 1}</span>
+                  <span className="font-bold text-gray-500 mr-2">#{i + 1}</span>
                   <span className="text-gray-700 font-medium">{c.nombre}</span>
-                  <span className="text-gray-400 ml-2 hidden sm:inline">{c.email}</span>
+                  <span className="text-gray-500 ml-2 hidden sm:inline">{c.email}</span>
                 </span>
                 <span className="font-bold text-emerald-700 whitespace-nowrap">
                   {Math.round(c.monto).toLocaleString()} CUP

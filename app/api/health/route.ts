@@ -23,6 +23,18 @@ export async function GET() {
       : 'Todas las variables de entorno presentes',
   };
 
+  // El secreto de firma de sesión es obligatorio (≥32 caracteres): sin él,
+  // lib/session.ts lanza al primer uso en vez de firmar con una clave débil.
+  const secretoSesionOk =
+    !!process.env.ADMIN_SESSION_SECRET &&
+    process.env.ADMIN_SESSION_SECRET.length >= 32;
+  checks.sesion = {
+    ok: secretoSesionOk,
+    detalle: secretoSesionOk
+      ? 'Secreto de sesión configurado'
+      : 'ADMIN_SESSION_SECRET falta o es corto (<32). Genera uno con: openssl rand -hex 64',
+  };
+
   try {
     const { data, error } = await supabaseAdmin
       .from('negocios')

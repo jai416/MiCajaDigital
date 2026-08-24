@@ -10,9 +10,23 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const handleLogout = async () => {
-    await fetch('/api/logout', { method: 'POST' });
-    // replace evita que "Atrás" vuelva al dashboard; refresh limpia el estado
+    // 1) Purga caches + desregistra el SW ANTES de salir: así ni offline ni
+    // con "Atrás" queda un shell del dashboard servido desde caché.
+    try {
+      if ('caches' in window) {
+        const llaves = await caches.keys();
+        await Promise.all(llaves.map((k) => caches.delete(k)));
+      }
+      if ('serviceWorker' in navigator) {
+        const regs = await navigator.serviceWorker.getRegistrations();
+        await Promise.all(regs.map((r) => r.unregister()));
+      }
+    } catch {
+      // la purga es best-effort; el logout sigue
+    }
+    // 2) replace evita que "Atrás" vuelva al dashboard; refresh limpia el estado
     // del router (datos sensibles en memoria del cliente).
+    await fetch('/api/logout', { method: 'POST' });
     router.replace('/login');
     router.refresh();
   };
@@ -27,12 +41,19 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   return (
     <div className="flex h-screen bg-gray-50">
+      {/* Skip-link: primera tecla Tab lo revela; salta la navegación lateral */}
+      <a
+        href="#contenido"
+        className="sr-only focus:not-sr-only focus:absolute focus:left-2 focus:top-2 focus:z-50 focus:rounded-lg focus:bg-emerald-600 focus:px-4 focus:py-2 focus:text-sm focus:font-semibold focus:text-white"
+      >
+        Saltar al contenido
+      </a>
       <aside className={`fixed inset-y-0 left-0 z-30 w-64 bg-white shadow-lg transform ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'} lg:translate-x-0 lg:static transition-transform duration-200`}>
         <div className="p-6 border-b border-gray-200">
           <h2 className="text-xl font-bold text-emerald-700">Mi Caja Digital</h2>
           <p className="text-xs text-gray-500">Panel Admin</p>
         </div>
-        <nav className="p-4 space-y-1">
+        <nav className="p-4 space-y-1" aria-label="Secciones del panel">
           {navItems.map((item) => (
             <Link
               key={item.href}
@@ -71,7 +92,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             </svg>
           </button>
         </header>
-        <main className="flex-1 overflow-auto p-6">{children}</main>
+        <main id="contenido" className="flex-1 overflow-auto p-6">{children}</main>
       </div>
 
       {sidebarOpen && (

@@ -2,22 +2,49 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
 import { getSession } from '@/lib/auth';
 import { registrarAccion } from '@/lib/audit';
+import precios from '@config/precios.json';
+
+// Fuente de verdad de los planes: config/precios.json (raíz del repo).
+const PLANES_VALIDOS = Object.keys(precios.planes);
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/// Parseo tolerante del body: JSON malformado → null (400) en vez de 500.
+async function leerJson(
+  request: NextRequest
+): Promise<Record<string, unknown> | null> {
+  try {
+    const b = await request.json();
+    return b && typeof b === 'object' && !Array.isArray(b)
+      ? (b as Record<string, unknown>)
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+function errorId(): NextResponse {
+  return NextResponse.json({ error: 'ID requerido (UUID)' }, { status: 400 });
+}
 
 export async function PATCH(request: NextRequest) {
   try {
     if (!(await getSession())) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
     }
-    const body = await request.json();
+    const body = await leerJson(request);
+    if (!body) {
+      return NextResponse.json({ error: 'JSON inválido' }, { status: 400 });
+    }
     const { id } = body;
 
-    if (!id) {
-      return NextResponse.json({ error: 'ID requerido' }, { status: 400 });
+    if (typeof id !== 'string' || !UUID_RE.test(id)) {
+      return errorId();
     }
 
     // Allowlist: solo campos administrativos. NUNCA aceptar columnas del body
     // a ciegas (mass assignment): un PATCH malicioso podría reescribir email,
-    // user_id, updated_at, etc.
+    // user_id, updated_at, etc. Cada campo valida además su TIPO para no
+    // meter basura en la DB desde el panel.
     const permitidos = [
       'activo',
       'plan',
@@ -28,7 +55,46 @@ export async function PATCH(request: NextRequest) {
     ] as const;
     const updates: Record<string, unknown> = {};
     for (const campo of permitidos) {
-      if (body[campo] !== undefined) updates[campo] = body[campo];
+      const v = body[campo];
+      if (v === undefined) continue;
+      switch (campo) {
+        case 'activo':
+          if (typeof v !== 'boolean') {
+            return NextResponse.json(
+              { error: 'activo debe ser booleano' },
+              { status: 400 }
+            );
+          }
+          break;
+        case 'plan':
+          if (typeof v !== 'string' || !PLANES_VALIDOS.includes(v)) {
+            return NextResponse.json({ error: 'Plan no válido' }, { status: 400 });
+          }
+          break;
+        case 'fecha_expiracion':
+        case 'deleted_at':
+          // null = restaurar de papelera / quitar fecha; si viene texto debe
+          // ser fecha parseable.
+          if (
+            v !== null &&
+            (typeof v !== 'string' || Number.isNaN(Date.parse(v)))
+          ) {
+            return NextResponse.json(
+              { error: `${campo} debe ser una fecha ISO o null` },
+              { status: 400 }
+            );
+          }
+          break;
+        default:
+          // nombre_negocio, telefono
+          if (typeof v !== 'string' || v.length > 200) {
+            return NextResponse.json(
+              { error: `${campo} debe ser texto (≤200)` },
+              { status: 400 }
+            );
+          }
+      }
+      updates[campo] = v;
     }
     if (Object.keys(updates).length === 0) {
       return NextResponse.json({ error: 'Sin campos válidos para actualizar' }, { status: 400 });
@@ -55,10 +121,14 @@ export async function DELETE(request: NextRequest) {
     if (!(await getSession())) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
     }
-    const { id, permanente } = await request.json();
+    const body = await leerJson(request);
+    if (!body) {
+      return NextResponse.json({ error: 'JSON inválido' }, { status: 400 });
+    }
+    const { id, permanente } = body;
 
-    if (!id) {
-      return NextResponse.json({ error: 'ID requerido' }, { status: 400 });
+    if (typeof id !== 'string' || !UUID_RE.test(id)) {
+      return errorId();
     }
 
     // Por defecto es soft-delete (papelera): marca deleted_at en vez de borrar

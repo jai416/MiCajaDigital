@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { fechaHora } from '@/lib/formato';
 
 interface CheckResult {
   ok: boolean;
@@ -82,7 +83,7 @@ export default function HealthPage() {
             </div>
           ))}
 
-          <p className="text-xs text-gray-400">Última comprobación: {new Date(data.timestamp).toLocaleString('es-ES')}</p>
+          <p className="text-xs text-gray-500">Última comprobación: {fechaHora(data.timestamp)}</p>
         </div>
       )}
 

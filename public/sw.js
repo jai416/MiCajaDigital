@@ -28,6 +28,13 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
+  // NADA de /dashboard se cachea (ni HTML ni assets RSC): es la zona
+  // autenticada. Cachear su shell dejaría ver el panel con datos viejos tras
+  // cerrar sesión o cambiar de cuenta en modo offline. El fallback offline de
+  // navegaciones solo aplica fuera del dashboard (login).
+  if (url.pathname.startsWith('/dashboard') || request.headers.has('RSC')) {
+    return;
+  }
   if (request.mode === 'navigate') {
     event.respondWith(
       fetch(request)

@@ -2,6 +2,8 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Modal from '@/components/Modal';
+import { fechaCorta } from '@/lib/formato';
 
 interface Negocio {
   id: string;
@@ -236,14 +238,14 @@ export default function NegociosTable({
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-gray-200 bg-gray-50">
-              <th className="text-left px-4 py-3 font-semibold text-gray-600">Negocio</th>
-              <th className="text-left px-4 py-3 font-semibold text-gray-600">Email</th>
-              <th className="text-left px-4 py-3 font-semibold text-gray-600">Teléfono</th>
-              <th className="text-center px-4 py-3 font-semibold text-gray-600">Estado</th>
-              <th className="text-left px-4 py-3 font-semibold text-gray-600">Registro</th>
-              <th className="text-left px-4 py-3 font-semibold text-gray-600">Expira</th>
-              <th className="text-center px-4 py-3 font-semibold text-gray-600">Plan</th>
-              <th className="text-center px-4 py-3 font-semibold text-gray-600">Acciones</th>
+              <th scope="col" className="text-left px-4 py-3 font-semibold text-gray-600">Negocio</th>
+              <th scope="col" className="text-left px-4 py-3 font-semibold text-gray-600">Email</th>
+              <th scope="col" className="text-left px-4 py-3 font-semibold text-gray-600">Teléfono</th>
+              <th scope="col" className="text-center px-4 py-3 font-semibold text-gray-600">Estado</th>
+              <th scope="col" className="text-left px-4 py-3 font-semibold text-gray-600">Registro</th>
+              <th scope="col" className="text-left px-4 py-3 font-semibold text-gray-600">Expira</th>
+              <th scope="col" className="text-center px-4 py-3 font-semibold text-gray-600">Plan</th>
+              <th scope="col" className="text-center px-4 py-3 font-semibold text-gray-600">Acciones</th>
             </tr>
           </thead>
           <tbody>
@@ -276,10 +278,10 @@ export default function NegociosTable({
                     </span>
                   </td>
                   <td className="px-4 py-3 text-gray-500 text-xs">
-                    {new Date(n.fecha_registro).toLocaleDateString('es-ES', { timeZone: 'UTC' })}
+                    {fechaCorta(n.fecha_registro)}
                   </td>
                   <td className="px-4 py-3 text-gray-500 text-xs">
-                    {new Date(n.fecha_expiracion).toLocaleDateString('es-ES', { timeZone: 'UTC' })}
+                    {fechaCorta(n.fecha_expiracion)}
                   </td>
                   <td className="px-4 py-3 text-center">
                     <span className="capitalize text-xs font-medium">{n.plan}</span>
@@ -289,8 +291,8 @@ export default function NegociosTable({
                       {n.deleted_at ? (
                         <>
                           <div className="flex flex-col items-center gap-0.5">
-                            <span className="text-xs text-gray-400 italic">
-                              {new Date(n.deleted_at).toLocaleDateString('es-ES', { timeZone: 'UTC' })}
+                            <span className="text-xs text-gray-500 italic">
+                              {fechaCorta(n.deleted_at)}
                             </span>
                             <span className="text-[11px] text-amber-600 italic">
                               Restáuralo para activar/renovar
@@ -350,7 +352,7 @@ export default function NegociosTable({
             })}
             {filtered.length === 0 && (
               <tr>
-                <td colSpan={8} className="px-4 py-8 text-center text-gray-400">
+                <td colSpan={8} className="px-4 py-8 text-center text-gray-500">
                   No se encontraron negocios
                 </td>
               </tr>
@@ -392,14 +394,11 @@ export default function NegociosTable({
       )}
 
       {modal && seleccion && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4"
-          onClick={cerrarModal}
+        <Modal
+          etiqueta={modal === 'editar' ? 'Editar negocio' : 'Renovar suscripción'}
+          onClose={cerrarModal}
         >
-          <div
-            className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6"
-            onClick={(e) => e.stopPropagation()}
-          >
+          <>
             <h3 className="text-lg font-bold text-gray-800 mb-1">
               {modal === 'editar' ? 'Editar negocio' : 'Renovar suscripción'}
             </h3>
@@ -432,7 +431,7 @@ export default function NegociosTable({
                 </div>
                 <div>
                   <label htmlFor="modal-expiracion" className="block text-sm font-medium text-gray-600 mb-1">
-                    Fecha de expiración <span className="text-gray-400">(dejar vacío para no cambiar)</span>
+                    Fecha de expiración <span className="text-gray-500">(dejar vacío para no cambiar)</span>
                   </label>
                   <input
                     id="modal-expiracion"
@@ -456,7 +455,7 @@ export default function NegociosTable({
                   value={dias}
                   onChange={(e) => setDias(e.target.value)}
                 />
-                <p className="text-xs text-gray-400 mt-2">
+                <p className="text-xs text-gray-500 mt-2">
                   Se extiende desde el vencimiento actual (o desde hoy si ya venció), igual que
                   el canje de código.
                 </p>
@@ -478,18 +477,13 @@ export default function NegociosTable({
                 {cargando ? 'Guardando...' : 'Guardar'}
               </button>
             </div>
-          </div>
-        </div>
+          </>
+        </Modal>
       )}
 
       {borrando && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-60 p-4">
-          <div
-            className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6"
-            role="dialog"
-            aria-modal="true"
-            aria-label="Confirmar borrado permanente"
-          >
+        <Modal etiqueta="Confirmar borrado permanente" onClose={() => setBorrando(null)}>
+          <>
             <h3 className="text-lg font-bold text-red-700 mb-1">
               ⚠️ Borrado definitivo
             </h3>
@@ -504,12 +498,8 @@ export default function NegociosTable({
             <input
               id="confirmar-borrar"
               type="text"
-              autoFocus
               value={textoConfirmar}
               onChange={(e) => setTextoConfirmar(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Escape') setBorrando(null);
-              }}
               placeholder="ELIMINAR"
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 outline-none font-mono"
             />
@@ -528,8 +518,8 @@ export default function NegociosTable({
                 {cargandoBorrado ? 'Eliminando...' : 'Eliminar para siempre'}
               </button>
             </div>
-          </div>
-        </div>
+          </>
+        </Modal>
       )}
     </div>
   );

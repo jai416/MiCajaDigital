@@ -1,4 +1,12 @@
-export const SESSION_COOKIE = 'admin_session';
+// Cookie con prefijo __Host- en producción: el navegador rechaza cualquier
+// cookie __Host- que no sea Secure, sin Domain y con path=/ (mitiga subdominios
+// maliciosos escribiendo nuestra sesión). En desarrollo (http://localhost) se
+// usa el nombre simple: los navegadores exigen canal seguro para __Host-.
+// NOTA: renombrar la cookie fuerza un re-login de todas las sesiones activas.
+export const SESSION_COOKIE =
+  process.env.NODE_ENV === 'production'
+    ? '__Host-admin_session'
+    : 'admin_session';
 
 // Duración de la sesión: debe coincidir con el maxAge de la cookie en auth.ts.
 // El timestamp va DENTRO del token firmado, así que aunque roben la cookie,
@@ -14,7 +22,18 @@ function versionSesion(): string {
 }
 
 function secretoSesion(): string {
-  return process.env.ADMIN_SESSION_SECRET || process.env.ADMIN_PASSWORD || '';
+  const secreto = process.env.ADMIN_SESSION_SECRET;
+  // Fail-fast: sin secreto dedicado NO se firma nada — ni con clave vacía ni
+  // derivada de ADMIN_PASSWORD (una firma con clave predecible/vacía produce
+  // sesiones falsificables). El error estalla en el primer uso y /api/health
+  // lo reporta como check "sesion".
+  if (!secreto || secreto.length < 32) {
+    throw new Error(
+      'ADMIN_SESSION_SECRET ausente o demasiado corto (<32 caracteres). ' +
+        'Genera uno con: openssl rand -hex 64 y pégalo en admin/.env.local'
+    );
+  }
+  return secreto;
 }
 
 // Comparación en tiempo constante sin Buffer (compatible con Edge runtime).

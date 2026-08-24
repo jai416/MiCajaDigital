@@ -1,4 +1,5 @@
 import { supabaseAdmin } from '@/lib/supabase';
+import { requireSession } from '@/lib/auth';
 import NegociosTable from './NegociosTable';
 
 export const dynamic = 'force-dynamic';
@@ -40,6 +41,7 @@ export default async function NegociosPage({
 }: {
   searchParams?: SearchParams;
 }) {
+  await requireSession();
   const q = searchParams?.q ?? '';
   const paginaNum = Number(searchParams?.page);
   const pagina =

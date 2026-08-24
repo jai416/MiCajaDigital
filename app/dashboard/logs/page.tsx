@@ -1,4 +1,5 @@
 import { supabaseAdmin } from '@/lib/supabase';
+import { requireSession } from '@/lib/auth';
 import LimpiarLogs from './LimpiarLogs';
 
 export const dynamic = 'force-dynamic';
@@ -58,6 +59,7 @@ const NIVEL_COLOR: Record<string, string> = {
 };
 
 export default async function LogsPage() {
+  await requireSession();
   const logs = await getLogs();
 
   return (
@@ -81,7 +83,7 @@ export default async function LogsPage() {
       </p>
 
       {logs.length === 0 ? (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-10 text-center text-gray-400">
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-10 text-center text-gray-500">
           Aún no hay errores reportados. 🎉
         </div>
       ) : (
@@ -105,7 +107,7 @@ export default async function LogsPage() {
                     {l.nombre_negocio} · {l.email}
                   </span>
                 )}
-                <span className="text-xs text-gray-400 ml-auto">
+                <span className="text-xs text-gray-500 ml-auto">
                   {l.created_at
                     ? new Date(l.created_at).toLocaleString('es-CU', { timeZone: 'UTC' })
                     : ''}{' '}

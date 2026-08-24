@@ -12,6 +12,25 @@ const PRECIOS: Record<string, Record<string, number>> = precios.planes;
 const CHARS_CODIGO = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const LARGO_CODIGO = 8;
 
+// Límite suave en memoria: el panel tiene UN administrador; esto solo corta
+// floods accidentales o un script desbocado (no es anti fuerza bruta — eso es
+// /api/login con RPC server-side). En serverless la memoria es por instancia,
+// suficiente para el propósito.
+const creacionesRecientes: number[] = [];
+const MAX_CODIGOS_POR_MINUTO = 30;
+function excedeLimiteCreacion(): boolean {
+  const ahora = Date.now();
+  while (
+    creacionesRecientes.length &&
+    ahora - creacionesRecientes[0] > 60000
+  ) {
+    creacionesRecientes.shift();
+  }
+  if (creacionesRecientes.length >= MAX_CODIGOS_POR_MINUTO) return true;
+  creacionesRecientes.push(ahora);
+  return false;
+}
+
 /// Genera un código con CSPRNG (randomInt de node:crypto). Los códigos activan
 /// suscripciones pagadas: NO usar Math.random() (predecible).
 function generarCodigo(): string {
@@ -29,12 +48,20 @@ export async function GET(request: NextRequest) {
     }
 
     // Paginación server-side: sin esto, cuando haya >100 códigos los viejos
-    // desaparecerían silenciosamente del panel.
-    const porPagina = Math.min(
-      200,
-      Math.max(1, Number(request.nextUrl.searchParams.get('porPagina') ?? 50))
+    // desaparecerían silenciosamente del panel. Validación estricta: Number
+    // de basura da NaN y NaN atraviesa Math.min/max → range(NaN, NaN) → 500.
+    const porPaginaNum = Number(
+      request.nextUrl.searchParams.get('porPagina') ?? 50
     );
-    const pagina = Math.max(1, Number(request.nextUrl.searchParams.get('pagina') ?? 1));
+    const porPagina =
+      Number.isFinite(porPaginaNum) && porPaginaNum > 0
+        ? Math.min(200, Math.trunc(porPaginaNum))
+        : 50;
+    const paginaNum = Number(request.nextUrl.searchParams.get('pagina') ?? 1);
+    const pagina =
+      Number.isInteger(paginaNum) && paginaNum > 0
+        ? Math.min(paginaNum, 10_000_000)
+        : 1;
     const desde = (pagina - 1) * porPagina;
 
     const [{ count }, { data, error }] = await Promise.all([
@@ -67,10 +94,30 @@ export async function POST(request: NextRequest) {
     if (!(await getSession())) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
     }
-    const body = await request.json();
-    const { email, plan, duracion_meses, metodo_pago } = body;
+    if (excedeLimiteCreacion()) {
+      return NextResponse.json(
+        { error: 'Demasiados códigos creados seguidos. Espera un minuto.' },
+        { status: 429 }
+      );
+    }
+    let body: unknown;
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json({ error: 'JSON inválido' }, { status: 400 });
+    }
+    const { email, plan, duracion_meses, metodo_pago } = (body ?? {}) as Record<
+      string,
+      unknown
+    >;
 
-    if (!email || !plan || !duracion_meses) {
+    if (
+      typeof email !== 'string' ||
+      typeof plan !== 'string' ||
+      typeof duracion_meses !== 'number' ||
+      !Number.isInteger(duracion_meses) ||
+      (metodo_pago !== undefined && typeof metodo_pago !== 'string')
+    ) {
       return NextResponse.json({ error: 'Datos incompletos' }, { status: 400 });
     }
     if (!PRECIOS[plan] || !PRECIOS[plan][String(duracion_meses)]) {

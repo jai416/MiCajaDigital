@@ -67,16 +67,28 @@ export async function POST(request: NextRequest) {
 
     const puede = await puedeIntentar(ip);
     if (!puede) {
-      await registrarAccion('login_bloqueado_rate_limit', 'sesion', null, { ip });
+      // Muestreo: en un ataque cada request generaría una fila en admin_audit;
+      // registrar 1 de cada 5 basta para forense y no inunda la tabla.
+      if (Math.random() < 0.2) {
+        await registrarAccion('login_bloqueado_rate_limit', 'sesion', null, { ip });
+      }
       return NextResponse.json(
         { error: `Demasiados intentos. Espera ${VENTANA_MIN} minutos.` },
         { status: 429 }
       );
     }
 
-    const { email, password } = await request.json();
+    let credenciales: unknown;
+    try {
+      credenciales = await request.json();
+    } catch {
+      await registrarIntento(ip, false);
+      return NextResponse.json({ error: 'JSON inválido' }, { status: 400 });
+    }
+    const email = (credenciales as Record<string, unknown> | null)?.email;
+    const password = (credenciales as Record<string, unknown> | null)?.password;
 
-    if (!email || !password) {
+    if (typeof email !== 'string' || typeof password !== 'string') {
       await registrarIntento(ip, false);
       return NextResponse.json({ error: 'Email y contraseña requeridos' }, { status: 400 });
     }

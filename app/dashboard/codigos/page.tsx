@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import precios from '@config/precios.json';
+import { fechaCorta, fechaHora } from '@/lib/formato';
 
 interface Codigo {
   id: string;
@@ -66,7 +67,13 @@ export default function CodigosPage() {
         c.metodo_pago, c.usado ? 'si' : 'no', c.usado_en ?? '',
         c.fecha_expiracion, c.created_at,
       ]
-        .map((v) => `"${String(v).replaceAll('"', '""')}"`)
+        .map((v) => {
+          let s = String(v).replaceAll('"', '""');
+          // Neutraliza inyección de fórmulas en Excel/Sheets (= + - @ al
+          // inicio de la celda se ejecutan al abrir el CSV).
+          if (/^[=+\-@]/.test(s)) s = `'${s}`;
+          return `"${s}"`;
+        })
         .join(',')
     );
     const blob = new Blob([[cabecera, ...filas].join('\n')], { type: 'text/csv;charset=utf-8' });
@@ -105,25 +112,30 @@ export default function CodigosPage() {
     }
     setError('');
     setCargando(true);
-    const res = await fetch('/api/codigos', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        email: email.trim(),
-        plan,
-        duracion_meses: duracion,
-        metodo_pago: metodo,
-      }),
-    });
-    const json = await res.json();
-    setCargando(false);
-    if (!res.ok) {
-      setError(json.error || 'Error al generar el código.');
-      return;
+    try {
+      const res = await fetch('/api/codigos', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: email.trim(),
+          plan,
+          duracion_meses: duracion,
+          metodo_pago: metodo,
+        }),
+      });
+      const json = await res.json();
+      setCargando(false);
+      if (!res.ok) {
+        setError(json.error || 'Error al generar el código.');
+        return;
+      }
+      setGenerado(json.data);
+      setEmail('');
+      await cargar(1);
+    } catch {
+      setCargando(false);
+      setError('Sin conexión con el servidor. Revisa tu red e inténtalo de nuevo.');
     }
-    setGenerado(json.data);
-    setEmail('');
-    await cargar(1);
   };
 
   const copiar = async (texto: string) => {
@@ -300,14 +312,14 @@ export default function CodigosPage() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-gray-200 bg-gray-50">
-                <th className="text-left px-4 py-3 font-semibold text-gray-600">Código</th>
-                <th className="text-left px-4 py-3 font-semibold text-gray-600">Email</th>
-                <th className="text-center px-4 py-3 font-semibold text-gray-600">Plan</th>
-                <th className="text-center px-4 py-3 font-semibold text-gray-600">Meses</th>
-                <th className="text-center px-4 py-3 font-semibold text-gray-600">Precio</th>
-                <th className="text-center px-4 py-3 font-semibold text-gray-600">Estado</th>
-                <th className="text-left px-4 py-3 font-semibold text-gray-600">Creado</th>
-                <th className="text-center px-4 py-3 font-semibold text-gray-600"></th>
+                <th scope="col" className="text-left px-4 py-3 font-semibold text-gray-600">Código</th>
+                <th scope="col" className="text-left px-4 py-3 font-semibold text-gray-600">Email</th>
+                <th scope="col" className="text-center px-4 py-3 font-semibold text-gray-600">Plan</th>
+                <th scope="col" className="text-center px-4 py-3 font-semibold text-gray-600">Meses</th>
+                <th scope="col" className="text-center px-4 py-3 font-semibold text-gray-600">Precio</th>
+                <th scope="col" className="text-center px-4 py-3 font-semibold text-gray-600">Estado</th>
+                <th scope="col" className="text-left px-4 py-3 font-semibold text-gray-600">Creado</th>
+                <th scope="col" className="text-center px-4 py-3 font-semibold text-gray-600"></th>
               </tr>
             </thead>
             <tbody>
@@ -331,18 +343,18 @@ export default function CodigosPage() {
                       {c.usado ? 'Usado' : new Date(c.fecha_expiracion).getTime() < Date.now() ? 'Vencido' : 'Disponible'}
                     </span>
                     {c.usado && c.usado_en && (
-                      <p className="text-[10px] text-gray-400 mt-1">
-                        el {new Date(c.usado_en).toLocaleString('es-ES', { timeZone: 'UTC' })}
+                      <p className="text-[10px] text-gray-500 mt-1">
+                        el {fechaHora(c.usado_en)}
                       </p>
                     )}
                     {!c.usado && (
-                      <p className="text-[10px] text-gray-400 mt-1">
-                        vence el {new Date(c.fecha_expiracion).toLocaleDateString('es-ES', { timeZone: 'UTC' })}
+                      <p className="text-[10px] text-gray-500 mt-1">
+                        vence el {fechaCorta(c.fecha_expiracion)}
                       </p>
                     )}
                   </td>
                   <td className="px-4 py-3 text-gray-500 text-xs">
-                    {new Date(c.created_at).toLocaleDateString('es-ES', { timeZone: 'UTC' })}
+                    {fechaCorta(c.created_at)}
                   </td>
                   <td className="px-4 py-3 text-center">
                     {!c.usado && (
@@ -362,7 +374,7 @@ export default function CodigosPage() {
               ))}
               {visibles.length === 0 && (
                 <tr>
-                  <td colSpan={8} className="px-4 py-8 text-center text-gray-400">
+                  <td colSpan={8} className="px-4 py-8 text-center text-gray-500">
                     No hay códigos en este filtro
                   </td>
                 </tr>

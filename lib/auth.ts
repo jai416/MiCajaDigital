@@ -1,4 +1,5 @@
 import { cookies } from 'next/headers';
+import { redirect } from 'next/navigation';
 import { randomBytes, timingSafeEqual, scryptSync } from 'crypto';
 import { SESSION_COOKIE, SESSION_TTL_MS, crearValorSesion, verificarValorSesion } from './session';
 
@@ -29,30 +30,50 @@ function valoresIguales(a: string, b: string): boolean {
   return timingSafeEqual(bufA, bufB);
 }
 
+// Hash señuelo (de una contraseña aleatoria que no existe): se verifica
+// SIEMPRE aunque el email ya haya fallado para igualar el tiempo de CPU y no
+// delatar por timing si el email del admin es el correcto.
+const HASH_SENUELO =
+  'scrypt$16384$8$1$0123456789abcdef0123456789abcdef:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef';
+
+function verificarHash(password: string, hash: string): boolean {
+  // Formato scrypt:N:r:p:salt_hex:hash_hex (sin '$', ver nota arriba).
+  const partes = hash.split(':');
+  if (partes.length !== 6 || partes[0] !== 'scrypt') return false;
+  const [, n, r, p, saltHex, hashHex] = partes;
+  try {
+    const derivado = scryptSync(password, Buffer.from(saltHex, 'hex'), 64, {
+      N: Number(n),
+      r: Number(r),
+      p: Number(p),
+    });
+    return valoresIguales(derivado.toString('hex'), hashHex);
+  } catch {
+    return false;
+  }
+}
+
 /// Verifica la contraseña contra el hash scrypt (`ADMIN_PASSWORD_HASH`) si está
 /// configurado; si no, contra el `ADMIN_PASSWORD` plano. Nunca guardes en texto
 /// plano: genera el hash con `node scripts/hash_password.mjs <clave>`.
 export function verifyPassword(password: string): boolean {
-  if (ADMIN_PASSWORD_HASH) {
-    const partes = ADMIN_PASSWORD_HASH.split(':');
-    if (partes.length !== 6 || partes[0] !== 'scrypt') return false;
-    const [, n, r, p, saltHex, hashHex] = partes;
-    try {
-      const derivado = scryptSync(password, Buffer.from(saltHex, 'hex'), 64, {
-        N: Number(n),
-        r: Number(r),
-        p: Number(p),
-      });
-      return valoresIguales(derivado.toString('hex'), hashHex);
-    } catch {
-      return false;
-    }
-  }
+  if (ADMIN_PASSWORD_HASH) return verificarHash(password, ADMIN_PASSWORD_HASH);
   return valoresIguales(password, ADMIN_PASSWORD);
 }
 
 export function verifyCredentials(email: string, password: string): boolean {
-  return valoresIguales(email, ADMIN_EMAIL) && verifyPassword(password);
+  const emailOk = valoresIguales(email, ADMIN_EMAIL);
+  let passOk: boolean;
+  if (ADMIN_PASSWORD_HASH) {
+    // scrypt corre siempre (~100 ms): da igual qué campo falló.
+    passOk = verificarHash(password, ADMIN_PASSWORD_HASH);
+  } else {
+    // Sin hash real, quema el mismo tiempo de CPU con el señuelo antes de la
+    // comparación plana para que el tiempo total no filtre información.
+    verificarHash(password, HASH_SENUELO);
+    passOk = valoresIguales(password, ADMIN_PASSWORD);
+  }
+  return emailOk && passOk;
 }
 
 export async function createSession() {
@@ -78,4 +99,11 @@ export async function getSession(): Promise<boolean> {
   const cookieStore = cookies();
   const token = cookieStore.get(SESSION_COOKIE)?.value;
   return verificarValorSesion(token);
+}
+
+/// Guard para server components: PRIMERA línea de toda página /dashboard que
+/// consulte datos. Sin sesión → redirect a /login (el middleware también
+/// protege, esto es defensa en profundidad por si el matcher se desconfigura).
+export async function requireSession(): Promise<void> {
+  if (!(await getSession())) redirect('/login');
 }
