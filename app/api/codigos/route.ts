@@ -211,7 +211,7 @@ export async function PATCH(request: NextRequest) {
     if (typeof id !== 'string' || typeof estado_pago !== 'string') {
       return NextResponse.json({ error: 'Datos incompletos' }, { status: 400 });
     }
-    if (!['confirmado', 'rechazado', 'pendiente'].includes(estado_pago)) {
+    if (!['confirmado', 'rechazado', 'pendiente', 'expirado'].includes(estado_pago)) {
       return NextResponse.json({ error: 'estado_pago no válido' }, { status: 400 });
     }
     const { error } = await supabaseAdmin

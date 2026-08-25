@@ -6,9 +6,9 @@ import { fechaHora } from '@/lib/formato';
 interface Conflicto {
   id: number;
   tabla: string;
-  fila_id: string;
+  row_id: string;
   user_id: string | null;
-  campo: string;
+  campo: string | null;
   valor_local: string | null;
   valor_remoto: string | null;
   accion: string;
@@ -85,8 +85,8 @@ export default function ConflictosPage() {
                   <span className="px-2 py-1 rounded-full text-xs font-semibold bg-blue-100 text-blue-700">
                     {c.tabla}
                   </span>
-                  <span className="font-mono text-xs text-gray-500">fila {c.fila_id}</span>
-                  <span className="font-mono text-xs text-gray-500">campo: {c.campo}</span>
+                  <span className="font-mono text-xs text-gray-500">fila {c.row_id}</span>
+                  {c.campo && <span className="font-mono text-xs text-gray-500">campo: {c.campo}</span>}
                   {c.resuelto && (
                     <span className="px-2 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-700">
                       resuelto
