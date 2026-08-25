@@ -35,6 +35,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     { href: '/dashboard', label: 'Dashboard', icon: '📊' },
     { href: '/dashboard/negocios', label: 'Negocios', icon: '🏪' },
     { href: '/dashboard/codigos', label: 'Códigos de pago', icon: '🔑' },
+    { href: '/dashboard/soporte', label: 'Soporte', icon: '💬' },
+    { href: '/dashboard/conflictos', label: 'Conflictos', icon: '⚠️' },
     { href: '/dashboard/logs', label: 'Logs de la app', icon: '🛠️' },
     { href: '/dashboard/health', label: 'Estado', icon: '🩺' },
   ];

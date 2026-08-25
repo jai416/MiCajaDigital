@@ -926,6 +926,69 @@ export default async function DashboardPage({
           </div>
         </div>
       </div>
+
+      {/* ── Funnel de conversión ──────────────────────────────── */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mt-6">
+        <h2 className="text-lg font-bold text-gray-800 mb-1">🔄 Funnel de conversión</h2>
+        <p className="text-sm text-gray-500 mb-6">
+          De registrados a clientes de pago. Las etapas se miden sobre el total histórico.
+        </p>
+        {(() => {
+          const etapas = [
+            { label: 'Registrados', total: stats.total, color: 'bg-blue-500', textColor: 'text-blue-700' },
+            { label: 'Con prueba activa', total: stats.enPrueba + stats.activos + stats.vencidasSinRenovar, color: 'bg-yellow-500', textColor: 'text-yellow-700' },
+            { label: 'Primer pago', total: stats.conversion > 0 ? Math.round((stats.total * stats.conversion) / 100) : stats.activos, color: 'bg-emerald-500', textColor: 'text-emerald-700' },
+            { label: 'Renovaron', total: stats.renovados, color: 'bg-purple-500', textColor: 'text-purple-700' },
+          ];
+          const maxEtapas = Math.max(1, ...etapas.map((e) => e.total));
+          return (
+            <div className="space-y-3">
+              {etapas.map((etapa, i) => {
+                const pct = stats.total > 0 ? Math.round((etapa.total / stats.total) * 100) : 0;
+                const ancho = Math.max(8, Math.round((etapa.total / maxEtapas) * 100));
+                return (
+                  <div key={etapa.label} className="flex items-center gap-3">
+                    <span className={`w-36 text-sm font-semibold ${etapa.textColor} text-right shrink-0`}>
+                      {etapa.label}
+                    </span>
+                    <div className="flex-1 bg-gray-100 rounded-full h-8 overflow-hidden">
+                      <div
+                        className={`${etapa.color} h-full rounded-full flex items-center pl-3 transition-all`}
+                        style={{ width: `${ancho}%` }}
+                      >
+                        <span className="text-xs font-bold text-white whitespace-nowrap">
+                          {etapa.total.toLocaleString()}
+                        </span>
+                      </div>
+                    </div>
+                    <span className="text-xs text-gray-500 w-12 text-right shrink-0">{pct}%</span>
+                  </div>
+                );
+              })}
+            </div>
+          );
+        })()}
+        <div className="mt-4 pt-4 border-t border-gray-100 grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="text-center">
+            <p className="text-lg font-bold text-blue-700">{stats.conversion}%</p>
+            <p className="text-[11px] text-gray-500">Registro → Pago</p>
+          </div>
+          <div className="text-center">
+            <p className="text-lg font-bold text-fuchsia-700">{stats.retencion}%</p>
+            <p className="text-[11px] text-gray-500">Pago → Renovación</p>
+          </div>
+          <div className="text-center">
+            <p className="text-lg font-bold text-rose-700">{stats.inactivas30}</p>
+            <p className="text-[11px] text-gray-500">Inactivas 30d</p>
+          </div>
+          <div className="text-center">
+            <p className="text-lg font-bold text-emerald-700">
+              {stats.diasPruebaAPago !== null ? `${stats.diasPruebaAPago}d` : '—'}
+            </p>
+            <p className="text-[11px] text-gray-500">Tiempo medio registro→pago</p>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

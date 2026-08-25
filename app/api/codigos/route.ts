@@ -195,3 +195,35 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Error interno' }, { status: 500 });
   }
 }
+
+export async function PATCH(request: NextRequest) {
+  try {
+    if (!(await getSession())) {
+      return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
+    }
+    let body: unknown;
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json({ error: 'JSON inválido' }, { status: 400 });
+    }
+    const { id, estado_pago } = (body ?? {}) as Record<string, unknown>;
+    if (typeof id !== 'string' || typeof estado_pago !== 'string') {
+      return NextResponse.json({ error: 'Datos incompletos' }, { status: 400 });
+    }
+    if (!['confirmado', 'rechazado', 'pendiente'].includes(estado_pago)) {
+      return NextResponse.json({ error: 'estado_pago no válido' }, { status: 400 });
+    }
+    const { error } = await supabaseAdmin
+      .from('codigos_pago')
+      .update({ estado_pago })
+      .eq('id', id);
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+    await registrarAccion('codigo_estado_pago', 'codigo_pago', id, { estado_pago });
+    return NextResponse.json({ ok: true });
+  } catch {
+    return NextResponse.json({ error: 'Error interno' }, { status: 500 });
+  }
+}

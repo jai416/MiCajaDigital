@@ -16,6 +16,7 @@ interface Codigo {
   usado: boolean;
   usado_en: string | null;
   usado_por: string | null;
+  estado_pago: string | null;
   created_at: string;
 }
 
@@ -44,8 +45,8 @@ export default function CodigosPage() {
   const [pagina, setPagina] = useState(1);
   const [totalPaginas, setTotalPaginas] = useState(1);
   const [total, setTotal] = useState(0);
-  // Feedback del botón Copiar (y fallback si clipboard API falla).
   const [copiado, setCopiado] = useState('');
+  const [actualizandoPago, setActualizandoPago] = useState<string | null>(null);
 
   const planSel = PLANES.find((p) => p.id === plan)!;
   const durSel = DURACIONES.find((d) => d.id === duracion)!;
@@ -105,7 +106,7 @@ export default function CodigosPage() {
     cargar();
   }, []);
 
-  const generar = async () => {
+  const generar = async (enviarWhatsApp = false) => {
     if (!email.trim()) {
       setError('Introduce el correo de la clienta.');
       return;
@@ -132,10 +133,32 @@ export default function CodigosPage() {
       setGenerado(json.data);
       setEmail('');
       await cargar(1);
+      if (enviarWhatsApp && json.data?.codigo) {
+        const nombrePlan = json.data.plan === 'basico' ? 'Básico' : json.data.plan === 'premium' ? 'Premium' : 'Pro';
+        const msg = `Mi Caja Digital — Código de activación: ${json.data.codigo} (plan ${nombrePlan}, ${json.data.precio_pagado.toLocaleString()} CUP). Canjéalo en Ajustes → Suscripción.`;
+        window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank');
+      }
     } catch {
       setCargando(false);
       setError('Sin conexión con el servidor. Revisa tu red e inténtalo de nuevo.');
     }
+  };
+
+  const actualizarPago = async (id: string, estado: 'confirmado' | 'rechazado') => {
+    setActualizandoPago(id);
+    try {
+      const res = await fetch('/api/codigos', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, estado_pago: estado }),
+      });
+      if (res.ok) {
+        setCodigos((prev) =>
+          prev.map((c) => (c.id === id ? { ...c, estado_pago: estado } : c))
+        );
+      }
+    } catch { /* sin red */ }
+    setActualizandoPago(null);
   };
 
   const copiar = async (texto: string) => {
@@ -238,13 +261,23 @@ export default function CodigosPage() {
               </p>
             </div>
             {error && <p className="text-sm text-red-600">{error}</p>}
-            <button
-              onClick={generar}
-              disabled={cargando}
-              className="w-full px-4 py-3 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white rounded-lg font-bold transition"
-            >
-              {cargando ? 'Generando...' : 'Generar código'}
-            </button>
+            <div className="flex gap-2">
+              <button
+                onClick={() => generar(false)}
+                disabled={cargando}
+                className="flex-1 px-4 py-3 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white rounded-lg font-bold transition"
+              >
+                {cargando ? 'Generando...' : 'Generar código'}
+              </button>
+              <button
+                onClick={() => generar(true)}
+                disabled={cargando}
+                className="flex-1 px-4 py-3 bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white rounded-lg font-bold transition"
+                title="Generar código y abrir WhatsApp con el mensaje listo"
+              >
+                {cargando ? 'Generando...' : '💰 Confirmar y enviar'}
+              </button>
+            </div>
           </div>
 
           {generado && (
@@ -318,6 +351,7 @@ export default function CodigosPage() {
                 <th scope="col" className="text-center px-4 py-3 font-semibold text-gray-600">Meses</th>
                 <th scope="col" className="text-center px-4 py-3 font-semibold text-gray-600">Precio</th>
                 <th scope="col" className="text-center px-4 py-3 font-semibold text-gray-600">Estado</th>
+                <th scope="col" className="text-center px-4 py-3 font-semibold text-gray-600">Pago</th>
                 <th scope="col" className="text-left px-4 py-3 font-semibold text-gray-600">Creado</th>
                 <th scope="col" className="text-center px-4 py-3 font-semibold text-gray-600"></th>
               </tr>
@@ -353,6 +387,30 @@ export default function CodigosPage() {
                       </p>
                     )}
                   </td>
+                  <td className="px-4 py-3 text-center">
+                    {c.usado ? (
+                      <span className="inline-flex px-2 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-500">—</span>
+                    ) : c.estado_pago === 'confirmado' ? (
+                      <span className="inline-flex px-2 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-700">Confirmado</span>
+                    ) : c.estado_pago === 'rechazado' ? (
+                      <span className="inline-flex px-2 py-1 rounded-full text-xs font-semibold bg-rose-100 text-rose-700">Rechazado</span>
+                    ) : (
+                      <div className="flex gap-1 justify-center">
+                        <button
+                          onClick={() => actualizarPago(c.id, 'confirmado')}
+                          disabled={actualizandoPago === c.id}
+                          className="px-2 py-1 text-[10px] font-semibold rounded bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50 transition"
+                          title="Confirmar pago"
+                        >✓</button>
+                        <button
+                          onClick={() => actualizarPago(c.id, 'rechazado')}
+                          disabled={actualizandoPago === c.id}
+                          className="px-2 py-1 text-[10px] font-semibold rounded bg-rose-600 text-white hover:bg-rose-700 disabled:opacity-50 transition"
+                          title="Rechazar pago"
+                        >✕</button>
+                      </div>
+                    )}
+                  </td>
                   <td className="px-4 py-3 text-gray-500 text-xs">
                     {fechaCorta(c.created_at)}
                   </td>
@@ -374,7 +432,7 @@ export default function CodigosPage() {
               ))}
               {visibles.length === 0 && (
                 <tr>
-                  <td colSpan={8} className="px-4 py-8 text-center text-gray-500">
+                  <td colSpan={9} className="px-4 py-8 text-center text-gray-500">
                     No hay códigos en este filtro
                   </td>
                 </tr>
