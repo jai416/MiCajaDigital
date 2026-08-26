@@ -39,9 +39,20 @@ export async function PATCH(request: NextRequest) {
   const s = await getSession();
   if (!s) return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
 
-  const body = await request.json();
+  let body: Record<string, unknown>;
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: 'JSON inválido' }, { status: 400 });
+  }
+
   const { id, resuelto, accion } = body;
-  if (!id) return NextResponse.json({ error: 'Falta id' }, { status: 400 });
+  if (!id || typeof id !== 'number') {
+    return NextResponse.json({ error: 'Falta id válido' }, { status: 400 });
+  }
+  if (resuelto !== undefined && typeof resuelto !== 'boolean') {
+    return NextResponse.json({ error: 'resuelto debe ser boolean' }, { status: 400 });
+  }
 
   const update: Record<string, unknown> = {};
   if (resuelto !== undefined) update.resuelto = resuelto;
