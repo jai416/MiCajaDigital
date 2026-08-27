@@ -70,7 +70,8 @@ export async function POST(request: NextRequest) {
       // Muestreo: en un ataque cada request generaría una fila en admin_audit;
       // registrar 1 de cada 5 basta para forense y no inunda la tabla.
       if (Math.random() < 0.2) {
-        await registrarAccion('login_bloqueado_rate_limit', 'sesion', null, { ip });
+        await registrarAccion('login_bloqueado_rate_limit', 'sesion', null, { ip },
+          ip, request.headers.get('user-agent') || undefined);
       }
       return NextResponse.json(
         { error: `Demasiados intentos. Espera ${VENTANA_MIN} minutos.` },
@@ -96,12 +97,14 @@ export async function POST(request: NextRequest) {
     if (verifyCredentials(email, password)) {
       await registrarIntento(ip, true);
       await createSession();
-      await registrarAccion('login_exitoso', 'sesion', null, { ip });
+      await registrarAccion('login_exitoso', 'sesion', null, { ip },
+        ip, request.headers.get('user-agent') || undefined);
       return NextResponse.json({ success: true });
     }
 
     await registrarIntento(ip, false);
-    await registrarAccion('login_fallido', 'sesion', null, { ip, email });
+    await registrarAccion('login_fallido', 'sesion', null, { ip, email },
+      ip, request.headers.get('user-agent') || undefined);
     return NextResponse.json({ error: 'Credenciales incorrectas' }, { status: 401 });
   } catch {
     return NextResponse.json({ error: 'Error interno' }, { status: 500 });

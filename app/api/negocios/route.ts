@@ -4,6 +4,32 @@ import { getSession } from '@/lib/auth';
 import { registrarAccion } from '@/lib/audit';
 import precios from '@config/precios.json';
 
+export const dynamic = 'force-dynamic';
+
+export async function GET(request: NextRequest) {
+  if (!(await getSession())) {
+    return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
+  }
+
+  const sp = request.nextUrl.searchParams;
+  const porPagina = Math.min(1000, Math.max(1, Number(sp.get('porPagina') ?? 500)));
+  const activo = sp.get('activo');
+
+  let query = supabaseAdmin
+    .from('negocios')
+    .select('id, nombre_negocio, email')
+    .order('nombre_negocio', { ascending: true })
+    .limit(porPagina);
+
+  if (activo === 'true') query = query.eq('activo', true);
+  else if (activo === 'false') query = query.eq('activo', false);
+
+  const { data, error } = await query;
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  return NextResponse.json({ data: data ?? [] });
+}
+
 // Fuente de verdad de los planes: config/precios.json (raíz del repo).
 const PLANES_VALIDOS = Object.keys(precios.planes);
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -109,7 +135,7 @@ export async function PATCH(request: NextRequest) {
     await registrarAccion('negocio_actualizado', 'negocio', String(id), {
       campos: Object.keys(updates),
       updates,
-    });
+    }, request.headers.get('x-real-ip') || request.headers.get('x-forwarded-for')?.split(',')[0]?.trim(), request.headers.get('user-agent') || undefined);
     return NextResponse.json({ success: true });
   } catch {
     return NextResponse.json({ error: 'Error interno' }, { status: 500 });
@@ -143,7 +169,8 @@ export async function DELETE(request: NextRequest) {
       if (error) {
         return NextResponse.json({ error: error.message }, { status: 500 });
       }
-      await registrarAccion('negocio_eliminado_permanente', 'negocio', String(id), {});
+      await registrarAccion('negocio_eliminado_permanente', 'negocio', String(id), {},
+        request.headers.get('x-real-ip') || request.headers.get('x-forwarded-for')?.split(',')[0]?.trim(), request.headers.get('user-agent') || undefined);
       return NextResponse.json({ success: true });
     }
 
@@ -156,7 +183,8 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    await registrarAccion('negocio_a_papelera', 'negocio', String(id), {});
+    await registrarAccion('negocio_a_papelera', 'negocio', String(id), {},
+      request.headers.get('x-real-ip') || request.headers.get('x-forwarded-for')?.split(',')[0]?.trim(), request.headers.get('user-agent') || undefined);
     return NextResponse.json({ success: true });
   } catch {
     return NextResponse.json({ error: 'Error interno' }, { status: 500 });

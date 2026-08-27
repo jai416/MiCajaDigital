@@ -38,6 +38,33 @@ export async function ensureFotosBucketExists(): Promise<{
     const existe = (buckets ?? []).some((b) => b.name === 'fotos');
     if (existe) return { ok: true };
     const { error: createError } = await supabaseAdmin.storage.createBucket('fotos', {
+      public: false,
+    });
+    if (createError) {
+      return { ok: false, error: createError.message };
+    }
+    return { ok: true };
+  } catch (e) {
+    return {
+      ok: false,
+      error: e instanceof Error ? e.message : 'Error desconocido',
+    };
+  }
+}
+
+/// Asegura que el bucket público "config" exista (para version.json de OTA check).
+export async function ensureConfigBucketExists(): Promise<{
+  ok: boolean;
+  error?: string;
+}> {
+  try {
+    const { data: buckets, error: listError } = await supabaseAdmin.storage.listBuckets();
+    if (listError) {
+      return { ok: false, error: listError.message };
+    }
+    const existe = (buckets ?? []).some((b) => b.name === 'config');
+    if (existe) return { ok: true };
+    const { error: createError } = await supabaseAdmin.storage.createBucket('config', {
       public: true,
     });
     if (createError) {

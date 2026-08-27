@@ -47,6 +47,8 @@ export default function CodigosPage() {
   const [total, setTotal] = useState(0);
   const [copiado, setCopiado] = useState('');
   const [actualizandoPago, setActualizandoPago] = useState<string | null>(null);
+  const [confirmarGenerar, setConfirmarGenerar] = useState(false);
+  const [pendienteWhatsApp, setPendienteWhatsApp] = useState(false);
 
   const planSel = PLANES.find((p) => p.id === plan)!;
   const durSel = DURACIONES.find((d) => d.id === duracion)!;
@@ -112,6 +114,13 @@ export default function CodigosPage() {
       return;
     }
     setError('');
+    setPendienteWhatsApp(enviarWhatsApp);
+    setConfirmarGenerar(true);
+  };
+
+  const confirmarGenerarCodigo = async () => {
+    setConfirmarGenerar(false);
+    setError('');
     setCargando(true);
     try {
       const res = await fetch('/api/codigos', {
@@ -133,7 +142,7 @@ export default function CodigosPage() {
       setGenerado(json.data);
       setEmail('');
       await cargar(1);
-      if (enviarWhatsApp && json.data?.codigo) {
+      if (pendienteWhatsApp && json.data?.codigo) {
         const nombrePlan = json.data.plan === 'basico' ? 'Básico' : json.data.plan === 'premium' ? 'Premium' : 'Pro';
         const msg = `Mi Caja Digital — Código de activación: ${json.data.codigo} (plan ${nombrePlan}, ${json.data.precio_pagado.toLocaleString()} CUP). Canjéalo en Ajustes → Suscripción.`;
         window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank');
@@ -278,6 +287,33 @@ export default function CodigosPage() {
                 {cargando ? 'Generando...' : '💰 Confirmar y enviar'}
               </button>
             </div>
+
+            {confirmarGenerar && (
+              <div className="mt-4 bg-amber-50 border border-amber-300 rounded-xl p-4">
+                <p className="text-sm font-bold text-amber-800 mb-2">¿Confirmar?</p>
+                <p className="text-sm text-amber-700 mb-1">
+                  Se generará un código para <strong>{email.trim()}</strong>
+                </p>
+                <p className="text-xs text-amber-600 mb-3">
+                  Plan {plan === 'basico' ? 'Básico' : plan === 'premium' ? 'Premium' : 'Pro'} ·{' '}
+                  {durSel.label} · {precio.toLocaleString()} CUP
+                </p>
+                <div className="flex gap-2">
+                  <button
+                    onClick={confirmarGenerarCodigo}
+                    className="flex-1 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold text-sm transition"
+                  >
+                    Confirmar
+                  </button>
+                  <button
+                    onClick={() => setConfirmarGenerar(false)}
+                    className="flex-1 px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg font-bold text-sm transition"
+                  >
+                    Cancelar
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
 
           {generado && (

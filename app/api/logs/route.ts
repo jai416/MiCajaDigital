@@ -86,7 +86,8 @@ export async function DELETE(request: NextRequest) {
       if (error) return NextResponse.json({ error: error.message }, { status: 400 });
       await registrarAccion('logs_eliminados_selectivos', 'logs', null, {
         cantidad: count ?? 0,
-      });
+      },
+        request.headers.get('x-real-ip') || request.headers.get('x-forwarded-for')?.split(',')[0]?.trim(), request.headers.get('user-agent') || undefined);
       return NextResponse.json({ ok: true, borrados: count ?? 0 });
     }
 
@@ -98,7 +99,8 @@ export async function DELETE(request: NextRequest) {
       if (error) return NextResponse.json({ error: error.message }, { status: 400 });
       await registrarAccion('logs_eliminados_todos', 'logs', null, {
         borrados: count ?? 0,
-      });
+      },
+        request.headers.get('x-real-ip') || request.headers.get('x-forwarded-for')?.split(',')[0]?.trim(), request.headers.get('user-agent') || undefined);
       return NextResponse.json({ ok: true, borrados: count ?? 0 });
     }
 
@@ -117,7 +119,8 @@ export async function DELETE(request: NextRequest) {
     await registrarAccion('logs_purgados', 'logs', null, {
       dias,
       borrados: count ?? 0,
-    });
+    },
+      request.headers.get('x-real-ip') || request.headers.get('x-forwarded-for')?.split(',')[0]?.trim(), request.headers.get('user-agent') || undefined);
     return NextResponse.json({ ok: true, borrados: count ?? 0 });
   } catch {
     return NextResponse.json({ error: 'Error interno' }, { status: 500 });

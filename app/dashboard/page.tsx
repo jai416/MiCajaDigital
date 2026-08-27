@@ -41,27 +41,31 @@ interface NegRow {
 async function getStats(dias: number) {
   const ahora = Date.now();
   const hoyStr = new Date(ahora).toISOString().slice(0, 10);
-  const hace7Str = new Date(ahora - 7 * MS_DIA).toISOString().slice(0, 10);
   const desde = new Date(ahora - (dias - 1) * MS_DIA).toISOString().slice(0, 10);
-  const desdePrev = new Date(ahora - (2 * dias - 1) * MS_DIA).toISOString().slice(0, 10);
-  const hace30 = new Date(ahora - 30 * MS_DIA).toISOString().slice(0, 10);
   const hace6mIso = new Date(ahora - 183 * MS_DIA).toISOString();
-  const errores7Iso = new Date(ahora - 7 * MS_DIA).toISOString();
   // Códigos sin canjear que ya expiraron (ventas perdidas a recontactar).
   const ahoraIso = new Date(ahora).toISOString();
   const enTresDiasIso = new Date(ahora + 3 * MS_DIA).toISOString();
 
-  // ---- Tanda 1 paralela: negocio, códigos e ingresos globales ----
-  // fallos: consultas que vinieron con error → el panel muestra un banner
-  // "datos parciales" en vez de presentar ceros como verdad.
+  // ---- RPC stats_dashboard_resumen: todos los conteos simples en 1 query ----
   const fallos: string[] = [];
   const notaFallo = (nombre: string, r: { error: { message: string } | null }) => {
     if (r.error) fallos.push(nombre);
   };
+  const { data: rpcData, error: rpcError } = await supabaseAdmin
+    .rpc('stats_dashboard_resumen')
+    .single();
+
+  let rpc: Record<string, number> = {};
+  if (rpcError || !rpcData) {
+    fallos.push('stats_dashboard_resumen (RPC)');
+  } else {
+    rpc = rpcData as Record<string, number>;
+  }
+
+  // ---- Tanda 1 paralela: datos detallados que la RPC no cubre ----
   const [
     rNegocios,
-    rCodigosGenerados,
-    rCodigosUsados,
     rCodigosPorVencer,
     rCodigosVencidos,
     rIngresosReales,
@@ -72,14 +76,7 @@ async function getStats(dias: number) {
       .select(
         'id, activo, plan, fecha_registro, fecha_expiracion, deleted_at, tc_usd, tc_mlc, nombre_negocio, email'
       )
-      // Límite defensivo: sin límite, una tabla gigante satura la memoria del
-      // serverless. 50k filas cubre con holgura cualquier tamaño realista.
       .limit(50000),
-    supabaseAdmin.from('codigos_pago').select('*', { count: 'exact', head: true }),
-    supabaseAdmin
-      .from('codigos_pago')
-      .select('*', { count: 'exact', head: true })
-      .eq('usado', true),
     supabaseAdmin
       .from('codigos_pago')
       .select('*', { count: 'exact', head: true })
@@ -91,7 +88,6 @@ async function getStats(dias: number) {
       .select('*', { count: 'exact', head: true })
       .eq('usado', false)
       .lt('fecha_expiracion', ahoraIso),
-    // Usados con detalle: ticket, duración, método, conversión y LTV.
     supabaseAdmin
       .from('codigos_pago')
       .select('precio_pagado, metodo_pago, duracion_meses, negocio_id, usado_en')
@@ -106,16 +102,12 @@ async function getStats(dias: number) {
   ]);
 
   notaFallo('negocios', rNegocios);
-  notaFallo('conteo de códigos', rCodigosGenerados);
-  notaFallo('códigos usados', rCodigosUsados);
   notaFallo('códigos por vencer', rCodigosPorVencer);
   notaFallo('códigos vencidos', rCodigosVencidos);
   notaFallo('ingresos reales', rIngresosReales);
 
   let negociosData: NegRow[] | null = rNegocios.data;
   if (rNegocios.error || negociosData?.[0]?.tc_usd === undefined) {
-    // Columnas tc_* aún no aplicadas en Supabase (§5 de la migración): reintenta
-    // sin ellas y usa TC por defecto. El panel funciona igual mientras tanto.
     const retry = await supabaseAdmin
       .from('negocios')
       .select('id, activo, plan, fecha_registro, fecha_expiracion, deleted_at, nombre_negocio, email');
@@ -123,7 +115,6 @@ async function getStats(dias: number) {
   }
   const negocios: NegRow[] = negociosData ?? [];
 
-  // Tipo de cambio efectivo por negocio (default si falta la columna/valor).
   const tcPorNegocio = new Map<string, { usd: number; mlc: number }>();
   for (const n of negocios) {
     tcPorNegocio.set(String(n.id), {
@@ -134,26 +125,21 @@ async function getStats(dias: number) {
   const tcDe = (userId: string) =>
     tcPorNegocio.get(userId) ?? { usd: TC_DEFAULT, mlc: TC_DEFAULT };
 
-  const codigosGenerados = rCodigosGenerados.count ?? 0;
-  const codigosUsados = rCodigosUsados.count ?? 0;
+  const codigosGenerados = rCodigosPorVencer.count ?? 0;
+  const codigosUsados = 0;
   const codigosPorVencer = rCodigosPorVencer.count ?? 0;
   const codigosVencidosSinUsar = rCodigosVencidos.count ?? 0;
   const ingresosReales = rIngresosReales.data ?? [];
   const codigosConNegocio = rCodigosConNegocio.data ?? [];
 
-  // ---- Tanda 2 paralela: actividad de la app (SOLO ventas válidas:
-  // excluye devueltas y borradas, que inflaban la actividad fantasma) ----
+  // ---- Tanda 2 paralela: datos detallados para gráficos/LTV ----
   const [
     rVentasRango,
     rGastosRango,
     rVentasDetalle,
-    rVentas7,
-    rVentasPrev,
-    rGastosPrev,
+    rCodigosGenerados,
+    rCodigosUsados,
     rIngresosMeses,
-    rErrores7,
-    rVentas30u,
-    rGastos30u,
   ] = await Promise.all([
     supabaseAdmin
       .from('ventas')
@@ -173,56 +159,31 @@ async function getStats(dias: number) {
       .is('deleted_at', null)
       .gte('fecha', desde)
       .limit(50000),
+    supabaseAdmin.from('codigos_pago').select('*', { count: 'exact', head: true }),
     supabaseAdmin
-      .from('ventas')
-      .select('user_id, fecha')
-      .eq('devuelto', 0)
-      .is('deleted_at', null)
-      .gte('fecha', hace7Str)
-      .limit(50000),
-    supabaseAdmin
-      .from('ventas')
+      .from('codigos_pago')
       .select('*', { count: 'exact', head: true })
-      .eq('devuelto', 0)
-      .is('deleted_at', null)
-      .gte('fecha', desdePrev)
-      .lt('fecha', desde),
-    supabaseAdmin
-      .from('gastos')
-      .select('*', { count: 'exact', head: true })
-      .is('deleted_at', null)
-      .gte('fecha', desdePrev)
-      .lt('fecha', desde),
+      .eq('usado', true),
     supabaseAdmin
       .from('codigos_pago')
       .select('precio_pagado, usado_en')
       .eq('usado', true)
       .gte('usado_en', hace6mIso)
       .limit(50000),
-    supabaseAdmin
-      .from('app_logs')
-      .select('*', { count: 'exact', head: true })
-      .gte('created_at', errores7Iso),
-    supabaseAdmin.from('ventas').select('user_id').eq('devuelto', 0).is('deleted_at', null).gte('fecha', hace30).limit(50000),
-    supabaseAdmin.from('gastos').select('user_id').is('deleted_at', null).gte('fecha', hace30).limit(50000),
   ]);
 
   notaFallo('ventas del rango', rVentasRango);
   notaFallo('gastos del rango', rGastosRango);
   notaFallo('detalle de ventas', rVentasDetalle);
-  notaFallo('ventas 7 días', rVentas7);
-  notaFallo('rango previo (ventas)', rVentasPrev);
-  notaFallo('rango previo (gastos)', rGastosPrev);
   notaFallo('ingresos por mes', rIngresosMeses);
-  notaFallo('errores de la app', rErrores7);
-  notaFallo('actividad 30 días', rVentas30u);
-  notaFallo('actividad 30 días (gastos)', rGastos30u);
 
+  const codigosGeneradosFinal = rCodigosGenerados.count ?? 0;
+  const codigosUsadosFinal = rCodigosUsados.count ?? 0;
   const ventasRango = rVentasRango.count ?? 0;
   const gastosRango = rGastosRango.count ?? 0;
-  const ventasRangoPrev = rVentasPrev.count ?? 0;
-  const gastosRangoPrev = rGastosPrev.count ?? 0;
-  const errores7 = rErrores7.count ?? 0;
+  const ventasRangoPrev = 0;
+  const gastosRangoPrev = 0;
+  const errores7 = rpc.logs_errores_7d ?? 0;
 
   // ---- Negocios: estados corregidos ----
   const vivos = negocios.filter((n) => !n.deleted_at);
@@ -402,9 +363,11 @@ async function getStats(dias: number) {
   }
 
   // Pulso de uso real: cuántas clientas vendieron hoy y en 7 días.
+  const hace7Ms = ahora - 7 * MS_DIA;
   const vendedores7 = new Set<string>();
-  for (const v of rVentas7.data ?? []) {
-    if (String(v.fecha).slice(0, 10) >= hace7Str) vendedores7.add(String(v.user_id));
+  for (const v of rVentasDetalle.data ?? []) {
+    const f = new Date(String(v.fecha)).getTime();
+    if (f >= hace7Ms) vendedores7.add(String(v.user_id));
   }
 
   // ---- Retención y conversión honesta ----
@@ -435,10 +398,13 @@ async function getStats(dias: number) {
       ? Math.round((conPago / denominadorConversion) * 100)
       : 0;
 
-  // ---- Inactivas: sin ventas NI gastos sincronizados en los últimos 30 días ----
+  // ---- Inactivas: sin ventas sincronizadas en los últimos 30 días ----
+  const hace30Ms = ahora - 30 * MS_DIA;
   const activasConDatos = new Set<string>();
-  for (const v of rVentas30u.data ?? []) activasConDatos.add(String(v.user_id));
-  for (const g of rGastos30u.data ?? []) activasConDatos.add(String(g.user_id));
+  for (const v of rVentasDetalle.data ?? []) {
+    const f = new Date(String(v.fecha)).getTime();
+    if (f >= hace30Ms && v.user_id) activasConDatos.add(String(v.user_id));
+  }
   const inactivas30 = vivos.filter((n) => !activasConDatos.has(String(n.id))).length;
 
   return {
@@ -452,8 +418,8 @@ async function getStats(dias: number) {
     vencidasSinRenovar: vencidasSinRenovar.length,
     pruebasTerminando,
     porPlan,
-    codigosGenerados,
-    codigosUsados,
+    codigosGenerados: codigosGeneradosFinal,
+    codigosUsados: codigosUsadosFinal,
     codigosPorVencer,
     codigosVencidosSinUsar,
     ingresoRealCup,

@@ -57,11 +57,16 @@ export async function GET() {
   // efectos secundarios (no intenta crear buckets nadie no autorizado).
   if (autenticado) {
     try {
-      const { ensureFotosBucketExists } = await import('@/lib/supabase');
+      const { ensureFotosBucketExists, ensureConfigBucketExists } = await import('@/lib/supabase');
       const bucket = await ensureFotosBucketExists();
       checks.storage = bucket.ok
         ? { ok: true, detalle: 'Bucket fotos listo' }
         : { ok: false, detalle: bucket.error ?? 'Bucket fotos no disponible' };
+
+      const configBucket = await ensureConfigBucketExists();
+      checks.storageConfig = configBucket.ok
+        ? { ok: true, detalle: 'Bucket config (OTA) listo' }
+        : { ok: false, detalle: configBucket.error ?? 'Bucket config no disponible' };
     } catch (e) {
       checks.storage = {
         ok: false,

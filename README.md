@@ -37,12 +37,13 @@ npm run test:e2e        # Playwright (requiere npx playwright install chromium)
   `crypto.randomInt` (nunca `Math.random`). Unicidad garantizada por la
   constraint `UNIQUE(codigo)` + reintento ante conflicto (23505).
 - **Auditoría**: toda acción del panel queda en la tabla `admin_audit`
-  (aplicar `supabase/migrations/20260822000000_admin_audit.sql` o pegar
-  `docs/supabase-admin_audit.sql` en el SQL Editor).
+   (aplicar `supabase/migrations/20260822000000_admin_audit.sql` o pegar
+   `docs/supabase-schema.sql` en el SQL Editor).
 - **Cabeceras de seguridad**: X-Frame-Options DENY, nosniff,
   Referrer-Policy, Permissions-Policy y HSTS (`next.config.js`).
 - **`/api/health` estratificado**: sin sesión responde solo `{status}`; los
-  detalles y la creación del bucket exigen login.
+  detalles y la creación del bucket exigen login. Verifica buckets `fotos`
+  (privado) y `config` (público).
 - **Borrado permanente** exige escribir `ELIMINAR` en un modal (no confirm()
   nativo) y queda auditado.
 - **Purga de logs acotada**: `/api/logs?dias=` se recorta a [1..730].
@@ -97,3 +98,16 @@ detalles y login fallido. Así corren en CI sin secretos.
 npx playwright install chromium   # una vez
 npm run test:e2e
 ```
+
+## Páginas del dashboard
+
+- `/dashboard` — Métricas y resumen (server component).
+- `/dashboard/negocios` — Gestión de cuentas (activar, renovar, papelera).
+- `/dashboard/codigos` — Generación y gestión de códigos de pago. Botón
+  "💰 Confirmar y enviar" con diálogo de confirmación antes de generar.
+- `/dashboard/logs` — Logs de la app con eliminación individual/masiva.
+- `/dashboard/health` — Health check (buckets, conexión, sesión).
+- `/dashboard/soporte` — Tickets de soporte (requiere migración §A).
+- `/dashboard/conflictos` — Log de conflictos de sync (requiere migración §B).
+- `/dashboard/mensajes` — Envío de mensajes directos a usuarios (requiere
+  `docs/SQL_PEGAR.sql` §5).

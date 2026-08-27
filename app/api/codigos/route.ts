@@ -178,7 +178,7 @@ export async function POST(request: NextRequest) {
           duracion_meses,
           precio_pagado: precio,
           metodo_pago: data.metodo_pago,
-        });
+        }, request.headers.get('x-real-ip') || request.headers.get('x-forwarded-for')?.split(',')[0]?.trim(), request.headers.get('user-agent') || undefined);
         return NextResponse.json({ data });
       }
       if (error.code !== '23505') {
@@ -221,7 +221,8 @@ export async function PATCH(request: NextRequest) {
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
-    await registrarAccion('codigo_estado_pago', 'codigo_pago', id, { estado_pago });
+    await registrarAccion('codigo_estado_pago', 'codigo_pago', id, { estado_pago },
+      request.headers.get('x-real-ip') || request.headers.get('x-forwarded-for')?.split(',')[0]?.trim(), request.headers.get('user-agent') || undefined);
     return NextResponse.json({ ok: true });
   } catch {
     return NextResponse.json({ error: 'Error interno' }, { status: 500 });
