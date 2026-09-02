@@ -64,6 +64,10 @@ export async function PATCH(request: NextRequest) {
     if (accion !== undefined && typeof accion !== 'string') {
       return NextResponse.json({ error: 'accion debe ser texto' }, { status: 400 });
     }
+    const ACCIONES_VALIDAS = ['resuelto', 'ignorado', 'en_progreso'];
+    if (accion && !ACCIONES_VALIDAS.includes(accion)) {
+      return NextResponse.json({ error: `accion debe ser: ${ACCIONES_VALIDAS.join(', ')}` }, { status: 400 });
+    }
 
     const update: Record<string, unknown> = {};
     if (resuelto !== undefined) update.resuelto = resuelto;

@@ -91,7 +91,7 @@ async function getStats(dias: number) {
       .limit(50000),
     supabaseAdmin
       .from('codigos_pago')
-      .select('precio_pagado, usado_en')
+      .select('precio_pagado, usado_en, negocio_id')
       .eq('usado', true)
       .gte('usado_en', hace6mIso)
       .limit(50000),

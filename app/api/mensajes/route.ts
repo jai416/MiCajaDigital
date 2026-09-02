@@ -28,7 +28,7 @@ export async function GET(request: NextRequest) {
 
   let query = supabaseAdmin
     .from('mensajes')
-    .select('*, negocios:user_id(nombre_negocio, email)', { count: 'exact' })
+    .select('*', { count: 'exact' })
     .order('created_at', { ascending: false })
     .range(desde, desde + porPagina - 1);
 

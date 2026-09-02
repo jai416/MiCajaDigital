@@ -26,7 +26,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     try {
       if ('caches' in window) {
         const llaves = await caches.keys();
-        await Promise.all(llaves.map((k) => caches.delete(k)));
+        const appCaches = llaves.filter((k) => k.includes('micajadigital') || k.includes('admin'));
+        await Promise.all(appCaches.map((k) => caches.delete(k)));
       }
       if ('serviceWorker' in navigator) {
         const regs = await navigator.serviceWorker.getRegistrations();
@@ -41,6 +42,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const navItems = [
     { href: '/dashboard', label: 'Dashboard', icon: '📊' },
     { href: '/dashboard/negocios', label: 'Negocios', icon: '🏪' },
+    { href: '/dashboard/actividad', label: 'Actividad', icon: '👁️' },
     { href: '/dashboard/codigos', label: 'Códigos de pago', icon: '🔑' },
     { href: '/dashboard/soporte', label: 'Soporte', icon: '💬' },
     { href: '/dashboard/soporte/mensajes', label: 'Mensajes', icon: '📩', badge: msgsNoLeidos },

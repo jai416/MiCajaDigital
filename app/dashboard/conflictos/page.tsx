@@ -25,6 +25,13 @@ export default function ConflictosPage() {
   const [cargado, setCargado] = useState(false);
   const [feedback, setFeedback] = useState('');
 
+  useEffect(() => {
+    if (feedback) {
+      const t = setTimeout(() => setFeedback(''), 3000);
+      return () => clearTimeout(t);
+    }
+  }, [feedback]);
+
   const cargar = async (p: number = 1) => {
     try {
       const res = await fetch(`/api/conflictos?pagina=${p}&porPagina=30&pendientes=${soloPendientes}`);
