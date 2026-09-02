@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 
@@ -8,10 +8,21 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const pathname = usePathname();
   const router = useRouter();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [msgsNoLeidos, setMsgsNoLeidos] = useState(0);
+
+  useEffect(() => {
+    const fetchConteo = () => {
+      fetch('/api/mensajes?conteo=true')
+        .then((r) => r.json())
+        .then((j) => { if (j.conteo != null) setMsgsNoLeidos(j.conteo); })
+        .catch(() => {});
+    };
+    fetchConteo();
+    const iv = setInterval(fetchConteo, 60000);
+    return () => clearInterval(iv);
+  }, []);
 
   const handleLogout = async () => {
-    // 1) Purga caches + desregistra el SW ANTES de salir: así ni offline ni
-    // con "Atrás" queda un shell del dashboard servido desde caché.
     try {
       if ('caches' in window) {
         const llaves = await caches.keys();
@@ -21,11 +32,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         const regs = await navigator.serviceWorker.getRegistrations();
         await Promise.all(regs.map((r) => r.unregister()));
       }
-    } catch {
-      // la purga es best-effort; el logout sigue
-    }
-    // 2) replace evita que "Atrás" vuelva al dashboard; refresh limpia el estado
-    // del router (datos sensibles en memoria del cliente).
+    } catch {}
     await fetch('/api/logout', { method: 'POST' });
     router.replace('/login');
     router.refresh();
@@ -36,7 +43,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     { href: '/dashboard/negocios', label: 'Negocios', icon: '🏪' },
     { href: '/dashboard/codigos', label: 'Códigos de pago', icon: '🔑' },
     { href: '/dashboard/soporte', label: 'Soporte', icon: '💬' },
-    { href: '/dashboard/soporte/mensajes', label: 'Mensajes', icon: '📩' },
+    { href: '/dashboard/soporte/mensajes', label: 'Mensajes', icon: '📩', badge: msgsNoLeidos },
     { href: '/dashboard/conflictos', label: 'Conflictos', icon: '⚠️' },
     { href: '/dashboard/logs', label: 'Logs de la app', icon: '🛠️' },
     { href: '/dashboard/health', label: 'Estado', icon: '🩺' },
@@ -44,13 +51,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   return (
     <div className="flex h-screen bg-gray-50">
-      {/* Skip-link: primera tecla Tab lo revela; salta la navegación lateral */}
-      <a
-        href="#contenido"
-        className="sr-only focus:not-sr-only focus:absolute focus:left-2 focus:top-2 focus:z-50 focus:rounded-lg focus:bg-emerald-600 focus:px-4 focus:py-2 focus:text-sm focus:font-semibold focus:text-white"
-      >
+      <a href="#contenido"
+        className="sr-only focus:not-sr-only focus:absolute focus:left-2 focus:top-2 focus:z-50 focus:rounded-lg focus:bg-emerald-600 focus:px-4 focus:py-2 focus:text-sm focus:font-semibold focus:text-white">
         Saltar al contenido
       </a>
+
       <aside className={`fixed inset-y-0 left-0 z-30 w-64 bg-white shadow-lg transform ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'} lg:translate-x-0 lg:static transition-transform duration-200`}>
         <div className="p-6 border-b border-gray-200">
           <h2 className="text-xl font-bold text-emerald-700">Mi Caja Digital</h2>
@@ -58,25 +63,23 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         </div>
         <nav className="p-4 space-y-1" aria-label="Secciones del panel">
           {navItems.map((item) => (
-            <Link
-              key={item.href}
-              href={item.href}
+            <Link key={item.href} href={item.href}
               className={`flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition ${
-                pathname === item.href
-                  ? 'bg-emerald-50 text-emerald-700'
-                  : 'text-gray-600 hover:bg-gray-100'
-              }`}
-            >
+                pathname === item.href ? 'bg-emerald-50 text-emerald-700' : 'text-gray-600 hover:bg-gray-100'
+              }`}>
               <span>{item.icon}</span>
-              {item.label}
+              <span className="flex-1">{item.label}</span>
+              {'badge' in item && item.badge != null && item.badge > 0 && (
+                <span className="px-2 py-0.5 bg-red-500 text-white text-[10px] font-bold rounded-full min-w-[18px] text-center">
+                  {item.badge > 99 ? '99+' : item.badge}
+                </span>
+              )}
             </Link>
           ))}
         </nav>
         <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-gray-200">
-          <button
-            onClick={handleLogout}
-            className="w-full px-4 py-2 text-sm text-red-600 hover:bg-red-50 rounded-lg transition"
-          >
+          <button onClick={handleLogout}
+            className="w-full px-4 py-2 text-sm text-red-600 hover:bg-red-50 rounded-lg transition">
             Cerrar Sesión
           </button>
         </div>
@@ -84,12 +87,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
       <div className="flex-1 flex flex-col min-w-0">
         <header className="bg-white shadow-sm border-b border-gray-200 px-6 py-4 lg:hidden">
-          <button
-            onClick={() => setSidebarOpen(!sidebarOpen)}
+          <button onClick={() => setSidebarOpen(!sidebarOpen)}
             aria-label={sidebarOpen ? 'Cerrar menú' : 'Abrir menú'}
             aria-expanded={sidebarOpen}
-            className="text-gray-600"
-          >
+            className="text-gray-600">
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
             </svg>

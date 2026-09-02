@@ -27,14 +27,44 @@ export default function LogsPage() {
   const [eliminando, setEliminando] = useState(false);
   const [feedback, setFeedback] = useState('');
 
+  // Filtros
+  const [filtroNivel, setFiltroNivel] = useState('todos');
+  const [filtroOrigen, setFiltroOrigen] = useState('');
+  const [filtroBuscar, setFiltroBuscar] = useState('');
+
+  const [feedbackCargar, setFeedbackCargar] = useState('');
+
   const cargar = async () => {
-    const res = await fetch('/api/logs?pagina=1&porPagina=300');
-    const json = await res.json();
-    if (res.ok) setLogs(json.data ?? []);
+    try {
+      const res = await fetch('/api/logs?pagina=1&porPagina=500');
+      const json = await res.json();
+      if (res.ok) setLogs(json.data ?? []);
+      else setFeedbackCargar(`Error: ${json.error ?? 'No se pudieron cargar los logs'}`);
+    } catch {
+      setFeedbackCargar('Error de conexión al cargar logs');
+    }
     setCargado(true);
   };
 
   useEffect(() => { cargar(); }, []);
+
+  // Orígenes únicos
+  const origenes = [...new Set(logs.map((l) => l.origen).filter(Boolean))].sort();
+
+  // Filtrado client-side
+  const logsFiltrados = logs.filter((l) => {
+    if (filtroNivel !== 'todos' && l.nivel !== filtroNivel) return false;
+    if (filtroOrigen && l.origen !== filtroOrigen) return false;
+    if (filtroBuscar) {
+      const q = filtroBuscar.toLowerCase();
+      const hay = (l.mensaje ?? '').toLowerCase().includes(q)
+        || (l.email ?? '').toLowerCase().includes(q)
+        || (l.nombre_negocio ?? '').toLowerCase().includes(q)
+        || (l.origen ?? '').toLowerCase().includes(q);
+      if (!hay) return false;
+    }
+    return true;
+  });
 
   const toggleSeleccion = (uuid: string) => {
     setSeleccion((prev) => {
@@ -46,8 +76,9 @@ export default function LogsPage() {
   };
 
   const toggleTodo = () => {
-    if (seleccion.size === logs.length) setSeleccion(new Set());
-    else setSeleccion(new Set(logs.map((l) => l.log_uuid).filter(Boolean) as string[]));
+    const uuids = logsFiltrados.map((l) => l.log_uuid).filter(Boolean) as string[];
+    if (seleccion.size === uuids.length) setSeleccion(new Set());
+    else setSeleccion(new Set(uuids));
   };
 
   const eliminarSeleccionados = async () => {
@@ -112,8 +143,7 @@ export default function LogsPage() {
       </div>
 
       <p className="text-sm text-gray-500 mb-4">
-        La app envía errores críticos aquí. Cada log incluye fecha/hora UTC. Puedes
-        seleccionar logs individuales o eliminar todos.
+        La app envía errores críticos aquí. Puedes filtrar por nivel, origen o texto.
       </p>
 
       {feedback && (
@@ -124,11 +154,43 @@ export default function LogsPage() {
         </div>
       )}
 
+      {/* Filtros */}
+      <div className="flex flex-wrap gap-3 mb-4">
+        <select value={filtroNivel} onChange={(e) => setFiltroNivel(e.target.value)}
+          className="px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white">
+          <option value="todos">Todos los niveles</option>
+          <option value="error">🔴 Error</option>
+          <option value="info">🔵 Info</option>
+        </select>
+
+        <select value={filtroOrigen} onChange={(e) => setFiltroOrigen(e.target.value)}
+          className="px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white">
+          <option value="">Todos los orígenes</option>
+          {origenes.map((o) => (
+            <option key={o} value={o}>{o}</option>
+          ))}
+        </select>
+
+        <input type="text" value={filtroBuscar} onChange={(e) => setFiltroBuscar(e.target.value)}
+          placeholder="Buscar en mensaje, email, negocio..."
+          className="flex-1 min-w-[200px] px-3 py-2 border border-gray-300 rounded-lg text-sm" />
+
+        {(filtroNivel !== 'todos' || filtroOrigen || filtroBuscar) && (
+          <button onClick={() => { setFiltroNivel('todos'); setFiltroOrigen(''); setFiltroBuscar(''); }}
+            className="px-3 py-2 text-xs text-gray-500 border border-gray-300 rounded-lg hover:bg-gray-50">
+            Limpiar filtros
+          </button>
+        )}
+      </div>
+
       <div className="flex items-center justify-between mb-4">
+        <span className="text-xs text-gray-500">
+          {logsFiltrados.length} de {logs.length} logs
+        </span>
         <div className="flex items-center gap-2">
           <button onClick={toggleTodo}
             className="px-3 py-1.5 text-xs font-semibold bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200">
-            {seleccion.size === logs.length ? 'Deseleccionar todo' : 'Seleccionar todo'}
+            {seleccion.size === logsFiltrados.length ? 'Deseleccionar todo' : 'Seleccionar todo'}
           </button>
           {seleccion.size > 0 && (
             <button onClick={eliminarSeleccionados} disabled={eliminando}
@@ -144,14 +206,14 @@ export default function LogsPage() {
       </div>
 
       {!cargado && <p className="text-gray-500">Cargando...</p>}
-      {cargado && logs.length === 0 && (
+      {cargado && logsFiltrados.length === 0 && (
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-10 text-center text-gray-500">
-          Aún no hay errores reportados.
+          {logs.length === 0 ? 'Aún no hay errores reportados.' : 'No hay logs que coincidan con los filtros.'}
         </div>
       )}
 
       <div className="space-y-2">
-        {logs.map((l) => (
+        {logsFiltrados.map((l) => (
           <div key={l.id}
             className={`bg-white rounded-xl shadow-sm border p-4 transition ${
               seleccion.has(l.log_uuid ?? '') ? 'border-blue-400 bg-blue-50' : 'border-gray-200'

@@ -74,6 +74,33 @@ export async function GET() {
       };
     }
 
+    // Verificar que version.json esté actualizado en el bucket config.
+    try {
+      const { data: vFile, error: vErr } = await supabaseAdmin.storage
+        .from('config')
+        .download('version.json');
+      if (vErr) {
+        checks.versionJson = { ok: false, detalle: `No se pudo leer config/version.json: ${vErr.message}` };
+      } else {
+        const texto = await vFile.text();
+        const remoto = JSON.parse(texto);
+        // Versión esperada del código fuente (debe coincidir con docs/version.json).
+        const ESPERADA = '1.3.0';
+        const codigoOk = remoto.version === ESPERADA;
+        checks.versionJson = {
+          ok: codigoOk,
+          detalle: codigoOk
+            ? `version.json remoto: v${remoto.version}+${remoto.versionCode} (esperado v${ESPERADA})`
+            : `⚠️ version.json remoto es v${remoto.version}, esperado v${ESPERADA}. Sube docs/version.json al bucket config.`,
+        };
+      }
+    } catch (e) {
+      checks.versionJson = {
+        ok: false,
+        detalle: e instanceof Error ? e.message : 'Error al verificar version.json',
+      };
+    }
+
     const healthy = Object.values(checks).every((c) => c.ok);
     return NextResponse.json(
       {

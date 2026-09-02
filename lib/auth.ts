@@ -1,6 +1,6 @@
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
-import { randomBytes, timingSafeEqual, scryptSync } from 'crypto';
+import { timingSafeEqual, scryptSync } from 'crypto';
 import { SESSION_COOKIE, SESSION_TTL_MS, crearValorSesion, verificarValorSesion } from './session';
 
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL!;
@@ -51,14 +51,6 @@ function verificarHash(password: string, hash: string): boolean {
   } catch {
     return false;
   }
-}
-
-/// Verifica la contraseña contra el hash scrypt (`ADMIN_PASSWORD_HASH`) si está
-/// configurado; si no, contra el `ADMIN_PASSWORD` plano. Nunca guardes en texto
-/// plano: genera el hash con `node scripts/hash_password.mjs <clave>`.
-export function verifyPassword(password: string): boolean {
-  if (ADMIN_PASSWORD_HASH) return verificarHash(password, ADMIN_PASSWORD_HASH);
-  return valoresIguales(password, ADMIN_PASSWORD);
 }
 
 export function verifyCredentials(email: string, password: string): boolean {

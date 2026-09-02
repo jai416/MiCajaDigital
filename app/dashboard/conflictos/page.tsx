@@ -23,15 +23,22 @@ export default function ConflictosPage() {
   const [total, setTotal] = useState(0);
   const [totalPaginas, setTotalPaginas] = useState(1);
   const [cargado, setCargado] = useState(false);
+  const [feedback, setFeedback] = useState('');
 
   const cargar = async (p: number = 1) => {
-    const res = await fetch(`/api/conflictos?pagina=${p}&porPagina=30&pendientes=${soloPendientes}`);
-    const json = await res.json();
-    if (res.ok) {
-      setConflictos(json.data ?? []);
-      setPagina(json.pagina ?? 1);
-      setTotalPaginas(json.totalPaginas ?? 1);
-      setTotal(json.total ?? 0);
+    try {
+      const res = await fetch(`/api/conflictos?pagina=${p}&porPagina=30&pendientes=${soloPendientes}`);
+      const json = await res.json();
+      if (res.ok) {
+        setConflictos(json.data ?? []);
+        setPagina(json.pagina ?? 1);
+        setTotalPaginas(json.totalPaginas ?? 1);
+        setTotal(json.total ?? 0);
+      } else {
+        setFeedback(`Error: ${json.error ?? 'No se pudieron cargar los conflictos'}`);
+      }
+    } catch {
+      setFeedback('Error de conexión al cargar conflictos');
     }
     setCargado(true);
   };
@@ -39,12 +46,21 @@ export default function ConflictosPage() {
   useEffect(() => { cargar(1); }, [soloPendientes]);
 
   const resolver = async (id: number) => {
-    await fetch('/api/conflictos', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id, resuelto: true, accion: 'resuelto_manual' }),
-    });
-    await cargar(pagina);
+    try {
+      const res = await fetch('/api/conflictos', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, resuelto: true, accion: 'resuelto_manual' }),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        setFeedback(`Error: ${json.error ?? 'No se pudo resolver'}`);
+        return;
+      }
+      await cargar(pagina);
+    } catch {
+      setFeedback('Error de conexión al resolver conflicto');
+    }
   };
 
   return (
@@ -61,6 +77,14 @@ export default function ConflictosPage() {
           <span className="text-sm text-gray-500">{total} conflictos</span>
         </div>
       </div>
+
+      {feedback && (
+        <div className={`mb-4 px-4 py-2 rounded-lg text-sm font-semibold ${
+          feedback.startsWith('Error') ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'
+        }`}>
+          {feedback}
+        </div>
+      )}
 
       <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-6">
         <p className="text-sm text-amber-800">

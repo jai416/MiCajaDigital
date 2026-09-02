@@ -31,23 +31,32 @@ export default function MensajesPage() {
   const [formTitulo, setFormTitulo] = useState('');
   const [formMensaje, setFormMensaje] = useState('');
   const [enviando, setEnviando] = useState(false);
+  const [feedback, setFeedback] = useState('');
 
   const cargar = async (p: number = 1) => {
-    const res = await fetch(`/api/mensajes?pagina=${p}&porPagina=20`);
-    const json = await res.json();
-    if (res.ok) {
-      setMensajes(json.data ?? []);
-      setPagina(json.pagina ?? 1);
-      setTotalPaginas(json.totalPaginas ?? 1);
-      setTotal(json.total ?? 0);
+    try {
+      const res = await fetch(`/api/mensajes?pagina=${p}&porPagina=20`);
+      const json = await res.json();
+      if (res.ok) {
+        setMensajes(json.data ?? []);
+        setPagina(json.pagina ?? 1);
+        setTotalPaginas(json.totalPaginas ?? 1);
+        setTotal(json.total ?? 0);
+      } else {
+        setFeedback(`Error: ${json.error ?? 'No se pudieron cargar los mensajes'}`);
+      }
+    } catch {
+      setFeedback('Error de conexión al cargar mensajes');
     }
     setCargado(true);
   };
 
   const cargarNegocios = async () => {
-    const res = await fetch('/api/negocios?porPagina=500&activo=todos');
-    const json = await res.json();
-    if (res.ok) setNegocios(json.data ?? []);
+    try {
+      const res = await fetch('/api/negocios?porPagina=500&activo=todos');
+      const json = await res.json();
+      if (res.ok) setNegocios(json.data ?? []);
+    } catch { /* silent */ }
   };
 
   useEffect(() => {
@@ -81,8 +90,17 @@ export default function MensajesPage() {
 
   const eliminar = async (id: number) => {
     if (!confirm('¿Eliminar este mensaje?')) return;
-    await fetch(`/api/mensajes?id=${id}`, { method: 'DELETE' });
-    await cargar(pagina);
+    try {
+      const res = await fetch(`/api/mensajes?id=${id}`, { method: 'DELETE' });
+      const json = await res.json();
+      if (!res.ok) {
+        setFeedback(`Error: ${json.error ?? 'No se pudo eliminar'}`);
+        return;
+      }
+      await cargar(pagina);
+    } catch {
+      setFeedback('Error de conexión al eliminar mensaje');
+    }
   };
 
   return (
@@ -91,6 +109,14 @@ export default function MensajesPage() {
         <h1 className="text-2xl font-bold text-gray-800">Mensajes directos</h1>
         <span className="text-sm text-gray-500">{total} mensajes</span>
       </div>
+
+      {feedback && (
+        <div className={`mb-4 px-4 py-2 rounded-lg text-sm font-semibold ${
+          feedback.startsWith('Error') ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'
+        }`}>
+          {feedback}
+        </div>
+      )}
 
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5 mb-6">
         <h2 className="text-sm font-semibold text-gray-700 mb-4">Enviar mensaje</h2>
