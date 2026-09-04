@@ -19,6 +19,25 @@ interface Mensaje {
   negocios?: { nombre_negocio: string; email: string } | null;
 }
 
+const PLANTILLAS_MENSAJES = [
+  { id: 'bienvenida', label: '👋 Bienvenida', titulo: 'Bienvenida a Mi Caja Digital', mensaje: '¡Hola! Bienvenida a Mi Caja Digital. Estamos aquí para ayudarte a gestionar tu negocio de forma más fácil y eficiente. Si tienes alguna pregunta, no dudes en escribirnos.' },
+  { id: 'actualizacion', label: '🆕 Actualización', titulo: 'Nueva actualización disponible', mensaje: '¡Hola! Tenemos una nueva versión de la app con mejoras importantes. Te recomendamos actualizar desde Ajustes → Sincronización para obtener las últimas funcionalidades.' },
+  { id: 'recordatorio_pago', label: '💰 Recordatorio de pago', titulo: 'Recordatorio: Renovación de suscripción', mensaje: '¡Hola! Tu suscripción está próxima a vencer. Para seguir disfrutando de Mi Caja Digital, contacta con nosotros para renovar tu plan.' },
+  { id: 'promocion', label: '🎉 Promoción', titulo: '¡Promoción especial!', mensaje: '¡Hola! Tenemos una promoción especial para ti. Contáctanos para conocer las ofertas disponibles en planes y renovaciones.' },
+  { id: 'mantenimiento', label: '🔧 Mantenimiento', titulo: 'Mantenimiento programado', mensaje: '¡Hola! Te informamos que realizaremos mantenimiento del sistema. Durante este periodo, algunos servicios pueden no estar disponibles temporalmente. Disculpa las molestias.' },
+  { id: 'agradecimiento', label: '🙏 Agradecimiento', titulo: '¡Gracias por confiar en nosotros!', mensaje: '¡Hola! Queremos agradecerte por usar Mi Caja Digital. Tu confianza nos motiva a seguir mejorando. Si tienes sugerencias, nos encantaría conocerlas.' },
+  { id: 'problema_tecnico', label: '🛠️ Problema técnico', titulo: 'Reporte de problema técnico', mensaje: '¡Hola! Hemos detectado un problema técnico que estamos resolviendo. Te mantendremos informado del progreso. Disculpa las molestias.' },
+  { id: 'nueva_funcion', label: '⚡ Nueva función', titulo: 'Descubre la nueva función', mensaje: '¡Hola! Acabamos de lanzar una nueva función que te ayudará a gestionar tu negocio aún mejor. Ábrete la app y descúbrela en Ajustes.' },
+  { id: 'tips_negocio', label: '💡 Tips para tu negocio', titulo: 'Consejos para hacer crecer tu negocio', mensaje: '¡Hola! Queremos compartirte algunos consejos: 1) Revisa tu cuadre diario, 2) Mantén tu catálogo actualizado, 3) Usa las estadísticas para tomar mejores decisiones. ¡Éxito!' },
+  { id: 'respuesta_sugerencia', label: '💡 Respuesta a sugerencia', titulo: 'Respuesta a tu sugerencia', mensaje: '¡Hola! Hemos recibido tu sugerencia y la estamos evaluando. Agradecemos mucho tu参与 para mejorar Mi Caja Digital. Te mantendremos informado de cualquier novedad.' },
+  { id: 'problema_resuelto', label: '✅ Problema resuelto', titulo: 'Problema resuelto', mensaje: '¡Hola! El problema que reportaste ha sido resuelto. Por favor, verifica si todo funciona correctamente. Si persiste, no dudes en contactarnos de nuevo.' },
+  { id: '_codigo_enviado', label: '🔑 Código enviado', titulo: 'Código de activación enviado', mensaje: '¡Hola! Tu código de activación ha sido enviado a tu correo. Recuerda que tiene 24 horas de vigencia. Si no lo recibes, revisa tu carpeta de spam.' },
+  { id: 'bienvenida_trial', label: '🎁 Bienvenida trial', titulo: '¡Bienvenida a tu prueba gratuita!', mensaje: '¡Hola! Bienvenida a tu prueba gratuita de 15 días de Mi Caja Digital. Disfruta de todas las funciones premium. Si necesitas ayuda, estamos aquí para ti.' },
+  { id: 'fin_trial', label: '⏰ Fin de trial', titulo: 'Tu prueba gratuita ha terminado', mensaje: '¡Hola! Tu prueba gratuita ha terminado. Para seguir usando Mi Caja Digital, contacta con nosotros para activar tu plan. ¡No pierdas tus datos!' },
+  { id: 'backup_recordatorio', label: '☁️ Recordatorio respaldo', titulo: 'Recordatorio: Respalda tus datos', mensaje: '¡Hola! Es importante que respaldes tus datos regularmente. Ve a Ajustes → Sincronización → Respaldar ahora para asegurar que tu información esté segura.' },
+  { id: 'personalizado', label: '✏️ Personalizado', titulo: '', mensaje: '' },
+];
+
 export default function MensajesPage() {
   const [mensajes, setMensajes] = useState<Mensaje[]>([]);
   const [negocios, setNegocios] = useState<Negocio[]>([]);
@@ -30,6 +49,7 @@ export default function MensajesPage() {
   const [formUserId, setFormUserId] = useState('');
   const [formTitulo, setFormTitulo] = useState('');
   const [formMensaje, setFormMensaje] = useState('');
+  const [plantillaSel, setPlantillaSel] = useState('');
   const [enviando, setEnviando] = useState(false);
   const [feedback, setFeedback] = useState('');
 
@@ -81,11 +101,21 @@ export default function MensajesPage() {
       setFormUserId('');
       setFormTitulo('');
       setFormMensaje('');
+      setPlantillaSel('');
       await cargar(1);
     } else {
       alert(json.error ?? 'Error al enviar');
     }
     setEnviando(false);
+  };
+
+  const aplicarPlantilla = (pid: string) => {
+    setPlantillaSel(pid);
+    const pl = PLANTILLAS_MENSAJES.find((p) => p.id === pid);
+    if (pl) {
+      setFormTitulo(pl.titulo);
+      setFormMensaje(pl.mensaje);
+    }
   };
 
   const eliminar = async (id: number) => {
@@ -120,6 +150,19 @@ export default function MensajesPage() {
 
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5 mb-6">
         <h2 className="text-sm font-semibold text-gray-700 mb-4">Enviar mensaje</h2>
+        <div className="mb-4">
+          <label className="block text-xs font-medium text-gray-600 mb-1">Plantilla rápida</label>
+          <select
+            value={plantillaSel}
+            onChange={(e) => aplicarPlantilla(e.target.value)}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-emerald-500 focus:border-emerald-500 bg-white"
+          >
+            <option value="">Seleccionar plantilla...</option>
+            {PLANTILLAS_MENSAJES.map((p) => (
+              <option key={p.id} value={p.id}>{p.label}</option>
+            ))}
+          </select>
+        </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
           <div>
             <label className="block text-xs font-medium text-gray-600 mb-1">Destinatario</label>

@@ -19,10 +19,11 @@ export async function GET(request: NextRequest) {
     // Paso 1: buscar negocios por email o nombre si se provee búsqueda
     let negociosFiltrados: string[] | null = null;
     if (busqueda) {
+      const sanitized = busqueda.replace(/[%_]/g, '').slice(0, 100);
       const { data: negMatch } = await supabaseAdmin
         .from('negocios')
         .select('id')
-        .or(`email.ilike.%${busqueda}%,nombre_negocio.ilike.%${busqueda}%`)
+        .or(`email.ilike.%${sanitized}%,nombre_negocio.ilike.%${sanitized}%`)
         .limit(200);
       negociosFiltrados = (negMatch ?? []).map((n: { id: string }) => String(n.id));
       if (negociosFiltrados.length === 0) {

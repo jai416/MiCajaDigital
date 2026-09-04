@@ -12,22 +12,34 @@ export async function GET(request: NextRequest) {
   }
 
   const sp = request.nextUrl.searchParams;
-  const porPagina = Math.min(1000, Math.max(1, Number(sp.get('porPagina') ?? 500)));
+  const pagina = Math.max(1, Number(sp.get('pagina') ?? 1) || 1);
+  const porPagina = Math.min(100, Math.max(1, Number(sp.get('porPagina') ?? 50) || 50));
+  const desde = (pagina - 1) * porPagina;
   const activo = sp.get('activo');
+  const busqueda = sp.get('q')?.trim();
 
   let query = supabaseAdmin
     .from('negocios')
-    .select('id, nombre_negocio, email')
+    .select('id, nombre_negocio, email, activo, plan, fecha_expiracion, deleted_at', { count: 'exact' })
     .order('nombre_negocio', { ascending: true })
-    .limit(porPagina);
+    .range(desde, desde + porPagina - 1);
 
   if (activo === 'true') query = query.eq('activo', true);
   else if (activo === 'false') query = query.eq('activo', false);
+  if (busqueda) {
+    const sanitized = busqueda.replace(/[%_]/g, '').slice(0, 100);
+    query = query.or(`email.ilike.%${sanitized}%,nombre_negocio.ilike.%${sanitized}%`);
+  }
 
-  const { data, error } = await query;
+  const { data, error, count } = await query;
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  return NextResponse.json({ data: data ?? [] });
+  return NextResponse.json({
+    data: data ?? [],
+    total: count ?? 0,
+    pagina,
+    totalPaginas: Math.ceil((count ?? 0) / porPagina),
+  });
 }
 
 // Fuente de verdad de los planes: config/precios.json (raíz del repo).
