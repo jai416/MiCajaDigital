@@ -15,6 +15,9 @@ export const metadata: Metadata = {
     statusBarStyle: 'default',
     title: 'Admin MCD',
   },
+  other: {
+    'mobile-web-app-capable': 'yes',
+  },
 };
 
 export const viewport: Viewport = {

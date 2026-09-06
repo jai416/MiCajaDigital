@@ -83,7 +83,10 @@ export async function DELETE(request: NextRequest) {
         .from('app_logs')
         .delete({ count: 'exact' })
         .in('log_uuid', uuids);
-      if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+      if (error) {
+        console.error('DELETE /api/logs selectivos error:', error.message);
+        return NextResponse.json({ error: 'Error interno' }, { status: 400 });
+      }
       await registrarAccion('logs_eliminados_selectivos', 'logs', null, {
         cantidad: count ?? 0,
       },
@@ -96,7 +99,10 @@ export async function DELETE(request: NextRequest) {
       const { error, count } = await supabaseAdmin
         .from('app_logs')
         .delete({ count: 'exact' });
-      if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+      if (error) {
+        console.error('DELETE /api/logs todos error:', error.message);
+        return NextResponse.json({ error: 'Error interno' }, { status: 400 });
+      }
       await registrarAccion('logs_eliminados_todos', 'logs', null, {
         borrados: count ?? 0,
       },
@@ -115,7 +121,10 @@ export async function DELETE(request: NextRequest) {
       .from('app_logs')
       .delete({ count: 'exact' })
       .lt('created_at', corte);
-    if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+    if (error) {
+      console.error('DELETE /api/logs purgados error:', error.message);
+      return NextResponse.json({ error: 'Error interno' }, { status: 400 });
+    }
     await registrarAccion('logs_purgados', 'logs', null, {
       dias,
       borrados: count ?? 0,

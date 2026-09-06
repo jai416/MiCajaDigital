@@ -84,7 +84,7 @@ export async function GET() {
       } else {
         const texto = await vFile.text();
         const remoto = JSON.parse(texto);
-        const ESPERADA = require('../../package.json').version || '1.3.0';
+        const ESPERADA = process.env.APP_VERSION || '1.3.2';
         const codigoOk = remoto.version === ESPERADA;
         checks.versionJson = {
           ok: codigoOk,

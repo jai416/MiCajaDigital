@@ -74,7 +74,8 @@ export async function GET(request: NextRequest) {
     ]);
 
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      console.error('GET /api/codigos query error:', error.message);
+      return NextResponse.json({ error: 'Error interno' }, { status: 500 });
     }
     const total = count ?? 0;
     return NextResponse.json({
@@ -182,7 +183,8 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ data });
       }
       if (error.code !== '23505') {
-        return NextResponse.json({ error: error.message }, { status: 500 });
+        console.error('POST /api/codigos insert error:', error.message);
+        return NextResponse.json({ error: 'Error interno' }, { status: 500 });
       }
       ultimoError = error.message;
     }
@@ -219,7 +221,8 @@ export async function PATCH(request: NextRequest) {
       .update({ estado_pago })
       .eq('id', id);
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      console.error('PATCH /api/codigos update error:', error.message);
+      return NextResponse.json({ error: 'Error interno' }, { status: 500 });
     }
     await registrarAccion('codigo_estado_pago', 'codigo_pago', id, { estado_pago },
       request.headers.get('x-real-ip') || request.headers.get('x-forwarded-for')?.split(',')[0]?.trim(), request.headers.get('user-agent') || undefined);

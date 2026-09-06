@@ -11,35 +11,42 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
   }
 
-  const sp = request.nextUrl.searchParams;
-  const pagina = Math.max(1, Number(sp.get('pagina') ?? 1) || 1);
-  const porPagina = Math.min(100, Math.max(1, Number(sp.get('porPagina') ?? 50) || 50));
-  const desde = (pagina - 1) * porPagina;
-  const activo = sp.get('activo');
-  const busqueda = sp.get('q')?.trim();
+  try {
+    const sp = request.nextUrl.searchParams;
+    const pagina = Math.max(1, Number(sp.get('pagina') ?? 1) || 1);
+    const porPagina = Math.min(100, Math.max(1, Number(sp.get('porPagina') ?? 50) || 50));
+    const desde = (pagina - 1) * porPagina;
+    const activo = sp.get('activo');
+    const busqueda = sp.get('q')?.trim();
 
-  let query = supabaseAdmin
-    .from('negocios')
-    .select('id, nombre_negocio, email, activo, plan, fecha_expiracion, deleted_at', { count: 'exact' })
-    .order('nombre_negocio', { ascending: true })
-    .range(desde, desde + porPagina - 1);
+    let query = supabaseAdmin
+      .from('negocios')
+      .select('id, nombre_negocio, email, activo, plan, fecha_expiracion, deleted_at', { count: 'exact' })
+      .order('nombre_negocio', { ascending: true })
+      .range(desde, desde + porPagina - 1);
 
-  if (activo === 'true') query = query.eq('activo', true);
-  else if (activo === 'false') query = query.eq('activo', false);
-  if (busqueda) {
-    const sanitized = busqueda.replace(/[%_]/g, '').slice(0, 100);
-    query = query.or(`email.ilike.%${sanitized}%,nombre_negocio.ilike.%${sanitized}%`);
+    if (activo === 'true') query = query.eq('activo', true);
+    else if (activo === 'false') query = query.eq('activo', false);
+    if (busqueda) {
+      const sanitized = busqueda.replace(/[%_]/g, '').slice(0, 100);
+      query = query.or(`email.ilike.%${sanitized}%,nombre_negocio.ilike.%${sanitized}%`);
+    }
+
+    const { data, error, count } = await query;
+    if (error) {
+      console.error('GET /api/negocios query error:', error.message);
+      return NextResponse.json({ error: 'Error interno' }, { status: 500 });
+    }
+
+    return NextResponse.json({
+      data: data ?? [],
+      total: count ?? 0,
+      pagina,
+      totalPaginas: Math.ceil((count ?? 0) / porPagina),
+    });
+  } catch {
+    return NextResponse.json({ error: 'Error interno' }, { status: 500 });
   }
-
-  const { data, error, count } = await query;
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-
-  return NextResponse.json({
-    data: data ?? [],
-    total: count ?? 0,
-    pagina,
-    totalPaginas: Math.ceil((count ?? 0) / porPagina),
-  });
 }
 
 // Fuente de verdad de los planes: config/precios.json (raíz del repo).
@@ -141,7 +148,8 @@ export async function PATCH(request: NextRequest) {
     const { error } = await supabaseAdmin.from('negocios').update(updates).eq('id', id);
 
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      console.error('PATCH /api/negocios update error:', error.message);
+      return NextResponse.json({ error: 'Error interno' }, { status: 500 });
     }
 
     await registrarAccion('negocio_actualizado', 'negocio', String(id), {
@@ -179,7 +187,8 @@ export async function DELETE(request: NextRequest) {
         .delete()
         .eq('id', id);
       if (error) {
-        return NextResponse.json({ error: error.message }, { status: 500 });
+        console.error('DELETE /api/negocios permanent error:', error.message);
+        return NextResponse.json({ error: 'Error interno' }, { status: 500 });
       }
       await registrarAccion('negocio_eliminado_permanente', 'negocio', String(id), {},
         request.headers.get('x-real-ip') || request.headers.get('x-forwarded-for')?.split(',')[0]?.trim(), request.headers.get('user-agent') || undefined);
@@ -192,7 +201,8 @@ export async function DELETE(request: NextRequest) {
       .eq('id', id);
 
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      console.error('DELETE /api/negocios soft-delete error:', error.message);
+      return NextResponse.json({ error: 'Error interno' }, { status: 500 });
     }
 
     await registrarAccion('negocio_a_papelera', 'negocio', String(id), {},
