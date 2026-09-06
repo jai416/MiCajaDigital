@@ -23,6 +23,7 @@ export default function ConflictosPage() {
   const [total, setTotal] = useState(0);
   const [totalPaginas, setTotalPaginas] = useState(1);
   const [cargado, setCargado] = useState(false);
+  const [resolviendoId, setResolviendoId] = useState<number | null>(null);
   const [feedback, setFeedback] = useState('');
 
   useEffect(() => {
@@ -53,6 +54,7 @@ export default function ConflictosPage() {
   useEffect(() => { cargar(1); }, [soloPendientes]);
 
   const resolver = async (id: number) => {
+    setResolviendoId(id);
     try {
       const res = await fetch('/api/conflictos', {
         method: 'PATCH',
@@ -67,6 +69,8 @@ export default function ConflictosPage() {
       await cargar(pagina);
     } catch {
       setFeedback('Error de conexión al resolver conflicto');
+    } finally {
+      setResolviendoId(null);
     }
   };
 
@@ -138,8 +142,9 @@ export default function ConflictosPage() {
               </div>
               {!c.resuelto && (
                 <button onClick={() => resolver(c.id)}
-                  className="px-3 py-1 text-xs font-semibold bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 shrink-0">
-                  Marcar resuelto
+                  disabled={resolviendoId === c.id}
+                  className="px-3 py-1 text-xs font-semibold bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 shrink-0 disabled:opacity-50">
+                  {resolviendoId === c.id ? 'Resolviendo...' : 'Marcar resuelto'}
                 </button>
               )}
             </div>

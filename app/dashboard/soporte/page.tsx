@@ -52,6 +52,7 @@ export default function SoportePage() {
   const [respuesta, setRespuesta] = useState('');
   const [plantillaSel, setPlantillaSel] = useState('');
 
+  const [tomandoId, setTomandoId] = useState<number | null>(null);
   const [feedback, setFeedback] = useState('');
 
   useEffect(() => {
@@ -82,6 +83,7 @@ export default function SoportePage() {
   useEffect(() => { cargar(1); }, [filtro]);
 
   const actualizar = async (id: number, estado: string, resp?: string) => {
+    if (estado === 'en_progreso') setTomandoId(id);
     try {
       const res = await fetch('/api/soporte', {
         method: 'PATCH',
@@ -99,6 +101,8 @@ export default function SoportePage() {
       await cargar(pagina);
     } catch {
       setFeedback('Error de conexión al actualizar ticket');
+    } finally {
+      setTomandoId(null);
     }
   };
 
@@ -172,8 +176,9 @@ export default function SoportePage() {
                   <>
                     {t.estado === 'abierto' && (
                       <button onClick={() => actualizar(t.id, 'en_progreso')}
-                        className="px-3 py-1 text-xs font-semibold bg-amber-500 text-white rounded-lg hover:bg-amber-600">
-                        Tomar
+                        disabled={tomandoId === t.id}
+                        className="px-3 py-1 text-xs font-semibold bg-amber-500 text-white rounded-lg hover:bg-amber-600 disabled:opacity-50">
+                        {tomandoId === t.id ? 'Tomando...' : 'Tomar'}
                       </button>
                     )}
                     {editando === t.id ? (

@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { fechaHora } from '@/lib/formato';
 
 interface ActividadNegocio {
   negocio_id: string;
@@ -13,13 +14,6 @@ interface ActividadNegocio {
   ventasSync: number;
   gastosSync: number;
   ultimosLogs: Array<{ nivel: string; origen: string; mensaje: string; created_at: string }>;
-}
-
-function fechaHora(iso: string) {
-  if (!iso) return '—';
-  try {
-    return new Date(iso).toLocaleString('es-CU', { timeZone: 'America/Havana', hour12: false });
-  } catch { return iso; }
 }
 
 export default function ActividadPage() {

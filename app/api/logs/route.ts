@@ -18,17 +18,31 @@ export async function GET(request: NextRequest) {
     const pagina = Number.isInteger(paginaNum) && paginaNum > 0 ? paginaNum : 1;
     const desde = (pagina - 1) * porPagina;
 
-    const [{ count }, { data, error }] = await Promise.all([
-      supabaseAdmin.from('app_logs').select('*', { count: 'exact', head: true }),
-      supabaseAdmin
-        .from('app_logs')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .range(desde, desde + porPagina - 1),
-    ]);
+    const nivel = sp.get('nivel');
+    const origen = sp.get('origen');
+    const buscar = sp.get('buscar');
+
+    const countQuery = supabaseAdmin.from('app_logs').select('*', { count: 'exact', head: true });
+    const dataQuery = supabaseAdmin
+      .from('app_logs')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (nivel && nivel !== 'todos') countQuery.eq('nivel', nivel);
+    if (origen) countQuery.eq('origen', origen);
+    if (buscar) countQuery.or(`mensaje.ilike.%${buscar}%,email.ilike.%${buscar}%,nombre_negocio.ilike.%${buscar}%,origen.ilike.%${buscar}%`);
+
+    if (nivel && nivel !== 'todos') dataQuery.eq('nivel', nivel);
+    if (origen) dataQuery.eq('origen', origen);
+    if (buscar) dataQuery.or(`mensaje.ilike.%${buscar}%,email.ilike.%${buscar}%,nombre_negocio.ilike.%${buscar}%,origen.ilike.%${buscar}%`);
+
+    dataQuery.range(desde, desde + porPagina - 1);
+
+    const [{ count }, { data, error }] = await Promise.all([countQuery, dataQuery]);
 
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      console.error('API error:', error);
+      return NextResponse.json({ error: 'Error interno' }, { status: 500 });
     }
 
     // Enriquecer con email/negocio via user_id → negocios

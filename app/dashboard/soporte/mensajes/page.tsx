@@ -53,6 +53,13 @@ export default function MensajesPage() {
   const [enviando, setEnviando] = useState(false);
   const [feedback, setFeedback] = useState('');
 
+  useEffect(() => {
+    if (feedback) {
+      const t = setTimeout(() => setFeedback(''), 3000);
+      return () => clearTimeout(t);
+    }
+  }, [feedback]);
+
   const cargar = async (p: number = 1) => {
     try {
       const res = await fetch(`/api/mensajes?pagina=${p}&porPagina=20`);
@@ -102,9 +109,10 @@ export default function MensajesPage() {
       setFormTitulo('');
       setFormMensaje('');
       setPlantillaSel('');
+      setFeedback('✓ Mensaje enviado correctamente');
       await cargar(1);
     } else {
-      alert(json.error ?? 'Error al enviar');
+      setFeedback(`Error: ${json.error ?? 'No se pudo enviar el mensaje'}`);
     }
     setEnviando(false);
   };

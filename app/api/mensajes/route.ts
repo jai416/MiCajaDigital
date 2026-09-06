@@ -37,7 +37,7 @@ export async function GET(request: NextRequest) {
   }
 
   const { data, error, count } = await query;
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) { console.error('API error:', error); return NextResponse.json({ error: 'Error interno' }, { status: 500 }); }
 
   return NextResponse.json({
     data: data ?? [],
@@ -84,7 +84,7 @@ export async function POST(request: NextRequest) {
     mensaje: mensaje.trim(),
   });
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) { console.error('API error:', error); return NextResponse.json({ error: 'Error interno' }, { status: 500 }); }
   return NextResponse.json({ ok: true });
 }
 
@@ -99,12 +99,10 @@ export async function DELETE(request: NextRequest) {
     if (!id) return NextResponse.json({ error: 'Falta id' }, { status: 400 });
 
     const { error } = await supabaseAdmin.from('mensajes').delete().eq('id', id);
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) { console.error('API error:', error); return NextResponse.json({ error: 'Error interno' }, { status: 500 }); }
     return NextResponse.json({ ok: true });
   } catch (e) {
-    return NextResponse.json(
-      { error: e instanceof Error ? e.message : 'Error interno' },
-      { status: 500 }
-    );
+    console.error('API error:', e);
+    return NextResponse.json({ error: 'Error interno' }, { status: 500 });
   }
 }

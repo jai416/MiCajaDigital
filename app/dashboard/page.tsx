@@ -28,9 +28,7 @@ async function getStats(dias: number) {
   const desde = new Date(ahora - (dias - 1) * MS_DIA).toISOString().slice(0, 10);
   const hace6mIso = new Date(ahora - 183 * MS_DIA).toISOString();
   const ahoraIso = new Date(ahora).toISOString();
-  const enTresDiasIso = new Date(ahora + 3 * MS_DIA).toISOString();
-  const desdePrev = new Date(ahora - (2 * dias - 1) * MS_DIA).toISOString().slice(0, 10);
-  const hastaPrev = new Date(ahora - dias * MS_DIA).toISOString().slice(0, 10);
+
 
   const fallos: string[] = [];
   const notaFallo = (nombre: string, r: { error: { message: string } | null } | null) => {
@@ -52,12 +50,8 @@ async function getStats(dias: number) {
 
   const total = neg.total ?? 0;
   const activos = neg.activos ?? 0;
-  const planBasico = neg.plan_basico ?? 0;
-  const planPro = neg.plan_pro ?? 0;
-  const planPremium = neg.plan_premium ?? 0;
   const expirados = neg.expirados ?? 0;
   const enPapelera = neg.papelera ?? 0;
-  const inactivos = neg.inactivos ?? 0;
   const ventasRango = (rpcData.ventas_rango as number) ?? 0;
   const ventasRangoPrev = (rpcData.ventas_prev as number) ?? 0;
   const gastosRango = (rpcData.gastos_rango as number) ?? 0;
@@ -145,7 +139,7 @@ async function getStats(dias: number) {
   }).length;
 
   const mrrCup = vigentes.reduce((s, n) => s + (PRECIOS_PLAN[n.plan] ?? 0), 0);
-  const arpuCup = activos > 0 ? Math.round(mrrCup / activos) : 0;
+  const arpuCup = vigentes.length > 0 ? Math.round(mrrCup / vigentes.length) : 0;
   const porPlan = vigentes.reduce<Record<string, number>>((acc, n) => {
     acc[n.plan] = (acc[n.plan] ?? 0) + 1;
     return acc;
@@ -153,9 +147,6 @@ async function getStats(dias: number) {
 
   const renovaciones7 = vigentes.filter((n) => n.expiracion <= ahora + 7 * MS_DIA).length;
   const renovaciones30 = vigentes.filter((n) => n.expiracion <= ahora + 30 * MS_DIA).length;
-  const montoRenovaciones30 = vigentes
-    .filter((n) => n.expiracion <= ahora + 30 * MS_DIA)
-    .reduce((s, n) => s + (PRECIOS_PLAN[n.plan] ?? 0), 0);
 
   // Registros por día
   const registrosPorDia: { dia: string; total: number }[] = [];
@@ -238,21 +229,27 @@ async function getStats(dias: number) {
     if (f >= hace7Ms) vendedores7.add(String((v as { user_id?: string }).user_id));
   }
 
-  // Retención y conversión
-  const pagosPorNegocio = new Map<string, number>();
+  // Retención: negocios cuyo último pago es posterior al fin del periodo del primer pago
+  const pagosPorNegocio = new Map<string, Array<{ usado_en: string }>>();
   for (const c of codigosConNegocio) {
     const k = String((c as { negocio_id?: string }).negocio_id);
-    pagosPorNegocio.set(k, (pagosPorNegocio.get(k) ?? 0) + 1);
+    const arr = pagosPorNegocio.get(k) ?? [];
+    arr.push({ usado_en: String((c as { usado_en?: string }).usado_en ?? '') });
+    pagosPorNegocio.set(k, arr);
   }
   const conPago = pagosPorNegocio.size;
   let renovados = 0;
-  pagosPorNegocio.forEach((n) => { if (n >= 2) renovados++; });
+  pagosPorNegocio.forEach((pagos) => {
+    if (pagos.length < 2) return;
+    const sorted = pagos.slice().sort((a, b) => a.usado_en.localeCompare(b.usado_en));
+    const primerPagoFin = new Date(sorted[0].usado_en).getTime() + 30 * MS_DIA;
+    const ultimoPago = new Date(sorted[sorted.length - 1].usado_en).getTime();
+    if (ultimoPago > primerPagoFin) renovados++;
+  });
   const retencion = conPago > 0 ? Math.round((renovados / conPago) * 100) : 0;
 
-  const expiradasSinPagar = rows.filter(
-    (n) => !n.activo && n.registro > 0 && n.registro < ahora - 15 * MS_DIA && !pagosPorNegocio.has(n.id)
-  ).length;
-  const denominadorConversion = conPago + expiradasSinPagar;
+  const todosExpirados = rows.filter((n) => !n.activo && n.expiracion > 0 && n.expiracion <= ahora).length;
+  const denominadorConversion = conPago + todosExpirados;
   const conversion = denominadorConversion > 0 ? Math.round((conPago / denominadorConversion) * 100) : 0;
 
   const hace30Ms = ahora - 30 * MS_DIA;
@@ -270,7 +267,7 @@ async function getStats(dias: number) {
     ingresoRealCup, mrrCup, arpuCup, gmvCup: Math.round(gmvCup),
     ticketPromedio, nuevos,
     nuevosDelta: deltaPct(nuevos, nuevosPrev),
-    renovaciones7, renovaciones30, montoRenovaciones30,
+    renovaciones7, renovaciones30,
     registrosPorDia, actividadPorDia,
     ventasRango, ventasDelta: deltaPct(ventasRango, ventasRangoPrev),
     gastosRango, gastosDelta: deltaPct(gastosRango, gastosRangoPrev),

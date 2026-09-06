@@ -23,6 +23,9 @@ interface Paginacion {
   pagina: number;
   totalPaginas: number;
   q: string;
+  plan?: string;
+  estado?: string;
+  expiran?: string;
 }
 
 const PLANES_VALIDOS = ['gratis', 'basico', 'pro', 'premium'];
@@ -363,33 +366,44 @@ export default function NegociosTable({
 
       {paginacion && paginacion.totalPaginas > 1 && (
         <div className="flex items-center justify-between mt-4">
-          {paginacion.pagina > 1 ? (
-            <a
-              href={`/dashboard/negocios?page=${paginacion.pagina - 1}${
-                paginacion.q ? `&q=${encodeURIComponent(paginacion.q)}` : ''
-              }`}
-              className="px-4 py-2 border border-gray-300 rounded-lg text-sm font-semibold text-gray-700 hover:bg-gray-50 transition"
-            >
-              ← Anterior
-            </a>
-          ) : (
-            <span />
-          )}
-          <span className="text-sm text-gray-500">
-            Página {paginacion.pagina} de {paginacion.totalPaginas}
-          </span>
-          {paginacion.pagina < paginacion.totalPaginas ? (
-            <a
-              href={`/dashboard/negocios?page=${paginacion.pagina + 1}${
-                paginacion.q ? `&q=${encodeURIComponent(paginacion.q)}` : ''
-              }`}
-              className="px-4 py-2 border border-gray-300 rounded-lg text-sm font-semibold text-gray-700 hover:bg-gray-50 transition"
-            >
-              Siguiente →
-            </a>
-          ) : (
-            <span />
-          )}
+          {(() => {
+            const buildHref = (page: number) => {
+              const params = new URLSearchParams();
+              params.set('page', String(page));
+              if (paginacion.q) params.set('q', paginacion.q);
+              if (paginacion.plan && paginacion.plan !== 'todos') params.set('plan', paginacion.plan);
+              if (paginacion.estado && paginacion.estado !== 'todos') params.set('estado', paginacion.estado);
+              if (paginacion.expiran && paginacion.expiran !== 'todos') params.set('expiran', paginacion.expiran);
+              return `/dashboard/negocios?${params.toString()}`;
+            };
+            return (
+              <>
+                {paginacion.pagina > 1 ? (
+                  <a
+                    href={buildHref(paginacion.pagina - 1)}
+                    className="px-4 py-2 border border-gray-300 rounded-lg text-sm font-semibold text-gray-700 hover:bg-gray-50 transition"
+                  >
+                    ← Anterior
+                  </a>
+                ) : (
+                  <span />
+                )}
+                <span className="text-sm text-gray-500">
+                  Página {paginacion.pagina} de {paginacion.totalPaginas}
+                </span>
+                {paginacion.pagina < paginacion.totalPaginas ? (
+                  <a
+                    href={buildHref(paginacion.pagina + 1)}
+                    className="px-4 py-2 border border-gray-300 rounded-lg text-sm font-semibold text-gray-700 hover:bg-gray-50 transition"
+                  >
+                    Siguiente →
+                  </a>
+                ) : (
+                  <span />
+                )}
+              </>
+            );
+          })()}
         </div>
       )}
 

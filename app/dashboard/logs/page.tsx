@@ -1,7 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { fechaHora } from '@/lib/formato';
+import { useEffect, useState, useCallback } from 'react';
 
 interface LogEntry {
   id: string;
@@ -27,44 +26,39 @@ export default function LogsPage() {
   const [eliminando, setEliminando] = useState(false);
   const [feedback, setFeedback] = useState('');
 
-  // Filtros
+  const [pagina, setPagina] = useState(1);
+  const [total, setTotal] = useState(0);
+  const [totalPaginas, setTotalPaginas] = useState(1);
+
   const [filtroNivel, setFiltroNivel] = useState('todos');
   const [filtroOrigen, setFiltroOrigen] = useState('');
   const [filtroBuscar, setFiltroBuscar] = useState('');
 
-  const [feedbackCargar, setFeedbackCargar] = useState('');
-
-  const cargar = async () => {
+  const cargar = useCallback(async (p: number = 1) => {
     try {
-      const res = await fetch('/api/logs?pagina=1&porPagina=500');
+      const params = new URLSearchParams({ pagina: String(p), porPagina: '50' });
+      if (filtroNivel !== 'todos') params.set('nivel', filtroNivel);
+      if (filtroOrigen) params.set('origen', filtroOrigen);
+      if (filtroBuscar) params.set('buscar', filtroBuscar);
+
+      const res = await fetch(`/api/logs?${params}`);
       const json = await res.json();
-      if (res.ok) setLogs(json.data ?? []);
-      else setFeedbackCargar(`Error: ${json.error ?? 'No se pudieron cargar los logs'}`);
+      if (res.ok) {
+        setLogs(json.data ?? []);
+        setPagina(json.pagina ?? 1);
+        setTotalPaginas(json.totalPaginas ?? 1);
+        setTotal(json.total ?? 0);
+      } else {
+        setFeedback(`Error: ${json.error ?? 'No se pudieron cargar los logs'}`);
+      }
     } catch {
-      setFeedbackCargar('Error de conexión al cargar logs');
+      setFeedback('Error de conexión al cargar logs');
     }
     setCargado(true);
-  };
+  }, [filtroNivel, filtroOrigen, filtroBuscar]);
 
-  useEffect(() => { cargar(); }, []);
-
-  // Orígenes únicos
-  const origenes = [...new Set(logs.map((l) => l.origen).filter(Boolean))].sort();
-
-  // Filtrado client-side
-  const logsFiltrados = logs.filter((l) => {
-    if (filtroNivel !== 'todos' && l.nivel !== filtroNivel) return false;
-    if (filtroOrigen && l.origen !== filtroOrigen) return false;
-    if (filtroBuscar) {
-      const q = filtroBuscar.toLowerCase();
-      const hay = (l.mensaje ?? '').toLowerCase().includes(q)
-        || (l.email ?? '').toLowerCase().includes(q)
-        || (l.nombre_negocio ?? '').toLowerCase().includes(q)
-        || (l.origen ?? '').toLowerCase().includes(q);
-      if (!hay) return false;
-    }
-    return true;
-  });
+  useEffect(() => { cargar(1); }, [cargar]);
+  useEffect(() => { setSeleccion(new Set()); }, [pagina]);
 
   const toggleSeleccion = (uuid: string) => {
     setSeleccion((prev) => {
@@ -76,7 +70,7 @@ export default function LogsPage() {
   };
 
   const toggleTodo = () => {
-    const uuids = logsFiltrados.map((l) => l.log_uuid).filter(Boolean) as string[];
+    const uuids = logs.map((l) => l.log_uuid).filter(Boolean) as string[];
     if (seleccion.size === uuids.length) setSeleccion(new Set());
     else setSeleccion(new Set(uuids));
   };
@@ -95,7 +89,7 @@ export default function LogsPage() {
       if (res.ok) {
         setFeedback(`✓ ${json.borrados} logs eliminados`);
         setSeleccion(new Set());
-        await cargar();
+        await cargar(pagina);
       } else {
         setFeedback(`Error: ${json.error}`);
       }
@@ -119,7 +113,7 @@ export default function LogsPage() {
       if (res.ok) {
         setFeedback(`✓ ${json.borrados} logs eliminados`);
         setSeleccion(new Set());
-        await cargar();
+        await cargar(1);
       } else {
         setFeedback(`Error: ${json.error}`);
       }
@@ -135,9 +129,9 @@ export default function LogsPage() {
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold text-gray-800">Logs de la app</h1>
         <div className="flex items-center gap-2">
-          <button onClick={cargar}
+          <button onClick={() => cargar(pagina)}
             className="px-3 py-1.5 text-xs font-semibold bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100">
-            🔄 Recargar
+            Recargar
           </button>
         </div>
       </div>
@@ -154,21 +148,12 @@ export default function LogsPage() {
         </div>
       )}
 
-      {/* Filtros */}
       <div className="flex flex-wrap gap-3 mb-4">
         <select value={filtroNivel} onChange={(e) => setFiltroNivel(e.target.value)}
           className="px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white">
           <option value="todos">Todos los niveles</option>
-          <option value="error">🔴 Error</option>
-          <option value="info">🔵 Info</option>
-        </select>
-
-        <select value={filtroOrigen} onChange={(e) => setFiltroOrigen(e.target.value)}
-          className="px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white">
-          <option value="">Todos los orígenes</option>
-          {origenes.map((o) => (
-            <option key={o} value={o}>{o}</option>
-          ))}
+          <option value="error">Error</option>
+          <option value="info">Info</option>
         </select>
 
         <input type="text" value={filtroBuscar} onChange={(e) => setFiltroBuscar(e.target.value)}
@@ -185,35 +170,35 @@ export default function LogsPage() {
 
       <div className="flex items-center justify-between mb-4">
         <span className="text-xs text-gray-500">
-          {logsFiltrados.length} de {logs.length} logs
+          {total} logs
         </span>
         <div className="flex items-center gap-2">
           <button onClick={toggleTodo}
             className="px-3 py-1.5 text-xs font-semibold bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200">
-            {seleccion.size === logsFiltrados.length ? 'Deseleccionar todo' : 'Seleccionar todo'}
+            {seleccion.size === logs.length && logs.length > 0 ? 'Deseleccionar todo' : 'Seleccionar todo'}
           </button>
           {seleccion.size > 0 && (
             <button onClick={eliminarSeleccionados} disabled={eliminando}
               className="px-3 py-1.5 text-xs font-semibold bg-red-500 text-white rounded-lg hover:bg-red-600 disabled:opacity-50">
-              🗑️ Eliminar {seleccion.size} seleccionado(s)
+              Eliminar {seleccion.size} seleccionado(s)
             </button>
           )}
+          <button onClick={eliminarTodos} disabled={eliminando}
+            className="px-3 py-1.5 text-xs font-semibold bg-red-100 text-red-600 rounded-lg hover:bg-red-200 disabled:opacity-50">
+            Eliminar todos
+          </button>
         </div>
-        <button onClick={eliminarTodos} disabled={eliminando}
-          className="px-3 py-1.5 text-xs font-semibold bg-red-100 text-red-600 rounded-lg hover:bg-red-200 disabled:opacity-50">
-          🗑️ Eliminar todos
-        </button>
       </div>
 
       {!cargado && <p className="text-gray-500">Cargando...</p>}
-      {cargado && logsFiltrados.length === 0 && (
+      {cargado && logs.length === 0 && (
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-10 text-center text-gray-500">
-          {logs.length === 0 ? 'Aún no hay errores reportados.' : 'No hay logs que coincidan con los filtros.'}
+          No hay logs que coincidan con los filtros.
         </div>
       )}
 
       <div className="space-y-2">
-        {logsFiltrados.map((l) => (
+        {logs.map((l) => (
           <div key={l.id}
             className={`bg-white rounded-xl shadow-sm border p-4 transition ${
               seleccion.has(l.log_uuid ?? '') ? 'border-blue-400 bg-blue-50' : 'border-gray-200'
@@ -254,6 +239,20 @@ export default function LogsPage() {
           </div>
         ))}
       </div>
+
+      {totalPaginas > 1 && (
+        <div className="flex items-center justify-between mt-6">
+          <button onClick={() => cargar(pagina - 1)} disabled={pagina <= 1}
+            className="px-4 py-2 border border-gray-300 rounded-lg text-sm font-semibold disabled:opacity-40">
+            Anterior
+          </button>
+          <span className="text-xs text-gray-500">Pagina {pagina} de {totalPaginas}</span>
+          <button onClick={() => cargar(pagina + 1)} disabled={pagina >= totalPaginas}
+            className="px-4 py-2 border border-gray-300 rounded-lg text-sm font-semibold disabled:opacity-40">
+            Siguiente
+          </button>
+        </div>
+      )}
     </div>
   );
 }

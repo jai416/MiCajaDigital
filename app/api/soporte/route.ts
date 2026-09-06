@@ -26,7 +26,7 @@ export async function GET(request: NextRequest) {
     }
 
     const { data, error, count } = await query;
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    if (error) { console.error('API error:', error); return NextResponse.json({ error: 'Error interno' }, { status: 500 }); }
 
     return NextResponse.json({
       data: data ?? [],
@@ -35,10 +35,8 @@ export async function GET(request: NextRequest) {
       totalPaginas: Math.ceil((count ?? 0) / porPagina),
     });
   } catch (e) {
-    return NextResponse.json(
-      { error: e instanceof Error ? e.message : 'Error interno' },
-      { status: 500 }
-    );
+    console.error('API error:', e);
+    return NextResponse.json({ error: 'Error interno' }, { status: 500 });
   }
 }
 
@@ -82,12 +80,10 @@ export async function PATCH(request: NextRequest) {
       .update(update)
       .eq('id', id);
 
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    if (error) { console.error('API error:', error); return NextResponse.json({ error: 'Error interno' }, { status: 500 }); }
     return NextResponse.json({ ok: true });
   } catch (e) {
-    return NextResponse.json(
-      { error: e instanceof Error ? e.message : 'Error interno' },
-      { status: 500 }
-    );
+    console.error('API error:', e);
+    return NextResponse.json({ error: 'Error interno' }, { status: 500 });
   }
 }

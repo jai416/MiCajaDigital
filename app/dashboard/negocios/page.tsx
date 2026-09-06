@@ -140,7 +140,14 @@ export default async function NegociosPage({
 
       <NegociosTable
         negocios={negocios}
-        paginacion={{ pagina, totalPaginas, q: sp.q ?? '' }}
+        paginacion={{
+          pagina,
+          totalPaginas,
+          q: sp.q ?? '',
+          plan: sp.plan ?? '',
+          estado: sp.estado ?? '',
+          expiran: sp.expiran ?? '',
+        }}
       />
     </div>
   );

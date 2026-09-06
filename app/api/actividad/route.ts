@@ -42,7 +42,7 @@ export async function GET(request: NextRequest) {
     if (negociosFiltrados) syncQuery = syncQuery.in('negocio_id', negociosFiltrados);
 
     const { data: syncData, error: syncError, count: syncCount } = await syncQuery;
-    if (syncError) return NextResponse.json({ error: syncError.message }, { status: 500 });
+    if (syncError) { console.error('API error:', syncError); return NextResponse.json({ error: 'Error interno' }, { status: 500 }); }
 
     // Paso 3: enriquecer con datos del negocio (email, nombre)
     const negocioIds = [...new Set((syncData ?? []).map((r: { negocio_id: string }) => String(r.negocio_id)))];
@@ -128,9 +128,7 @@ export async function GET(request: NextRequest) {
       totalPaginas: Math.ceil(actividad.length / porPagina),
     });
   } catch (e) {
-    return NextResponse.json(
-      { error: e instanceof Error ? e.message : 'Error interno' },
-      { status: 500 }
-    );
+    console.error('API error:', e);
+    return NextResponse.json({ error: 'Error interno' }, { status: 500 });
   }
 }
