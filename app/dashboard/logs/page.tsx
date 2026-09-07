@@ -31,14 +31,12 @@ export default function LogsPage() {
   const [totalPaginas, setTotalPaginas] = useState(1);
 
   const [filtroNivel, setFiltroNivel] = useState('todos');
-  const [filtroOrigen, setFiltroOrigen] = useState('');
   const [filtroBuscar, setFiltroBuscar] = useState('');
 
   const cargar = useCallback(async (p: number = 1) => {
     try {
       const params = new URLSearchParams({ pagina: String(p), porPagina: '50' });
       if (filtroNivel !== 'todos') params.set('nivel', filtroNivel);
-      if (filtroOrigen) params.set('origen', filtroOrigen);
       if (filtroBuscar) params.set('buscar', filtroBuscar);
 
       const res = await fetch(`/api/logs?${params}`);
@@ -55,7 +53,7 @@ export default function LogsPage() {
       setFeedback('Error de conexión al cargar logs');
     }
     setCargado(true);
-  }, [filtroNivel, filtroOrigen, filtroBuscar]);
+  }, [filtroNivel, filtroBuscar]);
 
   useEffect(() => { cargar(1); }, [cargar]);
   useEffect(() => { setSeleccion(new Set()); }, [pagina]);
@@ -160,8 +158,8 @@ export default function LogsPage() {
           placeholder="Buscar en mensaje, email, negocio..."
           className="flex-1 min-w-[200px] px-3 py-2 border border-gray-300 rounded-lg text-sm" />
 
-        {(filtroNivel !== 'todos' || filtroOrigen || filtroBuscar) && (
-          <button onClick={() => { setFiltroNivel('todos'); setFiltroOrigen(''); setFiltroBuscar(''); }}
+        {(filtroNivel !== 'todos' || filtroBuscar) && (
+          <button onClick={() => { setFiltroNivel('todos'); setFiltroBuscar(''); }}
             className="px-3 py-2 text-xs text-gray-500 border border-gray-300 rounded-lg hover:bg-gray-50">
             Limpiar filtros
           </button>
@@ -246,7 +244,7 @@ export default function LogsPage() {
             className="px-4 py-2 border border-gray-300 rounded-lg text-sm font-semibold disabled:opacity-40">
             Anterior
           </button>
-          <span className="text-xs text-gray-500">Pagina {pagina} de {totalPaginas}</span>
+          <span className="text-xs text-gray-500">Página {pagina} de {totalPaginas}</span>
           <button onClick={() => cargar(pagina + 1)} disabled={pagina >= totalPaginas}
             className="px-4 py-2 border border-gray-300 rounded-lg text-sm font-semibold disabled:opacity-40">
             Siguiente

@@ -38,16 +38,16 @@ export default function ActividadPage() {
         setTotalPaginas(json.totalPaginas ?? 1);
         setTotal(json.total ?? 0);
       }
-    } catch {}
+    } catch (e) { console.error(e); }
     setCargado(true);
   };
 
   useEffect(() => { cargar(); }, []);
+  useEffect(() => { cargar(1); }, [busqueda]);
 
   const buscar = () => {
     setBusqueda(busquedaInput);
     setPagina(1);
-    setTimeout(() => cargar(1), 50);
   };
 
   return (

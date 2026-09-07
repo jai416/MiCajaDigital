@@ -20,7 +20,7 @@ async function getNegocios(sp: SearchParams) {
     .select('*', { count: 'exact' })
     .order('fecha_registro', { ascending: false });
 
-  const termino = (sp.q ?? '').trim().replace(/[,()]/g, '');
+  const termino = (sp.q ?? '').trim().replace(/[,()%_]/g, '');
   if (termino) {
     query = query.or(
       `email.ilike.%${termino}%,nombre_negocio.ilike.%${termino}%`

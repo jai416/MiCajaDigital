@@ -21,6 +21,7 @@ export async function GET(request: NextRequest) {
     const nivel = sp.get('nivel');
     const origen = sp.get('origen');
     const buscar = sp.get('buscar');
+    const sanitizedBuscar = buscar ? buscar.replace(/[%_]/g, '').slice(0, 200) : null;
 
     const countQuery = supabaseAdmin.from('app_logs').select('*', { count: 'exact', head: true });
     const dataQuery = supabaseAdmin
@@ -30,11 +31,11 @@ export async function GET(request: NextRequest) {
 
     if (nivel && nivel !== 'todos') countQuery.eq('nivel', nivel);
     if (origen) countQuery.eq('origen', origen);
-    if (buscar) countQuery.or(`mensaje.ilike.%${buscar}%,email.ilike.%${buscar}%,nombre_negocio.ilike.%${buscar}%,origen.ilike.%${buscar}%`);
+    if (sanitizedBuscar) countQuery.or(`mensaje.ilike.%${sanitizedBuscar}%,email.ilike.%${sanitizedBuscar}%,nombre_negocio.ilike.%${sanitizedBuscar}%,origen.ilike.%${sanitizedBuscar}%`);
 
     if (nivel && nivel !== 'todos') dataQuery.eq('nivel', nivel);
     if (origen) dataQuery.eq('origen', origen);
-    if (buscar) dataQuery.or(`mensaje.ilike.%${buscar}%,email.ilike.%${buscar}%,nombre_negocio.ilike.%${buscar}%,origen.ilike.%${buscar}%`);
+    if (sanitizedBuscar) dataQuery.or(`mensaje.ilike.%${sanitizedBuscar}%,email.ilike.%${sanitizedBuscar}%,nombre_negocio.ilike.%${sanitizedBuscar}%,origen.ilike.%${sanitizedBuscar}%`);
 
     dataQuery.range(desde, desde + porPagina - 1);
 
@@ -92,6 +93,9 @@ export async function DELETE(request: NextRequest) {
       const uuids = body.uuids.filter((u: string) => typeof u === 'string' && u.length > 0);
       if (uuids.length === 0) {
         return NextResponse.json({ error: 'Sin UUIDs' }, { status: 400 });
+      }
+      if (uuids.length > 200) {
+        return NextResponse.json({ error: 'Máximo 200 UUIDs por solicitud' }, { status: 400 });
       }
       const { error, count } = await supabaseAdmin
         .from('app_logs')

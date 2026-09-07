@@ -59,7 +59,7 @@ export default function ConflictosPage() {
       const res = await fetch('/api/conflictos', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id, resuelto: true, accion: 'resuelto_manual' }),
+        body: JSON.stringify({ id, resuelto: true, accion: 'resuelto' }),
       });
       const json = await res.json();
       if (!res.ok) {

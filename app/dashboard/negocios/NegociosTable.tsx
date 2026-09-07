@@ -100,6 +100,10 @@ export default function NegociosTable({
       body: JSON.stringify({ id, activo: !current }),
     });
     if (res.ok) router.refresh();
+    else {
+      const j = await res.json().catch(() => ({}));
+      setError(j.error || 'Error al cambiar estado.');
+    }
   };
 
   const handleDelete = async (id: string, nombre: string) => {
@@ -110,6 +114,10 @@ export default function NegociosTable({
       body: JSON.stringify({ id }),
     });
     if (res.ok) router.refresh();
+    else {
+      const j = await res.json().catch(() => ({}));
+      setError(j.error || 'Error al mover a papelera.');
+    }
   };
 
   const handleRestaurar = async (id: string) => {
@@ -119,6 +127,10 @@ export default function NegociosTable({
       body: JSON.stringify({ id, deleted_at: null }),
     });
     if (res.ok) router.refresh();
+    else {
+      const j = await res.json().catch(() => ({}));
+      setError(j.error || 'Error al restaurar.');
+    }
   };
 
   const abrirBorradoPermanente = (n: Negocio) => {
@@ -211,7 +223,7 @@ export default function NegociosTable({
     if (!n.activo || !n.fecha_expiracion) return false;
     const exp = new Date(n.fecha_expiracion).getTime();
     const en3Dias = Date.now() + 3 * 86400000;
-    return exp <= en3Dias;
+    return exp > Date.now() && exp <= en3Dias;
   };
 
   return (

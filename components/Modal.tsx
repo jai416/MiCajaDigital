@@ -22,7 +22,8 @@ export default function Modal({
     const nodo = ref.current;
     const previo = document.activeElement as HTMLElement | null;
 
-    // Foco inicial: primer elemento enfocable del diálogo.
+    document.body.style.overflow = 'hidden';
+
     nodo?.querySelector<HTMLElement>(FOCUSABLE)?.focus();
 
     const onKeyDown = (e: KeyboardEvent) => {
@@ -50,6 +51,7 @@ export default function Modal({
 
     return () => {
       document.removeEventListener('keydown', onKeyDown);
+      document.body.style.overflow = '';
       previo?.focus?.();
     };
   }, [onClose]);

@@ -79,7 +79,7 @@ async function getStats(dias: number) {
       .limit(50000),
     supabaseAdmin
       .from('codigos_pago')
-      .select('negocio_id')
+      .select('negocio_id, duracion_meses, plan')
       .eq('usado', true)
       .not('negocio_id', 'is', null)
       .limit(50000),
@@ -93,6 +93,7 @@ async function getStats(dias: number) {
 
   notaFallo('negocios', rNegocios);
   notaFallo('detalle de ventas', rVentasDetalle);
+  notaFallo('códigos con negocio', rCodigosConNegocio);
   notaFallo('ingresos por mes', rIngresosMeses);
 
   const negocios = (rNegocios.data ?? []) as Array<{
@@ -229,12 +230,18 @@ async function getStats(dias: number) {
     if (f >= hace7Ms) vendedores7.add(String((v as { user_id?: string }).user_id));
   }
 
-  // Retención: negocios cuyo último pago es posterior al fin del periodo del primer pago
-  const pagosPorNegocio = new Map<string, Array<{ usado_en: string }>>();
+  const MESES_DURACION: Record<string, number> = { basico: 1, pro: 1, premium: 1 };
+  for (const planId of Object.keys(precios.planes)) {
+    const duraciones = Object.keys(precios.planes[planId as keyof typeof precios.planes]).map(Number);
+    if (duraciones.length > 0) MESES_DURACION[planId] = Math.min(...duraciones);
+  }
+
+  const pagosPorNegocio = new Map<string, Array<{ usado_en: string; meses: number }>>();
   for (const c of codigosConNegocio) {
     const k = String((c as { negocio_id?: string }).negocio_id);
     const arr = pagosPorNegocio.get(k) ?? [];
-    arr.push({ usado_en: String((c as { usado_en?: string }).usado_en ?? '') });
+    const meses = Number((c as { duracion_meses?: number }).duracion_meses) || MESES_DURACION[String((c as { plan?: string }).plan ?? 'pro')] || 1;
+    arr.push({ usado_en: String((c as { usado_en?: string }).usado_en ?? ''), meses });
     pagosPorNegocio.set(k, arr);
   }
   const conPago = pagosPorNegocio.size;
@@ -242,7 +249,7 @@ async function getStats(dias: number) {
   pagosPorNegocio.forEach((pagos) => {
     if (pagos.length < 2) return;
     const sorted = pagos.slice().sort((a, b) => a.usado_en.localeCompare(b.usado_en));
-    const primerPagoFin = new Date(sorted[0].usado_en).getTime() + 30 * MS_DIA;
+    const primerPagoFin = new Date(sorted[0].usado_en).getTime() + sorted[0].meses * 30 * MS_DIA;
     const ultimoPago = new Date(sorted[sorted.length - 1].usado_en).getTime();
     if (ultimoPago > primerPagoFin) renovados++;
   });
@@ -265,7 +272,7 @@ async function getStats(dias: number) {
     vencidasSinRenovar: vencidasSinRenovar.length, pruebasTerminando, porPlan,
     codigosGenerados, codigosUsados, codigosPorVencer, codigosVencidosSinUsar,
     ingresoRealCup, mrrCup, arpuCup, gmvCup: Math.round(gmvCup),
-    ticketPromedio, nuevos,
+    ticketPromedio, conPago, nuevos,
     nuevosDelta: deltaPct(nuevos, nuevosPrev),
     renovaciones7, renovaciones30,
     registrosPorDia, actividadPorDia,
@@ -586,7 +593,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Se
           const etapas = [
             { label: 'Registrados', total: stats.total, color: 'bg-blue-500', textColor: 'text-blue-700' },
             { label: 'Con prueba activa', total: stats.enPrueba + stats.activos + stats.vencidasSinRenovar, color: 'bg-yellow-500', textColor: 'text-yellow-700' },
-            { label: 'Primer pago', total: stats.conversion > 0 ? Math.round((stats.total * stats.conversion) / 100) : stats.activos, color: 'bg-emerald-500', textColor: 'text-emerald-700' },
+            { label: 'Primer pago', total: stats.conPago, color: 'bg-emerald-500', textColor: 'text-emerald-700' },
             { label: 'Renovaron', total: stats.renovados, color: 'bg-purple-500', textColor: 'text-purple-700' },
           ];
           const maxEtapas = Math.max(1, ...etapas.map((e) => e.total));
