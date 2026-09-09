@@ -95,8 +95,9 @@ export async function DELETE(request: NextRequest) {
     if (!s) return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
 
     const sp = request.nextUrl.searchParams;
-    const id = Number(sp.get('id'));
-    if (!id) return NextResponse.json({ error: 'Falta id' }, { status: 400 });
+    const id = sp.get('id');
+    const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!id || !UUID_RE.test(id)) return NextResponse.json({ error: 'Falta id válido (UUID)' }, { status: 400 });
 
     const { error } = await supabaseAdmin.from('mensajes').delete().eq('id', id);
   if (error) { console.error('API error:', error); return NextResponse.json({ error: 'Error interno' }, { status: 500 }); }

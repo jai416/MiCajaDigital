@@ -10,7 +10,7 @@ interface Negocio {
 }
 
 interface Mensaje {
-  id: number;
+  id: string;
   user_id: string;
   titulo: string;
   mensaje: string;
@@ -126,7 +126,7 @@ export default function MensajesPage() {
     }
   };
 
-  const eliminar = async (id: number) => {
+  const eliminar = async (id: string) => {
     if (!confirm('¿Eliminar este mensaje?')) return;
     try {
       const res = await fetch(`/api/mensajes?id=${id}`, { method: 'DELETE' });

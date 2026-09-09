@@ -53,8 +53,9 @@ export async function PATCH(request: NextRequest) {
     }
 
     const { id, estado, respuesta_admin } = body;
-    if (!id || typeof id !== 'number' || id < 1 || id > 2147483647) {
-      return NextResponse.json({ error: 'Falta id válido' }, { status: 400 });
+    const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!id || typeof id !== 'string' || !UUID_RE.test(id)) {
+      return NextResponse.json({ error: 'Falta id válido (UUID)' }, { status: 400 });
     }
 
     const estadosValidos = ['abierto', 'en_progreso', 'resuelto', 'cerrado'];

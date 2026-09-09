@@ -147,7 +147,6 @@ async function getStats(dias: number) {
   }, {});
 
   const renovaciones7 = vigentes.filter((n) => n.expiracion <= ahora + 7 * MS_DIA).length;
-  const renovaciones30 = vigentes.filter((n) => n.expiracion <= ahora + 30 * MS_DIA).length;
 
   // Registros por día
   const registrosPorDia: { dia: string; total: number }[] = [];
@@ -274,7 +273,7 @@ async function getStats(dias: number) {
     ingresoRealCup, mrrCup, arpuCup, gmvCup: Math.round(gmvCup),
     ticketPromedio, conPago, nuevos,
     nuevosDelta: deltaPct(nuevos, nuevosPrev),
-    renovaciones7, renovaciones30,
+    renovaciones7,
     registrosPorDia, actividadPorDia,
     ventasRango, ventasDelta: deltaPct(ventasRango, ventasRangoPrev),
     gastosRango, gastosDelta: deltaPct(gastosRango, gastosRangoPrev),
@@ -299,18 +298,15 @@ export default async function DashboardPage({ searchParams }: { searchParams: Se
     { label: 'En Prueba', value: stats.enPrueba, color: 'bg-yellow-500', icon: '⏳' },
     { label: 'Vencidas sin renovar', value: stats.vencidasSinRenovar, color: 'bg-red-500', icon: '📞', title: 'Cuentas activas cuyo plan ya venció.' },
     { label: 'Ingresos Mensuales (MRR)', value: `${(stats.mrrCup / 1000).toFixed(1)}k CUP`, color: 'bg-purple-500', icon: '💰' },
-    { label: 'Ingreso Acumulado', value: `${(stats.ingresoRealCup / 1000).toFixed(1)}k CUP`, color: 'bg-indigo-500', icon: '🏦' },
     { label: 'ARPU', value: `${stats.arpuCup.toLocaleString()} CUP`, color: 'bg-purple-400', icon: '🧮' },
     { label: `Nuevos (${stats.dias} días)`, value: `${stats.nuevos}${flecha(stats.nuevosDelta)}`, color: 'bg-sky-500', icon: '🆕' },
     { label: 'Próx. Renovaciones (7d)', value: stats.renovaciones7, color: 'bg-orange-500', icon: '⏰' },
     { label: 'Conversión a Pago', value: `${stats.conversion}%`, color: 'bg-lime-600', icon: '📈' },
-    { label: 'Códigos Generados', value: stats.codigosGenerados, color: 'bg-cyan-500', icon: '🎟️' },
-    { label: 'Códigos Usados', value: stats.codigosUsados, color: 'bg-teal-500', icon: '✅' },
     { label: 'Códigos por Vencer (3d)', value: stats.codigosPorVencer, color: 'bg-amber-500', icon: '⏱️' },
     { label: 'Códigos VENCIDOS sin usar', value: stats.codigosVencidosSinUsar, color: 'bg-rose-600', icon: '💀' },
     { label: `Ventas válidas (${stats.dias}d)`, value: `${stats.ventasRango}${flecha(stats.ventasDelta)}`, color: 'bg-violet-500', icon: '🧾' },
     { label: `Gastos (${stats.dias}d)`, value: `${stats.gastosRango}${flecha(stats.gastosDelta)}`, color: 'bg-pink-500', icon: '💸' },
-    { label: 'Facturación clientas (est.)', value: `${(stats.gmvCup / 1000).toFixed(1)}k CUP`, color: 'bg-emerald-700', icon: '🌍' },
+    { label: 'GMV estimado (CUP, vía TC publicada)', value: `${(stats.gmvCup / 1000).toFixed(1)}k CUP`, color: 'bg-emerald-700', icon: '🌍' },
     { label: 'Vendieron HOY', value: stats.vendedoresHoy, color: 'bg-green-600', icon: '🔥' },
     { label: 'Vendieron (7d)', value: stats.vendedores7, color: 'bg-teal-600', icon: '📊' },
     { label: 'Errores reportados (7d)', value: stats.errores7, color: 'bg-gray-700', icon: '🐞' },
@@ -546,13 +542,9 @@ export default async function DashboardPage({ searchParams }: { searchParams: Se
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
           <h2 className="text-lg font-bold text-gray-800 mb-4">Próximas renovaciones</h2>
           <div className="grid grid-cols-2 gap-4">
-            <div className="bg-orange-50 rounded-lg p-4">
-              <p className="text-2xl font-bold text-orange-700">{stats.renovaciones7}</p>
-              <p className="text-xs text-orange-600">Renovaciones 7 días</p>
-            </div>
             <div className="bg-amber-50 rounded-lg p-4">
-              <p className="text-2xl font-bold text-amber-700">{stats.renovaciones30}</p>
-              <p className="text-xs text-amber-600">Renovaciones 30 días</p>
+              <p className="text-2xl font-bold text-amber-700">{stats.renovaciones7}</p>
+              <p className="text-xs text-amber-600">Renovaciones próximas 7d</p>
             </div>
           </div>
           <div className="mt-4 pt-4 border-t border-gray-100">

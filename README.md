@@ -110,4 +110,16 @@ npm run test:e2e
 - `/dashboard/soporte` — Tickets de soporte (requiere migración §A).
 - `/dashboard/conflictos` — Log de conflictos de sync (requiere migración §B).
 - `/dashboard/mensajes` — Envío de mensajes directos a usuarios (requiere
-  `docs/SQL_PEGAR.sql` §5).
+  `docs/SQL_APLICAR_TODOS.sql` §4).
+- `/dashboard/actividad` — Actividad reciente de sync por negocio.
+
+### API backup/export
+
+`POST /api/backup` — exporta todas las tablas de la BD como JSON descargable.
+
+- **Auth**: requiere sesión admin (`getSession()`).
+- **Body opcional**: `{ "negocio_id": "uuid" }` para exportar solo un negocio.
+- **Response**: `application/json` descargable como `micajadigital_backup_YYYY-MM-DD.json`.
+- **Límite**: 50,000 filas por tabla (seguridad contra OOM).
+- **Tablas**: negocios, ventas, gastos, catalogo, compras, pago_fiado, codigos_pago, mensajes, soporte_tickets, conflictos_log, suscripcion_eventos, app_logs, admin_audit.
+- **UI**: `BackupButton.tsx` en `/dashboard/negocios` (header "Exportar respaldo completo" + por-row).

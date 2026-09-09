@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { fechaHora } from '@/lib/formato';
 
 interface Ticket {
-  id: number;
+  id: string;
   user_id: string;
   negocio_id: string | null;
   categoria: string;
@@ -48,11 +48,11 @@ export default function SoportePage() {
   const [total, setTotal] = useState(0);
   const [totalPaginas, setTotalPaginas] = useState(1);
   const [cargado, setCargado] = useState(false);
-  const [editando, setEditando] = useState<number | null>(null);
+  const [editando, setEditando] = useState<string | null>(null);
   const [respuesta, setRespuesta] = useState('');
   const [plantillaSel, setPlantillaSel] = useState('');
 
-  const [tomandoId, setTomandoId] = useState<number | null>(null);
+  const [tomandoId, setTomandoId] = useState<string | null>(null);
   const [feedback, setFeedback] = useState('');
 
   useEffect(() => {
@@ -82,7 +82,7 @@ export default function SoportePage() {
 
   useEffect(() => { cargar(1); }, [filtro]);
 
-  const actualizar = async (id: number, estado: string, resp?: string) => {
+  const actualizar = async (id: string, estado: string, resp?: string) => {
     if (estado === 'en_progreso') setTomandoId(id);
     try {
       const res = await fetch('/api/soporte', {

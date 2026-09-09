@@ -190,7 +190,7 @@ export async function POST(request: NextRequest) {
     }
     // Prácticamente imposible (32^8 combinaciones), pero respondemos honesto.
     return NextResponse.json(
-      { error: `No se pudo generar un código único. ${ultimoError ?? ''}` },
+      { error: 'No se pudo generar un código único. Intenta de nuevo.' },
       { status: 500 }
     );
   } catch {
