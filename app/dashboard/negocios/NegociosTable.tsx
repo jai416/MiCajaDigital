@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Modal from '@/components/Modal';
 import { fechaCorta } from '@/lib/formato';
+import BackupButton from './BackupButton';
 
 interface Negocio {
   id: string;
@@ -358,6 +359,7 @@ export default function NegociosTable({
                           >
                             🗑️ Papelera
                           </button>
+                          <BackupButton negocioId={n.id} negocioNombre={n.nombre_negocio} />
                         </>
                       )}
                     </div>

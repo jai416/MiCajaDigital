@@ -1,6 +1,7 @@
 import { supabaseAdmin } from '@/lib/supabase';
 import { requireSession } from '@/lib/auth';
 import NegociosTable from './NegociosTable';
+import BackupButton from './BackupButton';
 
 export const dynamic = 'force-dynamic';
 
@@ -84,10 +85,13 @@ export default async function NegociosPage({
     <div>
       <div className="flex items-center justify-between mb-4">
         <h1 className="text-2xl font-bold text-gray-800">Negocios</h1>
-        <span className="text-sm text-gray-500">
-          {total} registros · página {pagina} de {totalPaginas}
-          {enPapelera > 0 ? ` · ${enPapelera} en papelera` : ''}
-        </span>
+        <div className="flex items-center gap-4">
+          <BackupButton />
+          <span className="text-sm text-gray-500">
+            {total} registros · página {pagina} de {totalPaginas}
+            {enPapelera > 0 ? ` · ${enPapelera} en papelera` : ''}
+          </span>
+        </div>
       </div>
 
       <form action="/dashboard/negocios" method="get" className="mb-6 space-y-3">
