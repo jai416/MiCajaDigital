@@ -128,7 +128,7 @@ npm run test:e2e
 
 ### Backup automático diario (GitHub Actions)
 
-`pg_dump` diario contra Supabase → repo privado `micajadigital-backups`
+`pg_dump` diario contra Supabase → repo privado `MiCajaDigital-BACKUPS`
 (rotación 30 días). Workflow: `.github/workflows/backup.yml` (en este repo).
 
 - **Cron**: 3:00 AM UTC + `workflow_dispatch` (manual).

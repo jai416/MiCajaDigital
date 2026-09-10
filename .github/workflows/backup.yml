@@ -3,7 +3,7 @@
 # ============================================================
 # Hace pg_dump completo (tablas + RLS + RPCs + datos) de la BD
 # de Supabase, lo comprime con gzip y lo guarda en el repo
-# privado `micajadigital-backups` con rotación de 30 días.
+# privado `MiCajaDigital-BACKUPS` con rotación de 30 días.
 #
 # Costo: $0 (GitHub Actions free tier: 2000 min/mes; este
 # workflow consume ~3-5 min/día ≈ 150 min/mes).
@@ -13,7 +13,7 @@
 #   - BACKUP_REPO_TOKEN → PAT fine-grained con acceso SOLO al repo de backups (Contents: Read and write)
 # Repositorios:
 #   - Este repo (MiCajaDigital)       → donde vive el workflow
-#   - jai416/micajadigital-backups     → donde se guardan los dumps (.sql.gz)
+#   - jai416/MiCajaDigital-BACKUPS     → donde se guardan los dumps (.sql.gz)
 # ============================================================
 
 name: Backup Supabase
@@ -45,7 +45,7 @@ jobs:
       - name: Checkout repo de backups
         uses: actions/checkout@v5
         with:
-          repository: jai416/micajadigital-backups
+          repository: jai416/MiCajaDigital-BACKUPS
           token: ${{ secrets.BACKUP_REPO_TOKEN }}
           path: backups
           fetch-depth: 0
