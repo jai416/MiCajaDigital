@@ -65,20 +65,24 @@ jobs:
 
       # --------------------------------------------------------
       # 3. Ejecutar pg_dump contra Supabase.
+      #    Validación temprana: si falta el secret, abortar con mensaje
+      #    claro (pg_dump con URL vacía cae al socket local y el error
+      #    es confuso: "No such file or directory").
       #    Flags:
       #      --no-owner   → no incluir ALTER OWNER (restaurable en cualquier proyecto)
       #      --no-acl     → no incluir GRANT/REVOKE de permisos (restaurable en cualquier proyecto)
       #      --clean      → el dump incluye DROP antes de CREATE (restauración idempotente)
       #      --if-exists  → los DROP usan IF EXISTS (no falla si no existe)
-      #    El dump completo incluye: tablas + datos + funciones (RPCs) +
-      #    policies (RLS) + triggers + índices + tipos.
-      #    NOTA: usamos el puerto 6543 del pooler (modo transaccional).
-      #    Si el dump falla con errores de conexión, probar el 5432 (sesión).
       # --------------------------------------------------------
       - name: Generar dump con pg_dump
         env:
           SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
         run: |
+          if [ -z "$SUPABASE_DB_URL" ]; then
+            echo "::error::Falta el secret SUPABASE_DB_URL en el environment 'backups'."
+            echo "::error::Añádelo en Settings → Environments → backups → Environment secrets."
+            exit 1
+          fi
           TIMESTAMP=$(date -u +%Y-%m-%d_%H%M)
           echo "TIMESTAMP=$TIMESTAMP" >> "$GITHUB_ENV"
           echo "Dumping Supabase DB a micajadigital_${TIMESTAMP}.sql ..."
