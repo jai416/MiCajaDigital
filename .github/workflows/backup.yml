@@ -93,8 +93,13 @@ jobs:
           fi
           TIMESTAMP=$(date -u +%Y-%m-%d_%H%M)
           echo "TIMESTAMP=$TIMESTAMP" >> "$GITHUB_ENV"
+          # Ruta completa: el pg_dump del PATH del runner es el 16
+          # preinstalado; el 17 del PPA vive en /usr/lib/postgresql/17/bin.
+          PG_DUMP="/usr/lib/postgresql/17/bin/pg_dump"
+          if [ ! -x "$PG_DUMP" ]; then PG_DUMP=$(command -v pg_dump); fi
+          "$PG_DUMP" --version
           echo "Dumping Supabase DB a micajadigital_${TIMESTAMP}.sql ..."
-          pg_dump "$SUPABASE_DB_URL" \
+          "$PG_DUMP" "$SUPABASE_DB_URL" \
             --no-owner --no-acl --clean --if-exists \
             -f "backups/micajadigital_${TIMESTAMP}.sql"
 
