@@ -39,9 +39,11 @@ jobs:
       # 1. Checkout del repo privado de backups.
       #    Usa el PAT (BACKUP_REPO_TOKEN) porque el GITHUB_TOKEN
       #    nativo solo tiene acceso a ESTE repo, no al de backups.
+      #    v5: actions/checkout v4 corre sobre Node 20 (deprecado
+      #    en runners de GitHub Actions — usar v5 con Node 24).
       # --------------------------------------------------------
       - name: Checkout repo de backups
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           repository: jai416/micajadigital-backups
           token: ${{ secrets.BACKUP_REPO_TOKEN }}
