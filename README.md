@@ -1,5 +1,7 @@
 # Panel Admin — Mi Caja Digital
 
+[![Backup Supabase](https://github.com/jai416/MiCajaDigital/actions/workflows/backup.yml/badge.svg)](https://github.com/jai416/MiCajaDigital/actions/workflows/backup.yml)
+
 Next.js 14 + Supabase. Documentación de mantenimiento, seguridad y upgrades.
 
 ## Puesta en marcha
@@ -123,3 +125,14 @@ npm run test:e2e
 - **Límite**: 50,000 filas por tabla (seguridad contra OOM).
 - **Tablas**: negocios, ventas, gastos, catalogo, compras, pago_fiado, codigos_pago, mensajes, soporte_tickets, conflictos_log, suscripcion_eventos, app_logs, admin_audit.
 - **UI**: `BackupButton.tsx` en `/dashboard/negocios` (header "Exportar respaldo completo" + por-row).
+
+### Backup automático diario (GitHub Actions)
+
+`pg_dump` diario contra Supabase → repo privado `micajadigital-backups`
+(rotación 30 días). Workflow: `.github/workflows/backup.yml` (en este repo).
+
+- **Cron**: 3:00 AM UTC + `workflow_dispatch` (manual).
+- **Secrets**: `SUPABASE_DB_URL`, `BACKUP_REPO_TOKEN` (ver `docs/BACKUP_SETUP.md`).
+- **Restauración**: `gunzip -c archivo.sql.gz | psql "$STAGING_DB_URL"`.
+- **Prueba de restauración**: `scripts/test_backup_restore.sh` (verifica las 7 tablas principales).
+- Guía completa de setup: **`docs/BACKUP_SETUP.md`** (raíz del proyecto Flutter).

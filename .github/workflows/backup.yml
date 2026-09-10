@@ -1,0 +1,130 @@
+# ============================================================
+# Backup automático diario de la base de datos Supabase
+# ============================================================
+# Hace pg_dump completo (tablas + RLS + RPCs + datos) de la BD
+# de Supabase, lo comprime con gzip y lo guarda en el repo
+# privado `micajadigital-backups` con rotación de 30 días.
+#
+# Costo: $0 (GitHub Actions free tier: 2000 min/mes; este
+# workflow consume ~3-5 min/día ≈ 150 min/mes).
+#
+# Secrets necesarios (Settings → Secrets and variables → Actions):
+#   - SUPABASE_DB_URL   → postgresql://postgres.xxx:PASS@aws-0-us-east-1.pooler.supabase.com:6543/postgres
+#   - BACKUP_REPO_TOKEN → PAT fine-grained con acceso SOLO al repo de backups (Contents: Read and write)
+# Repositorios:
+#   - Este repo (MiCajaDigital)       → donde vive el workflow
+#   - jai416/micajadigital-backups     → donde se guardan los dumps (.sql.gz)
+# ============================================================
+
+name: Backup Supabase
+
+on:
+  # Ejecución diaria a las 3:00 AM UTC (≈ 11:00 PM en Cuba, fuera de horas pico de uso)
+  schedule:
+    - cron: '0 3 * * *'
+  # Permite ejecutarlo manualmente desde Actions → Backup Supabase → Run workflow
+  workflow_dispatch:
+
+concurrency:
+  group: backup-supabase
+  cancel-in-progress: false
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      # --------------------------------------------------------
+      # 1. Checkout del repo privado de backups.
+      #    Usa el PAT (BACKUP_REPO_TOKEN) porque el GITHUB_TOKEN
+      #    nativo solo tiene acceso a ESTE repo, no al de backups.
+      # --------------------------------------------------------
+      - name: Checkout repo de backups
+        uses: actions/checkout@v4
+        with:
+          repository: jai416/micajadigital-backups
+          token: ${{ secrets.BACKUP_REPO_TOKEN }}
+          path: backups
+          fetch-depth: 0
+
+      # --------------------------------------------------------
+      # 2. Instalar PostgreSQL client (trae pg_dump y psql).
+      # --------------------------------------------------------
+      - name: Instalar postgresql-client
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-client
+
+      # --------------------------------------------------------
+      # 3. Ejecutar pg_dump contra Supabase.
+      #    Flags:
+      #      --no-owner   → no incluir ALTER OWNER (restaurable en cualquier proyecto)
+      #      --no-acl     → no incluir GRANT/REVOKE de permisos (restaurable en cualquier proyecto)
+      #      --clean      → el dump incluye DROP antes de CREATE (restauración idempotente)
+      #      --if-exists  → los DROP usan IF EXISTS (no falla si no existe)
+      #    El dump completo incluye: tablas + datos + funciones (RPCs) +
+      #    policies (RLS) + triggers + índices + tipos.
+      #    NOTA: usamos el puerto 6543 del pooler (modo transaccional).
+      #    Si el dump falla con errores de conexión, probar el 5432 (sesión).
+      # --------------------------------------------------------
+      - name: Generar dump con pg_dump
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          TIMESTAMP=$(date -u +%Y-%m-%d_%H%M)
+          echo "TIMESTAMP=$TIMESTAMP" >> "$GITHUB_ENV"
+          echo "Dumping Supabase DB a micajadigital_${TIMESTAMP}.sql ..."
+          pg_dump "$SUPABASE_DB_URL" \
+            --no-owner --no-acl --clean --if-exists \
+            -f "backups/micajadigital_${TIMESTAMP}.sql"
+
+      # --------------------------------------------------------
+      # 4. Verificar que el dump no esté vacío (sanity check).
+      #    Si pg_dump falló silenciosamente, abortar antes de commitear basura.
+      # --------------------------------------------------------
+      - name: Verificar dump
+        run: |
+          TIMESTAMP="${{ env.TIMESTAMP }}"
+          SIZE=$(stat -c%s "backups/micajadigital_${TIMESTAMP}.sql")
+          if [ "$SIZE" -lt 10000 ]; then
+            echo "::error::El dump pesa ${SIZE} bytes — demasiado pequeño. Abortando."
+            exit 1
+          fi
+          echo "Dump OK: ${SIZE} bytes"
+
+      # --------------------------------------------------------
+      # 5. Comprimir con gzip (nombre: micajadigital_YYYY-MM-DD_HHMM.sql.gz).
+      # --------------------------------------------------------
+      - name: Comprimir dump
+        run: |
+          TIMESTAMP="${{ env.TIMESTAMP }}"
+          gzip -9 "backups/micajadigital_${TIMESTAMP}.sql"
+          echo "Comprimido: micajadigital_${TIMESTAMP}.sql.gz ($(stat -c%s backups/micajadigital_${TIMESTAMP}.sql.gz) bytes)"
+
+      # --------------------------------------------------------
+      # 6. Rotación: borrar dumps con más de 30 días.
+      #    -mtime +30 = archivos cuya modificación fue hace 31 días o más.
+      # --------------------------------------------------------
+      - name: Rotar backups (borrar >30 días)
+        run: |
+          cd backups
+          echo "Backups antes de rotación: $(ls -1 *.sql.gz 2>/dev/null | wc -l)"
+          find . -name "*.sql.gz" -mtime +30 -delete
+          echo "Backups después de rotación: $(ls -1 *.sql.gz 13>/dev/null | wc -l)"
+
+      # --------------------------------------------------------
+      # 7. Commit + push al repo de backups.
+      #    `|| echo "Sin cambios"` evita que el workflow falle
+      #    cuando no hay nada nuevo que commitear (rotación sin nuevos dumps).
+      # --------------------------------------------------------
+      - name: Commit y push del backup
+        env:
+          BACKUP_REPO_TOKEN: ${{ secrets.BACKUP_REPO_TOKEN }}
+        run: |
+          cd backups
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "backup: micajadigital_${{ env.TIMESTAMP }} ($(date -u +%Y-%m-%dT%H:%M:%SZ))" || echo "Sin cambios"
+          git push
