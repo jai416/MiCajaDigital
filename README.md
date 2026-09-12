@@ -49,6 +49,11 @@ npm run test:e2e        # Playwright (requiere npx playwright install chromium)
 - **Borrado permanente** exige escribir `ELIMINAR` en un modal (no confirm()
   nativo) y queda auditado.
 - **Purga de logs acotada**: `/api/logs?dias=` se recorta a [1..730].
+- **Contraseña de producción**: `ADMIN_PASSWORD_HASH` es obligatorio; `ADMIN_PASSWORD`
+  solo puede usarse en desarrollo. El health check marca el panel como degradado si
+  falta el hash en producción.
+- **OTA alineada con Flutter**: `/api/version` publica `version`, `versionCode`,
+  `url` y `mensaje`, con fallback `1.3.2+2020`, el mismo contrato que consume la app.
 
 ## Mantenimiento
 
@@ -114,6 +119,15 @@ npm run test:e2e
 - `/dashboard/mensajes` — Envío de mensajes directos a usuarios (requiere
   `docs/SQL_APLICAR_TODOS.sql` §4).
 - `/dashboard/actividad` — Actividad reciente de sync por negocio.
+
+### Auditoría 12 sep 2026
+
+- Se revocó en Supabase el grant público heredado de `stats_dashboard_v2`.
+- Se corrigieron los IDs `BIGINT` de mensajes y el filtro de
+  `suscripcion_eventos` en el backup por negocio.
+- Las mutaciones de códigos y backups validan UUID antes de consultar Supabase.
+- `npx tsc --noEmit` y `npm run build` pasan. Las pruebas Playwright no pudieron
+  ejecutarse porque el binario `playwright` no está instalado en `admin/node_modules`.
 
 ### API backup/export
 

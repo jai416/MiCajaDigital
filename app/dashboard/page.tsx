@@ -8,6 +8,13 @@ const PRECIOS_PLAN: Record<string, number> = Object.fromEntries(
   Object.entries(precios.planes).map(([id, p]) => [id, p['1']]),
 );
 
+// El DB guarda 'gratis' pero el significado para el admin es "Prueba".
+function labelPlan(p: string): string {
+  if (p === 'gratis') return 'Prueba';
+  if (p === 'basico') return 'Básico';
+  return p.charAt(0).toUpperCase() + p.slice(1);
+}
+
 const RANGOS = [7, 15, 30, 90] as const;
 
 interface SearchParams {
@@ -389,7 +396,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Se
             )}
             {Object.entries(stats.porPlan).map(([plan, n]) => (
               <div key={plan} className="flex items-center justify-between">
-                <span className="capitalize text-sm text-gray-600">{plan}</span>
+                <span className="text-sm text-gray-600">{labelPlan(plan)}</span>
                 <span className="text-sm font-bold text-gray-800">
                   {n} · {((PRECIOS_PLAN[plan] ?? 0) * n).toLocaleString()} CUP/mes
                 </span>

@@ -96,10 +96,11 @@ export async function DELETE(request: NextRequest) {
 
     const sp = request.nextUrl.searchParams;
     const id = sp.get('id');
-    const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-    if (!id || !UUID_RE.test(id)) return NextResponse.json({ error: 'Falta id válido (UUID)' }, { status: 400 });
+    if (!id || !/^\d+$/.test(id) || Number(id) <= 0) {
+      return NextResponse.json({ error: 'Falta id válido' }, { status: 400 });
+    }
 
-    const { error } = await supabaseAdmin.from('mensajes').delete().eq('id', id);
+    const { error } = await supabaseAdmin.from('mensajes').delete().eq('id', Number(id));
   if (error) { console.error('API error:', error); return NextResponse.json({ error: 'Error interno' }, { status: 500 }); }
     return NextResponse.json({ ok: true });
   } catch (e) {

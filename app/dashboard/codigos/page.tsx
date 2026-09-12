@@ -31,6 +31,13 @@ const DURACIONES = [
   { id: 12, label: '12 meses (-17%)' },
 ];
 
+// El DB guarda 'gratis' pero el significado para el admin es "Prueba".
+function labelPlan(p: string): string {
+  if (p === 'gratis') return 'Prueba';
+  if (p === 'basico') return 'Básico';
+  return p.charAt(0).toUpperCase() + p.slice(1);
+}
+
 export default function CodigosPage() {
   const [codigos, setCodigos] = useState<Codigo[]>([]);
   const [email, setEmail] = useState('');
@@ -397,7 +404,7 @@ export default function CodigosPage() {
                 <tr key={c.id} className="border-b border-gray-100 hover:bg-gray-50 transition">
                   <td className="px-4 py-3 font-mono font-bold">{c.codigo}</td>
                   <td className="px-4 py-3 text-gray-500">{c.email}</td>
-                  <td className="px-4 py-3 text-center capitalize">{c.plan}</td>
+                  <td className="px-4 py-3 text-center">{labelPlan(c.plan)}</td>
                   <td className="px-4 py-3 text-center">{c.duracion_meses}</td>
                   <td className="px-4 py-3 text-center">{c.precio_pagado.toLocaleString()} CUP</td>
                   <td className="px-4 py-3 text-center">

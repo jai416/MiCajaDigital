@@ -38,6 +38,11 @@ async function getNegocios(sp: SearchParams) {
   if (sp.estado && sp.estado !== 'todos') {
     if (sp.estado === 'activo') {
       query = query.eq('activo', true).gt('fecha_expiracion', ahora.toISOString());
+    } else if (sp.estado === 'prueba') {
+      // "En prueba" NO es un plan: el trigger crea las pruebas con plan='pro'
+      // y activo=false. Se identifica por fecha de registro < 15 días.
+      const hace15 = new Date(ahora.getTime() - 15 * 86400000);
+      query = query.eq('activo', false).gte('fecha_registro', hace15.toISOString());
     } else if (sp.estado === 'inactivo') {
       query = query.eq('activo', false);
     } else if (sp.estado === 'expirado') {
@@ -126,6 +131,7 @@ export default async function NegociosPage({
             className="px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white">
             <option value="todos">Todos los estados</option>
             <option value="activo">Activo</option>
+            <option value="prueba">En prueba (15 días)</option>
             <option value="inactivo">Inactivo</option>
             <option value="expirado">Expirado</option>
             <option value="papelera">En papelera</option>

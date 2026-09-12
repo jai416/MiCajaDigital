@@ -11,6 +11,7 @@ const PRECIOS: Record<string, Record<string, number>> = precios.planes;
 // teléfono o WhatsApp sin confusiones.
 const CHARS_CODIGO = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const LARGO_CODIGO = 8;
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 // Límite suave en memoria: el panel tiene UN administrador; esto solo corta
 // floods accidentales o un script desbocado (no es anti fuerza bruta — eso es
@@ -210,7 +211,7 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: 'JSON inválido' }, { status: 400 });
     }
     const { id, estado_pago } = (body ?? {}) as Record<string, unknown>;
-    if (typeof id !== 'string' || typeof estado_pago !== 'string') {
+    if (typeof id !== 'string' || !UUID_RE.test(id) || typeof estado_pago !== 'string') {
       return NextResponse.json({ error: 'Datos incompletos' }, { status: 400 });
     }
     if (!['confirmado', 'rechazado', 'pendiente', 'expirado'].includes(estado_pago)) {

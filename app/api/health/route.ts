@@ -8,13 +8,15 @@ export async function GET() {
   const autenticado = await getSession();
   const checks: Record<string, { ok: boolean; detalle?: string }> = {};
 
-  // HASH o contraseña: se exige una de las dos (el hash es lo recomendado).
+  // En producción solo se acepta el hash; la contraseña plana queda para dev.
   const envOk = Boolean(
     process.env.NEXT_PUBLIC_SUPABASE_URL &&
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY &&
       process.env.SUPABASE_SERVICE_ROLE_KEY &&
       process.env.ADMIN_EMAIL &&
-      (process.env.ADMIN_PASSWORD_HASH || process.env.ADMIN_PASSWORD)
+      (process.env.NODE_ENV === 'production'
+        ? process.env.ADMIN_PASSWORD_HASH
+        : (process.env.ADMIN_PASSWORD_HASH || process.env.ADMIN_PASSWORD))
   );
   checks.env = {
     ok: envOk,
@@ -85,12 +87,16 @@ export async function GET() {
         const texto = await vFile.text();
         const remoto = JSON.parse(texto);
         const ESPERADA = process.env.APP_VERSION || '1.3.2';
-        const codigoOk = remoto.version === ESPERADA;
+        const codigoEsperado = Number(process.env.APP_VERSION_CODE || '2020');
+        const codigoOk = remoto.version === ESPERADA &&
+          Number(remoto.versionCode) === codigoEsperado &&
+          typeof remoto.url === 'string' && remoto.url.length > 0 &&
+          typeof remoto.mensaje === 'string';
         checks.versionJson = {
           ok: codigoOk,
           detalle: codigoOk
-            ? `version.json remoto: v${remoto.version}+${remoto.versionCode} (esperado v${ESPERADA})`
-            : `⚠️ version.json remoto es v${remoto.version}, esperado v${ESPERADA}. Sube docs/version.json al bucket config.`,
+            ? `version.json remoto: v${remoto.version}+${remoto.versionCode}`
+            : `⚠️ version.json remoto no coincide con v${ESPERADA}+${codigoEsperado} o no usa las claves OTA esperadas.`,
         };
       }
     } catch (e) {

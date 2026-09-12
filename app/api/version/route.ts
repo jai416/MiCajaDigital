@@ -10,14 +10,13 @@ export async function POST() {
     if (!s) return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
 
     const version = process.env.APP_VERSION || '1.3.2';
-    const versionCode = parseInt(process.env.APP_VERSION_CODE || '2018', 10);
+    const versionCode = parseInt(process.env.APP_VERSION_CODE || '2020', 10);
 
     const versionData = {
       version,
       versionCode,
-      message: `Mi Caja Digital ${version}`,
-      downloadUrl: process.env.APK_DOWNLOAD_URL || '',
-      minVersion: 1,
+      url: process.env.APK_DOWNLOAD_URL || 'https://apkpure.com/p/com.tunegocio.micajadigital.app',
+      mensaje: `Mi Caja Digital ${version}`,
     };
 
     const { error } = await supabaseAdmin

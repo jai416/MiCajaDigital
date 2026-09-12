@@ -12,14 +12,11 @@ const ADMIN_PASSWORD_HASH = process.env.ADMIN_PASSWORD_HASH;
 
 if (
   process.env.NODE_ENV === 'production' &&
-  ADMIN_PASSWORD &&
   !ADMIN_PASSWORD_HASH
 ) {
-  // No aborta el arranque (evita quedarse fuera del panel en un deploy), pero
-  // deja constancia fuerte de que la contraseña viaja en texto plano.
-  console.warn(
-    '⚠️ SEGURIDAD: ADMIN_PASSWORD en texto plano en producción. Genera ' +
-      'ADMIN_PASSWORD_HASH con `node scripts/hash_password.mjs <clave>` y elimina ADMIN_PASSWORD.'
+  throw new Error(
+    'ADMIN_PASSWORD_HASH ausente en producción. Genera el hash con ' +
+      '`node scripts/hash_password.mjs <clave>` y elimina ADMIN_PASSWORD.'
   );
 }
 

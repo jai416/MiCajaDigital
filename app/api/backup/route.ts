@@ -8,6 +8,7 @@ export const dynamic = 'force-dynamic';
 // Límite de filas por tabla para evitar OOM en el servidor.
 // Si una tabla supera este límite, se trunca y se indica en el JSON.
 const LIMITE_FILAS = 50000;
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 // Tablas que se exportan. Cada entrada define:
 //   tabla: nombre en Supabase
@@ -44,13 +45,14 @@ async function exportarTabla(
   // Para tablas sin filtro de negocio, si se especifica un negocioId
   // intentamos filtrar por user_id (que es el auth.uid del dueño)
   if (negocioId && !filtroNegocio) {
-    // Algunas tablas usan user_id en vez de negocio_id
+    // Algunas tablas usan user_id en vez de negocio_id.
     if (tabla === 'pago_fiado' || tabla === 'conflictos_log' || tabla === 'app_logs') {
       query = query.eq('user_id', negocioId);
     }
-    // admin_audit y suscripcion_eventos usan negocio_id
-    if (tabla === 'admin_audit' || tabla === 'suscripcion_eventos') {
-      query = query.eq('entidad_id', negocioId);
+    // suscripcion_eventos usa negocio_id; admin_audit no se exporta por negocio
+    // porque su entidad puede no ser un negocio y no tiene FK uniforme.
+    if (tabla === 'suscripcion_eventos') {
+      query = query.eq('negocio_id', negocioId);
     }
     // soporte_tickets usa user_id
     if (tabla === 'soporte_tickets') {
@@ -86,7 +88,7 @@ export async function POST(request: NextRequest) {
     try {
       const body = await request.json();
       if (body && typeof body === 'object' && body.negocio_id) {
-        if (typeof body.negocio_id !== 'string' || body.negocio_id.length > 200) {
+        if (typeof body.negocio_id !== 'string' || !UUID_RE.test(body.negocio_id)) {
           return NextResponse.json(
             { error: 'negocio_id inválido' },
             { status: 400 }

@@ -29,7 +29,69 @@ interface Paginacion {
   expiran?: string;
 }
 
-const PLANES_VALIDOS = ['gratis', 'basico', 'pro', 'premium'];
+const MS_DIA = 86400000;
+// OJO: el trigger crea las pruebas con plan='pro' y activo=false (NUNCA con
+// 'gratis'). El valor 'gratis' existe en el CHECK de la DB pero la app lo
+// trata como "Pro gratis para siempre" (suscripcion.dart) — no ofrecerlo
+// desde el panel. Solo los planes de pago y la prueba temporal (que es un
+// 'pro' inactivo con registro < 15 días).
+const PLANES_VALIDOS = ['basico', 'pro', 'premium'];
+
+// Descripciones para el modal de edición (precios de config/precios.json).
+const DESCRIPCION_PLAN: Record<string, string> = {
+  basico: 'Básico · 2.500 CUP/mes',
+  pro: 'Pro · 5.000 CUP/mes',
+  premium: 'Premium · 7.000 CUP/mes',
+};
+
+function labelPlan(p: string): string {
+  if (p === 'basico') return 'Básico';
+  return p.charAt(0).toUpperCase() + p.slice(1);
+}
+
+interface InfoSuscripcion {
+  estado: 'activo' | 'prueba' | 'porVencer' | 'vencido' | 'papelera';
+  etiqueta: string;
+  detalle: string;
+  dias: number | null;
+}
+
+// Resumen legible del estado de la suscripción de un negocio.
+function infoSuscripcion(n: Negocio): InfoSuscripcion {
+  if (n.deleted_at) {
+    return { estado: 'papelera', etiqueta: 'Papelera', detalle: `En papelera desde ${fechaCorta(n.deleted_at)}`, dias: null };
+  }
+  const ahora = Date.now();
+  const exp = n.fecha_expiracion ? new Date(n.fecha_expiracion).getTime() : 0;
+  const registro = n.fecha_registro ? new Date(n.fecha_registro).getTime() : 0;
+  const dias = exp ? Math.ceil((exp - ahora) / MS_DIA) : null;
+
+  if (exp > ahora && dias !== null && dias <= 3 && n.activo) {
+    return { estado: 'porVencer', etiqueta: 'Por vencer', detalle: `Vence en ${dias} día${dias === 1 ? '' : 's'} (${fechaCorta(n.fecha_expiracion)})`, dias };
+  }
+  if (n.activo && exp > ahora) {
+    return { estado: 'activo', etiqueta: 'Activo', detalle: `Vence el ${fechaCorta(n.fecha_expiracion)}${dias !== null ? ` (${dias} días)` : ''}`, dias };
+  }
+  if (!n.activo && registro && ahora - registro < 15 * MS_DIA) {
+    const diasPrueba = Math.max(0, Math.ceil((registro + 15 * MS_DIA - ahora) / MS_DIA));
+    return { estado: 'prueba', etiqueta: 'En prueba', detalle: `Prueba: ${diasPrueba} día${diasPrueba === 1 ? '' : 's'} restantes · vence ${fechaCorta(n.fecha_expiracion)}`, dias: diasPrueba };
+  }
+  if (exp && exp <= ahora) {
+    return { estado: 'vencido', etiqueta: 'Vencido', detalle: `Venció el ${fechaCorta(n.fecha_expiracion)}`, dias };
+  }
+  if (!n.activo) {
+    return { estado: 'vencido', etiqueta: 'Inactivo', detalle: 'Sin suscripción activa', dias: null };
+  }
+  return { estado: 'activo', etiqueta: 'Activo', detalle: n.fecha_expiracion ? `Vence el ${fechaCorta(n.fecha_expiracion)}` : 'Sin fecha de expiración', dias };
+}
+
+const CLASES_BADGE: Record<InfoSuscripcion['estado'], string> = {
+  activo: 'bg-emerald-100 text-emerald-700',
+  prueba: 'bg-blue-100 text-blue-700',
+  porVencer: 'bg-amber-100 text-amber-700',
+  vencido: 'bg-red-100 text-red-600',
+  papelera: 'bg-gray-200 text-gray-600',
+};
 
 export default function NegociosTable({
   negocios,
@@ -43,16 +105,20 @@ export default function NegociosTable({
   const [filter, setFilter] = useState('todos');
   const [modal, setModal] = useState<ModalTipo>(null);
   const [seleccion, setSeleccion] = useState<Negocio | null>(null);
-  const [plan, setPlan] = useState('gratis');
+  const [plan, setPlan] = useState('pro');
   const [expiracion, setExpiracion] = useState('');
   const [dias, setDias] = useState('30');
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState('');
+  const [mensaje, setMensaje] = useState('');
   // Borrado permanente: modal propio que exige escribir ELIMINAR (los
   // confirm() nativos se aceptan por inercia con doble click).
   const [borrando, setBorrando] = useState<Negocio | null>(null);
   const [textoConfirmar, setTextoConfirmar] = useState('');
   const [cargandoBorrado, setCargandoBorrado] = useState(false);
+  // Selección múltiple para acciones bulk.
+  const [seleccionados, setSeleccionados] = useState<Set<string>>(new Set());
+  const [cargandoBulk, setCargandoBulk] = useState(false);
 
   const filtered = negocios.filter((n) => {
     const matchSearch =
@@ -65,13 +131,61 @@ export default function NegociosTable({
     if (filter === 'todos') return true;
     if (filter === 'activos') return n.activo;
     if (filter === 'inactivos') return !n.activo;
-    if (filter === 'prueba') {
-      const quinceDias = 15 * 86400000;
-      const registro = new Date(n.fecha_registro).getTime();
-      return !n.activo && Date.now() - registro < quinceDias;
-    }
+    if (filter === 'prueba') return infoSuscripcion(n).estado === 'prueba';
     return true;
   });
+
+  const todosMarcados =
+    filtered.length > 0 && filtered.every((n) => seleccionados.has(n.id));
+
+  const toggleTodos = () => {
+    setSeleccionados(todosMarcados ? new Set() : new Set(filtered.map((n) => n.id)));
+  };
+
+  const toggleUno = (id: string) => {
+    setSeleccionados((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const accionBulk = async (accion: 'activar' | 'desactivar' | 'papelera') => {
+    if (seleccionados.size === 0) return;
+    if (accion === 'papelera' && !confirm(`¿Mover ${seleccionados.size} negocio(s) a la papelera?`)) return;
+    setCargandoBulk(true);
+    setError('');
+    setMensaje('');
+    const resultados = await Promise.all(
+      [...seleccionados].map((id) =>
+        fetch('/api/negocios', {
+          method: accion === 'papelera' ? 'DELETE' : 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(
+            accion === 'papelera'
+              ? { id }
+              : { id, activo: accion === 'activar' },
+          ),
+        }),
+      ),
+    );
+    setCargandoBulk(false);
+    const fallidos = resultados.filter((r) => !r.ok).length;
+    if (fallidos > 0) {
+      setError(`${fallidos} de ${seleccionados.size} acciones fallaron.`);
+    } else {
+      setMensaje(
+        accion === 'activar'
+          ? `${seleccionados.size} negocio(s) activados.`
+          : accion === 'desactivar'
+            ? `${seleccionados.size} negocio(s) desactivados.`
+            : `${seleccionados.size} negocio(s) movidos a la papelera.`,
+      );
+      setSeleccionados(new Set());
+      router.refresh();
+    }
+  };
 
   const cerrarModal = () => {
     setModal(null);
@@ -81,7 +195,7 @@ export default function NegociosTable({
 
   const abrirEditar = (n: Negocio) => {
     setSeleccion(n);
-    setPlan(PLANES_VALIDOS.includes(n.plan) ? n.plan : 'gratis');
+    setPlan(PLANES_VALIDOS.includes(n.plan) ? n.plan : 'pro');
     setExpiracion(n.fecha_expiracion ? n.fecha_expiracion.slice(0, 10) : '');
     setError('');
     setModal('editar');
@@ -220,11 +334,10 @@ export default function NegociosTable({
     router.refresh();
   };
 
-  const mostrarPorVencer = (n: Negocio) => {
-    if (!n.activo || !n.fecha_expiracion) return false;
-    const exp = new Date(n.fecha_expiracion).getTime();
-    const en3Dias = Date.now() + 3 * 86400000;
-    return exp > Date.now() && exp <= en3Dias;
+  const presetFecha = (diasDesdeHoy: number) => {
+    const d = new Date();
+    d.setUTCDate(d.getUTCDate() + diasDesdeHoy);
+    setExpiracion(d.toISOString().slice(0, 10));
   };
 
   return (
@@ -250,70 +363,111 @@ export default function NegociosTable({
         </select>
       </div>
 
+      {error && (
+        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-4 text-sm">
+          {error}
+        </div>
+      )}
+      {mensaje && (
+        <div className="bg-emerald-50 border border-emerald-200 text-emerald-700 px-4 py-3 rounded-lg mb-4 text-sm">
+          {mensaje}
+        </div>
+      )}
+
+      {seleccionados.size > 0 && (
+        <div className="bg-blue-50 border border-blue-200 rounded-lg px-4 py-3 mb-4 flex flex-wrap items-center gap-3">
+          <span className="text-sm font-semibold text-blue-800">
+            {seleccionados.size} seleccionado{seleccionados.size === 1 ? '' : 's'}
+          </span>
+          <button
+            onClick={() => accionBulk('activar')}
+            disabled={cargandoBulk}
+            className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50 transition"
+          >
+            {cargandoBulk ? '...' : '✓ Activar'}
+          </button>
+          <button
+            onClick={() => accionBulk('desactivar')}
+            disabled={cargandoBulk}
+            className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-gray-600 text-white hover:bg-gray-700 disabled:opacity-50 transition"
+          >
+            {cargandoBulk ? '...' : 'Desactivar'}
+          </button>
+          <button
+            onClick={() => accionBulk('papelera')}
+            disabled={cargandoBulk}
+            className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-red-600 text-white hover:bg-red-700 disabled:opacity-50 transition"
+          >
+            {cargandoBulk ? '...' : '🗑️ Papelera'}
+          </button>
+          <button
+            onClick={() => setSeleccionados(new Set())}
+            disabled={cargandoBulk}
+            className="px-3 py-1.5 rounded-lg text-xs font-semibold border border-blue-300 text-blue-700 hover:bg-blue-100 disabled:opacity-50 transition"
+          >
+            Cancelar
+          </button>
+        </div>
+      )}
+
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-gray-200 bg-gray-50">
+              {!filter.includes('papelera') && (
+                <th scope="col" className="px-4 py-3 w-10">
+                  <input
+                    type="checkbox"
+                    checked={todosMarcados}
+                    onChange={toggleTodos}
+                    aria-label="Seleccionar todos"
+                    className="w-4 h-4 accent-emerald-600"
+                  />
+                </th>
+              )}
               <th scope="col" className="text-left px-4 py-3 font-semibold text-gray-600">Negocio</th>
               <th scope="col" className="text-left px-4 py-3 font-semibold text-gray-600">Email</th>
-              <th scope="col" className="text-left px-4 py-3 font-semibold text-gray-600">Teléfono</th>
-              <th scope="col" className="text-center px-4 py-3 font-semibold text-gray-600">Estado</th>
-              <th scope="col" className="text-left px-4 py-3 font-semibold text-gray-600">Registro</th>
-              <th scope="col" className="text-left px-4 py-3 font-semibold text-gray-600">Expira</th>
               <th scope="col" className="text-center px-4 py-3 font-semibold text-gray-600">Plan</th>
+              <th scope="col" className="text-center px-4 py-3 font-semibold text-gray-600">Estado</th>
+              <th scope="col" className="text-left px-4 py-3 font-semibold text-gray-600">Suscripción</th>
               <th scope="col" className="text-center px-4 py-3 font-semibold text-gray-600">Acciones</th>
             </tr>
           </thead>
           <tbody>
             {filtered.map((n) => {
-              const porVencer = mostrarPorVencer(n);
+              const info = infoSuscripcion(n);
               return (
-                <tr key={n.id} className="border-b border-gray-100 hover:bg-gray-50 transition">
+                <tr key={n.id} className={`border-b border-gray-100 hover:bg-gray-50 transition ${seleccionados.has(n.id) ? 'bg-blue-50/50' : ''}`}>
+                  {!filter.includes('papelera') && (
+                    <td className="px-4 py-3">
+                      <input
+                        type="checkbox"
+                        checked={seleccionados.has(n.id)}
+                        onChange={() => toggleUno(n.id)}
+                        aria-label={`Seleccionar ${n.nombre_negocio}`}
+                        className="w-4 h-4 accent-emerald-600"
+                      />
+                    </td>
+                  )}
                   <td className="px-4 py-3 font-medium">{n.nombre_negocio}</td>
                   <td className="px-4 py-3 text-gray-500">{n.email}</td>
-                  <td className="px-4 py-3 text-gray-500">{n.telefono || '—'}</td>
                   <td className="px-4 py-3 text-center">
-                    <span
-                      className={`inline-flex px-2 py-1 rounded-full text-xs font-semibold ${
-                        n.deleted_at
-                          ? 'bg-gray-200 text-gray-600'
-                          : porVencer
-                            ? 'bg-amber-100 text-amber-700'
-                            : n.activo
-                              ? 'bg-emerald-100 text-emerald-700'
-                              : 'bg-gray-100 text-gray-500'
-                      }`}
-                    >
-                      {n.deleted_at
-                        ? 'Papelera'
-                        : porVencer
-                          ? 'Por vencer'
-                          : n.activo
-                            ? 'Activo'
-                            : 'Inactivo'}
+                    <span className="text-xs font-semibold text-gray-700">
+                      {labelPlan(n.plan)}
                     </span>
                   </td>
-                  <td className="px-4 py-3 text-gray-500 text-xs">
-                    {fechaCorta(n.fecha_registro)}
-                  </td>
-                  <td className="px-4 py-3 text-gray-500 text-xs">
-                    {fechaCorta(n.fecha_expiracion)}
-                  </td>
                   <td className="px-4 py-3 text-center">
-                    <span className="capitalize text-xs font-medium">{n.plan}</span>
+                    <span className={`inline-flex px-2 py-1 rounded-full text-xs font-semibold ${CLASES_BADGE[info.estado]}`}>
+                      {info.etiqueta}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3 text-xs text-gray-600">
+                    {info.detalle}
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex items-center justify-center gap-2">
                       {n.deleted_at ? (
                         <>
-                          <div className="flex flex-col items-center gap-0.5">
-                            <span className="text-xs text-gray-500 italic">
-                              {fechaCorta(n.deleted_at)}
-                            </span>
-                            <span className="text-[11px] text-amber-600 italic">
-                              Restáuralo para activar/renovar
-                            </span>
-                          </div>
                           <button
                             onClick={() => handleRestaurar(n.id)}
                             className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-50 text-emerald-600 hover:bg-emerald-100 transition"
@@ -369,7 +523,7 @@ export default function NegociosTable({
             })}
             {filtered.length === 0 && (
               <tr>
-                <td colSpan={8} className="px-4 py-8 text-center text-gray-500">
+                <td colSpan={7} className="px-4 py-8 text-center text-gray-500">
                   No se encontraron negocios
                 </td>
               </tr>
@@ -452,10 +606,14 @@ export default function NegociosTable({
                   >
                     {PLANES_VALIDOS.map((p) => (
                       <option key={p} value={p}>
-                        {p.charAt(0).toUpperCase() + p.slice(1)}
+                        {DESCRIPCION_PLAN[p]}
                       </option>
                     ))}
                   </select>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Para dar una prueba: no toques el plan, solo deja "Desactivado" y
+                    pon la fecha de expiración 15 días adelante.
+                  </p>
                 </div>
                 <div>
                   <label htmlFor="modal-expiracion" className="block text-sm font-medium text-gray-600 mb-1">
@@ -468,6 +626,29 @@ export default function NegociosTable({
                     value={expiracion}
                     onChange={(e) => setExpiracion(e.target.value)}
                   />
+                  <div className="flex gap-2 mt-2">
+                    <button
+                      type="button"
+                      onClick={() => presetFecha(15)}
+                      className="px-3 py-1 border border-gray-300 rounded-lg text-xs text-gray-600 hover:bg-gray-50 transition"
+                    >
+                      Hoy + 15 días
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => presetFecha(30)}
+                      className="px-3 py-1 border border-gray-300 rounded-lg text-xs text-gray-600 hover:bg-gray-50 transition"
+                    >
+                      Hoy + 30 días
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => presetFecha(90)}
+                      className="px-3 py-1 border border-gray-300 rounded-lg text-xs text-gray-600 hover:bg-gray-50 transition"
+                    >
+                      Hoy + 90 días
+                    </button>
+                  </div>
                 </div>
               </div>
             ) : (
