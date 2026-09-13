@@ -53,9 +53,9 @@ export async function PATCH(request: NextRequest) {
     }
 
     const { id, estado, respuesta_admin } = body;
-    const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-    if (!id || typeof id !== 'string' || !UUID_RE.test(id)) {
-      return NextResponse.json({ error: 'Falta id válido (UUID)' }, { status: 400 });
+    const ticketId = Number(id);
+    if (!id || !Number.isInteger(ticketId) || ticketId <= 0) {
+      return NextResponse.json({ error: 'Falta id válido (entero)' }, { status: 400 });
     }
 
     const estadosValidos = ['abierto', 'en_progreso', 'resuelto', 'cerrado'];
@@ -79,7 +79,7 @@ export async function PATCH(request: NextRequest) {
     const { error } = await supabaseAdmin
       .from('soporte_tickets')
       .update(update)
-      .eq('id', id);
+      .eq('id', ticketId);
 
     if (error) { console.error('API error:', error); return NextResponse.json({ error: 'Error interno' }, { status: 500 }); }
     return NextResponse.json({ ok: true });

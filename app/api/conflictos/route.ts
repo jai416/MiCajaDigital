@@ -53,9 +53,9 @@ export async function PATCH(request: NextRequest) {
     }
 
     const { id, resuelto, accion } = body;
-    const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-    if (!id || typeof id !== 'string' || !UUID_RE.test(id)) {
-      return NextResponse.json({ error: 'Falta id válido (UUID)' }, { status: 400 });
+    const conflictoId = Number(id);
+    if (!id || !Number.isInteger(conflictoId) || conflictoId <= 0) {
+      return NextResponse.json({ error: 'Falta id válido (entero)' }, { status: 400 });
     }
     if (resuelto !== undefined && typeof resuelto !== 'boolean') {
       return NextResponse.json({ error: 'resuelto debe ser boolean' }, { status: 400 });
@@ -75,7 +75,7 @@ export async function PATCH(request: NextRequest) {
     const { error } = await supabaseAdmin
       .from('conflictos_log')
       .update(update)
-      .eq('id', id);
+      .eq('id', conflictoId);
 
     if (error) { console.error('API error:', error); return NextResponse.json({ error: 'Error interno' }, { status: 500 }); }
     return NextResponse.json({ ok: true });

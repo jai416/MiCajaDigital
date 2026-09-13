@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { fechaHora } from '@/lib/formato';
 
 interface Conflicto {
-  id: string;
+  id: number;
   tabla: string;
   row_id: string;
   user_id: string | null;
@@ -23,7 +23,7 @@ export default function ConflictosPage() {
   const [total, setTotal] = useState(0);
   const [totalPaginas, setTotalPaginas] = useState(1);
   const [cargado, setCargado] = useState(false);
-  const [resolviendoId, setResolviendoId] = useState<string | null>(null);
+  const [resolviendoId, setResolviendoId] = useState<number | null>(null);
   const [feedback, setFeedback] = useState('');
 
   useEffect(() => {
@@ -53,7 +53,7 @@ export default function ConflictosPage() {
 
   useEffect(() => { cargar(1); }, [soloPendientes]);
 
-  const resolver = async (id: string) => {
+  const resolver = async (id: number) => {
     setResolviendoId(id);
     try {
       const res = await fetch('/api/conflictos', {
