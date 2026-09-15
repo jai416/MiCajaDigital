@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
 import { getSession } from '@/lib/auth';
+import { registrarAccion } from '@/lib/audit';
 
 export const dynamic = 'force-dynamic';
 
@@ -85,6 +86,12 @@ export async function POST(request: NextRequest) {
   });
 
   if (error) { console.error('API error:', error); return NextResponse.json({ error: 'Error interno' }, { status: 500 }); }
+
+  await registrarAccion('mensaje_enviado', 'mensaje', null, {
+    user_id,
+    titulo: titulo.trim(),
+  }, request.headers.get('x-real-ip') || request.headers.get('x-forwarded-for')?.split(',')[0]?.trim(), request.headers.get('user-agent') || undefined);
+
   return NextResponse.json({ ok: true });
 }
 

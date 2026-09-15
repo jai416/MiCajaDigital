@@ -126,8 +126,8 @@ npm run test:e2e
 - Se corrigieron los IDs `BIGINT` de mensajes y el filtro de
   `suscripcion_eventos` en el backup por negocio.
 - Las mutaciones de códigos y backups validan UUID antes de consultar Supabase.
-- `npx tsc --noEmit` y `npm run build` pasan. Las pruebas Playwright no pudieron
-  ejecutarse porque el binario `playwright` no está instalado en `admin/node_modules`.
+- `npx tsc --noEmit` y `npm run build` pasan. Para Playwright: `npm install` (ya
+  en devDependencies) y `npx playwright install chromium` (una vez).
 
 ### API backup/export
 
