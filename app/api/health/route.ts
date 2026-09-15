@@ -87,7 +87,7 @@ export async function GET() {
         const texto = await vFile.text();
         const remoto = JSON.parse(texto);
         const ESPERADA = process.env.APP_VERSION || '1.3.3';
-        const codigoEsperado = Number(process.env.APP_VERSION_CODE || '2020');
+        const codigoEsperado = Number(process.env.APP_VERSION_CODE || '2021');
         const codigoOk = remoto.version === ESPERADA &&
           Number(remoto.versionCode) === codigoEsperado &&
           typeof remoto.url === 'string' && remoto.url.length > 0 &&
