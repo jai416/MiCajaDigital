@@ -10,7 +10,7 @@ export async function POST() {
     if (!s) return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
 
     const version = process.env.APP_VERSION || '1.3.3';
-    const versionCode = parseInt(process.env.APP_VERSION_CODE || '2020', 10);
+    const versionCode = parseInt(process.env.APP_VERSION_CODE || '2021', 10);
 
     const versionData = {
       version,

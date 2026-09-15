@@ -45,7 +45,7 @@ export async function GET() {
 
     checks.supabase = {
       ok: !error,
-      detalle: error ? error.message : 'Conexión a Supabase OK (tabla negocios accesible)',
+      detalle: error ? 'Error de conexión Supabase (detalle no expuesto)' : 'Conexión a Supabase OK (tabla negocios accesible)',
     };
   } catch (e) {
     checks.supabase = {

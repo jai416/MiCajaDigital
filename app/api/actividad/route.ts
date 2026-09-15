@@ -38,6 +38,9 @@ export async function GET(request: NextRequest) {
 
     if (negociosFiltrados) logsQuery = logsQuery.in('user_id', negociosFiltrados);
 
+    // Paginación server-side para no cargar todo en memoria
+    logsQuery = logsQuery.range(desde, desde + porPagina - 1);
+
     const { data: logsData, error: logsError, count: logsCount } = await logsQuery;
     if (logsError) { console.error('API error:', logsError); return NextResponse.json({ error: 'Error interno' }, { status: 500 }); }
 
