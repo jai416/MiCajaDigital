@@ -7,45 +7,50 @@ export const dynamic = 'force-dynamic';
 
 // GET: List messages (all users, paginated) or count unread
 export async function GET(request: NextRequest) {
-  const s = await getSession();
-  if (!s) return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
+  try {
+    const s = await getSession();
+    if (!s) return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
 
-  const sp = request.nextUrl.searchParams;
+    const sp = request.nextUrl.searchParams;
 
-  // Modo conteo: devuelve el número de mensajes no leídos
-  if (sp.get('conteo') === 'true') {
-    const { count, error } = await supabaseAdmin
+    // Modo conteo: devuelve el número de mensajes no leídos
+    if (sp.get('conteo') === 'true') {
+      const { count, error } = await supabaseAdmin
+        .from('mensajes')
+        .select('*', { count: 'exact', head: true })
+        .eq('leido', false);
+      if (error) return NextResponse.json({ conteo: 0 });
+      return NextResponse.json({ conteo: count ?? 0 });
+    }
+
+    const pagina = Math.max(1, Number(sp.get('pagina') ?? 1) || 1);
+    const porPagina = Math.min(100, Math.max(1, Number(sp.get('porPagina') ?? 50) || 50));
+    const desde = (pagina - 1) * porPagina;
+    const userId = sp.get('user_id');
+
+    let query = supabaseAdmin
       .from('mensajes')
-      .select('*', { count: 'exact', head: true })
-      .eq('leido', false);
-    if (error) return NextResponse.json({ conteo: 0 });
-    return NextResponse.json({ conteo: count ?? 0 });
+      .select('*', { count: 'exact' })
+      .order('created_at', { ascending: false })
+      .range(desde, desde + porPagina - 1);
+
+    if (userId) {
+      query = query.eq('user_id', userId);
+    }
+
+    const { data, error, count } = await query;
+    if (error) { console.error('API error:', error); return NextResponse.json({ error: 'Error interno' }, { status: 500 }); }
+
+    return NextResponse.json({
+      data: data ?? [],
+      total: count ?? 0,
+      pagina,
+      totalPaginas: Math.ceil((count ?? 0) / porPagina),
+    });
+  } catch (e) {
+    console.error('API error:', e);
+    return NextResponse.json({ error: 'Error interno' }, { status: 500 });
   }
-
-  const pagina = Math.max(1, Number(sp.get('pagina') ?? 1));
-  const porPagina = Math.min(100, Math.max(1, Number(sp.get('porPagina') ?? 50)));
-  const desde = (pagina - 1) * porPagina;
-  const userId = sp.get('user_id');
-
-  let query = supabaseAdmin
-    .from('mensajes')
-    .select('*', { count: 'exact' })
-    .order('created_at', { ascending: false })
-    .range(desde, desde + porPagina - 1);
-
-  if (userId) {
-    query = query.eq('user_id', userId);
-  }
-
-  const { data, error, count } = await query;
-  if (error) { console.error('API error:', error); return NextResponse.json({ error: 'Error interno' }, { status: 500 }); }
-
-  return NextResponse.json({
-    data: data ?? [],
-    total: count ?? 0,
-    pagina,
-    totalPaginas: Math.ceil((count ?? 0) / porPagina),
-  });
 }
 
 // POST: Send a message to a user

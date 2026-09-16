@@ -70,9 +70,10 @@ export async function GET() {
         ? { ok: true, detalle: 'Bucket config (OTA) listo' }
         : { ok: false, detalle: configBucket.error ?? 'Bucket config no disponible' };
     } catch (e) {
+      console.error('health/storage:', e);
       checks.storage = {
         ok: false,
-        detalle: e instanceof Error ? e.message : 'Error al verificar storage',
+        detalle: 'Error al verificar storage (detalle no expuesto)',
       };
     }
 
@@ -82,7 +83,7 @@ export async function GET() {
         .from('config')
         .download('version.json');
       if (vErr) {
-        checks.versionJson = { ok: false, detalle: `No se pudo leer config/version.json: ${vErr.message}` };
+        checks.versionJson = { ok: false, detalle: 'No se pudo leer config/version.json (detalle no expuesto)' };
       } else {
         const texto = await vFile.text();
         const remoto = JSON.parse(texto);
@@ -100,9 +101,10 @@ export async function GET() {
         };
       }
     } catch (e) {
+      console.error('health/version.json:', e);
       checks.versionJson = {
         ok: false,
-        detalle: e instanceof Error ? e.message : 'Error al verificar version.json',
+        detalle: 'Error al verificar version.json (detalle no expuesto)',
       };
     }
 

@@ -155,7 +155,6 @@ export async function POST(request: NextRequest) {
     // intenta insertar y, si choca (23505 unique_violation), se regenera.
     // Sin pre-consultas y sin carrera posible entre dos inserts simultáneos.
     const emailNormalizado = email.trim().toLowerCase();
-    let ultimoError: string | null = null;
     for (let intento = 0; intento < 5; intento++) {
       const { data, error } = await supabaseAdmin
         .from('codigos_pago')
@@ -187,7 +186,6 @@ export async function POST(request: NextRequest) {
         console.error('POST /api/codigos insert error:', error.message);
         return NextResponse.json({ error: 'Error interno' }, { status: 500 });
       }
-      ultimoError = error.message;
     }
     // Prácticamente imposible (32^8 combinaciones), pero respondemos honesto.
     return NextResponse.json(

@@ -32,6 +32,7 @@ export default function LogsPage() {
 
   const [filtroNivel, setFiltroNivel] = useState('todos');
   const [filtroBuscar, setFiltroBuscar] = useState('');
+  const [buscarInput, setBuscarInput] = useState('');
 
   const cargar = useCallback(async (p: number = 1) => {
     try {
@@ -57,6 +58,12 @@ export default function LogsPage() {
 
   useEffect(() => { cargar(1); }, [cargar]);
   useEffect(() => { setSeleccion(new Set()); }, [pagina]);
+
+  // Debounce del campo de búsqueda: no dispara /api/logs por tecla.
+  useEffect(() => {
+    const t = setTimeout(() => setFiltroBuscar(buscarInput.trim()), 300);
+    return () => clearTimeout(t);
+  }, [buscarInput]);
 
   const toggleSeleccion = (uuid: string) => {
     setSeleccion((prev) => {
@@ -154,12 +161,12 @@ export default function LogsPage() {
           <option value="info">Info</option>
         </select>
 
-        <input type="text" value={filtroBuscar} onChange={(e) => setFiltroBuscar(e.target.value)}
+        <input type="text" value={buscarInput} onChange={(e) => setBuscarInput(e.target.value)}
           placeholder="Buscar en mensaje, email, negocio..."
           className="flex-1 min-w-[200px] px-3 py-2 border border-gray-300 rounded-lg text-sm" />
 
         {(filtroNivel !== 'todos' || filtroBuscar) && (
-          <button onClick={() => { setFiltroNivel('todos'); setFiltroBuscar(''); }}
+          <button onClick={() => { setFiltroNivel('todos'); setBuscarInput(''); setFiltroBuscar(''); }}
             className="px-3 py-2 text-xs text-gray-500 border border-gray-300 rounded-lg hover:bg-gray-50">
             Limpiar filtros
           </button>

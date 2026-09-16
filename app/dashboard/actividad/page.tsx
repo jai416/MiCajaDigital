@@ -11,8 +11,7 @@ interface ActividadNegocio {
   totalSyncs: number;
   exitosos: number;
   fallidos: number;
-  ventasSync: number;
-  gastosSync: number;
+  warnings: number;
   ultimosLogs: Array<{ nivel: string; origen: string; mensaje: string; created_at: string }>;
 }
 
@@ -105,12 +104,8 @@ export default function ActividadPage() {
                     <p className="text-[11px] text-red-600">Fallidos</p>
                   </div>
                   <div className="bg-violet-50 rounded-lg p-3">
-                    <p className="text-lg font-bold text-violet-700">{a.ventasSync}</p>
-                    <p className="text-[11px] text-violet-600">Ventas sync</p>
-                  </div>
-                  <div className="bg-pink-50 rounded-lg p-3">
-                    <p className="text-lg font-bold text-pink-700">{a.gastosSync}</p>
-                    <p className="text-[11px] text-pink-600">Gastos sync</p>
+                    <p className="text-lg font-bold text-violet-700">{a.warnings}</p>
+                    <p className="text-[11px] text-violet-600">Advertencias</p>
                   </div>
                 </div>
 

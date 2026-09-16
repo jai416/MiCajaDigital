@@ -16,7 +16,6 @@ interface Mensaje {
   mensaje: string;
   leido: boolean;
   created_at: string;
-  negocios?: { nombre_negocio: string; email: string } | null;
 }
 
 const PLANTILLAS_MENSAJES = [
@@ -53,6 +52,11 @@ export default function MensajesPage() {
   const [enviando, setEnviando] = useState(false);
   const [feedback, setFeedback] = useState('');
 
+  // El GET /api/mensajes no trae join a negocios; se resuelve con el listado
+  // ya cargado en `negocios` (todos los negocios, sin paginar por buscador).
+  const negocioDe = (user_id: string): Negocio | undefined =>
+    negocios.find((n) => String(n.id) === String(user_id));
+
   useEffect(() => {
     if (feedback) {
       const t = setTimeout(() => setFeedback(''), 3000);
@@ -80,9 +84,24 @@ export default function MensajesPage() {
 
   const cargarNegocios = async () => {
     try {
-      const res = await fetch('/api/negocios?porPagina=500&activo=todos');
-      const json = await res.json();
-      if (res.ok) setNegocios(json.data ?? []);
+      // El listado necesita TODOS los negocios (mapa de user_id → nombre).
+      // /api/negocios limita porPagina a 100, así que se pagina completo.
+      const todos: Negocio[] = [];
+      let paginaN = 1;
+      let totalPaginasN = 1;
+      while (paginaN <= totalPaginasN) {
+        const res = await fetch(`/api/negocios?porPagina=100&activo=todos&pagina=${paginaN}`);
+        const json = await res.json();
+        if (res.ok && Array.isArray(json.data)) {
+          todos.push(...json.data);
+          totalPaginasN = json.totalPaginas ?? totalPaginasN;
+        } else {
+          break;
+        }
+        if (paginaN >= totalPaginasN) break;
+        paginaN++;
+      }
+      setNegocios(todos);
     } catch { /* silent */ }
   };
 
@@ -227,10 +246,14 @@ export default function MensajesPage() {
             <div className="flex items-start justify-between gap-4">
               <div className="flex-1">
                 <div className="flex items-center gap-2 mb-2">
-                  <span className="text-sm font-semibold text-gray-800">
-                    {m.negocios?.nombre_negocio ?? '—'}
-                  </span>
-                  <span className="text-xs text-gray-400">{m.negocios?.email ?? ''}</span>
+                  {(() => { const n = negocioDe(m.user_id); return (
+                  <>
+                    <span className="text-sm font-semibold text-gray-800">
+                      {n?.nombre_negocio ?? '—'}
+                    </span>
+                    <span className="text-xs text-gray-400">{n?.email ?? ''}</span>
+                  </>
+                ); })()}
                   <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${
                     m.leido ? 'bg-gray-100 text-gray-500' : 'bg-emerald-100 text-emerald-700'
                   }`}>
