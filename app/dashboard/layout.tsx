@@ -47,6 +47,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     { href: '/dashboard/soporte', label: 'Soporte', icon: '💬' },
     { href: '/dashboard/soporte/mensajes', label: 'Mensajes', icon: '📩', badge: msgsNoLeidos },
     { href: '/dashboard/conflictos', label: 'Conflictos', icon: '⚠️' },
+    { href: '/dashboard/versiones', label: 'Versiones', icon: '📱' },
     { href: '/dashboard/logs', label: 'Logs de la app', icon: '🛠️' },
     { href: '/dashboard/health', label: 'Estado', icon: '🩺' },
   ];
