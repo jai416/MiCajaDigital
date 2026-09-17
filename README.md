@@ -53,7 +53,8 @@ npm run test:e2e        # Playwright (requiere npx playwright install chromium)
   solo puede usarse en desarrollo. El health check marca el panel como degradado si
   falta el hash en producción.
 - **OTA alineada con Flutter**: `/api/version` publica `version`, `versionCode`,
-  `url` y `mensaje`, con fallback `1.3.2+2020`, el mismo contrato que consume la app.
+  `url` y `mensaje`, con fallback `1.3.3+2021` (de `process.env.APP_VERSION` /
+  `APP_VERSION_CODE`), el mismo contrato que consume la app.
 
 ## Mantenimiento
 
