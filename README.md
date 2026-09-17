@@ -119,6 +119,9 @@ npm run test:e2e
 - `/dashboard/mensajes` — Envío de mensajes directos a usuarios (requiere
   `docs/SQL_APLICAR_TODOS.sql` §4).
 - `/dashboard/actividad` — Actividad reciente de sync por negocio.
+- `/dashboard/versiones` — Versión instalada de la app por usuaria (la app la
+  reporta al arrancar vía RPC `reportar_version_app`; requiere
+  `docs/SQL_VERSION_APP.sql`).
 
 ### Auditoría 12 sep 2026
 
