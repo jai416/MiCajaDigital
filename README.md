@@ -116,7 +116,9 @@ npm run test:e2e
 - `/dashboard/logs` — Logs de la app con eliminación individual/masiva.
 - `/dashboard/health` — Health check (buckets, conexión, sesión).
 - `/dashboard/soporte` — Tickets de soporte (requiere migración §A).
-- `/dashboard/conflictos` — Log de conflictos de sync (requiere migración §B).
+- `/dashboard/conflictos` — Resolución de conflictos de sync: contexto (usuario,
+  fila actual en la nube), reparación por campo y acciones explícitas (requiere
+  migración §B).
 - `/dashboard/mensajes` — Envío de mensajes directos a usuarios (requiere
   `docs/SQL_APLICAR_TODOS.sql` §4).
 - `/dashboard/actividad` — Actividad reciente de sync por negocio.
