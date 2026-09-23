@@ -53,7 +53,7 @@ npm run test:e2e        # Playwright (requiere npx playwright install chromium)
   solo puede usarse en desarrollo. El health check marca el panel como degradado si
   falta el hash en producción.
 - **OTA alineada con Flutter**: `/api/version` publica `version`, `versionCode`,
-  `url` y `mensaje`, con fallback `1.3.3+2021` (de `process.env.APP_VERSION` /
+  `url` y `mensaje`, con fallback `1.3.4+2022` (de `process.env.APP_VERSION` /
   `APP_VERSION_CODE`), el mismo contrato que consume la app.
 
 ## Mantenimiento
@@ -156,3 +156,50 @@ npm run test:e2e
 - **Restauración**: `gunzip -c archivo.sql.gz | psql "$STAGING_DB_URL"`.
 - **Prueba de restauración**: `scripts/test_backup_restore.sh` (verifica las 7 tablas principales).
 - Guía completa de setup: **`docs/BACKUP_SETUP.md`** (raíz del proyecto Flutter).
+
+## Notificaciones Telegram
+
+El panel envía notificaciones al admin vía Telegram cuando ocurren eventos clave
+(pagos confirmados, backups, tickets de soporte, health check fallando).
+
+### Variables de entorno necesarias
+
+```bash
+# URL base del Worker proxy (Cuba bloquea api.telegram.org)
+TELEGRAM_PROXY_URL=https://tu-worker.workers.dev
+# Token del bot (@BotFather)
+TELEGRAM_BOT_TOKEN=8858641490:AAH222...
+# Chat ID privado del admin
+TELEGRAM_CHAT_ID=6988595915
+# Secreto para proteger el cron (generar con: openssl rand -hex 32)
+CRON_SECRET=c0bff979...
+```
+
+### Puntos de notificación
+
+| Evento | Endpoint | Cuándo |
+|--------|----------|--------|
+| Pago confirmado | `PATCH /api/codigos` | `estado_pago = 'confirmado'` |
+| Backup manual | `POST /api/backup` | Al generar el JSON |
+
+### Cron de notificaciones
+
+`GET /api/cron/notificaciones` — protegido con `Authorization: Bearer ${CRON_SECRET}`.
+
+Chequeos (cada 15 min):
+1. Pruebas por vencer mañana
+2. Tickets de soporte nuevos (últimos 15 min)
+3. Health check del panel
+4. Códigos por vencer (3 días)
+
+**Programar el cron:**
+- **Render**: si el plan lo permite, crear un Cron Job apuntando a
+  `GET https://tu-panel.onrender.com/api/cron/notificaciones` con header
+  `Authorization: Bearer <CRON_SECRET>`, cada 15 minutos.
+- **GitHub Actions** (alternativa): añadir un workflow que haga `curl` cada 15 min.
+
+### Fail-safe
+
+- Si falta cualquier env var, las notificaciones se ignoran silenciosamente.
+- Si el Worker proxy o Telegram fallan, el panel sigue funcionando igual.
+- Los errores se loguean con `console.error` (sin propagar al caller).

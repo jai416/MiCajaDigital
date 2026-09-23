@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
 import { getSession } from '@/lib/auth';
 import { registrarAccion } from '@/lib/audit';
+import { notificarTelegram } from '@/lib/telegram';
 
 export const dynamic = 'force-dynamic';
 
@@ -147,13 +148,18 @@ export async function POST(request: NextRequest) {
       ua
     );
 
-    // Devolver el JSON como archivo descargable
+    // Notificar al admin por Telegram
     const json = JSON.stringify(backup, null, 2);
     const fecha = exportedAt.slice(0, 10);
     const nombre = negocioId
       ? `micajadigital_backup_${negocioId.slice(0, 8)}_${fecha}.json`
       : `micajadigital_backup_${fecha}.json`;
+    const kb = Math.round(json.length / 1024);
+    notificarTelegram(
+      `💾 <b>Backup manual OK</b>\nArchivo: ${nombre}\nTablas: ${TABLAS.length}\nTamaño: ${kb} KB`
+    );
 
+    // Devolver el JSON como archivo descargable
     return new NextResponse(json, {
       status: 200,
       headers: {

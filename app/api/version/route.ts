@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
 import { getSession } from '@/lib/auth';
+import { getAppVersion, getVersionCode } from '@/lib/version';
 
 export const dynamic = 'force-dynamic';
 
@@ -9,8 +10,8 @@ export async function POST() {
     const s = await getSession();
     if (!s) return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
 
-    const version = process.env.APP_VERSION || '1.3.3';
-    const versionCode = parseInt(process.env.APP_VERSION_CODE || '2021', 10);
+    const version = getAppVersion();
+    const versionCode = getVersionCode();
 
     const versionData = {
       version,

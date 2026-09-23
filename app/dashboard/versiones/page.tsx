@@ -1,10 +1,11 @@
 import { supabaseAdmin } from '@/lib/supabase';
 import { requireSession } from '@/lib/auth';
 import { fechaHora } from '@/lib/formato';
+import { getAppVersion } from '@/lib/version';
 
 export const dynamic = 'force-dynamic';
 
-const VERSION_ESPERADA = process.env.APP_VERSION || '1.3.3';
+const VERSION_ESPERADA = getAppVersion();
 
 interface NegocioVersion {
   id: string;

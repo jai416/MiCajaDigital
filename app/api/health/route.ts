@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
 import { getSession } from '@/lib/auth';
+import { getAppVersion, getVersionCode } from '@/lib/version';
 
 export const dynamic = 'force-dynamic';
 
@@ -90,8 +91,8 @@ export async function GET() {
       } else {
         const texto = await vFile.text();
         const remoto = JSON.parse(texto);
-        const ESPERADA = process.env.APP_VERSION || '1.3.3';
-        const codigoEsperado = Number(process.env.APP_VERSION_CODE || '2021');
+        const ESPERADA = getAppVersion();
+        const codigoEsperado = getVersionCode();
         const codigoOk = remoto.version === ESPERADA &&
           Number(remoto.versionCode) === codigoEsperado &&
           typeof remoto.url === 'string' && remoto.url.length > 0 &&

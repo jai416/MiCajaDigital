@@ -4,6 +4,7 @@ import { supabaseAdmin } from '@/lib/supabase';
 import { getSession } from '@/lib/auth';
 import precios from '@config/precios.json';
 import { registrarAccion } from '@/lib/audit';
+import { notificarTelegram, escaparTelegram } from '@/lib/telegram';
 
 const PRECIOS: Record<string, Record<string, number>> = precios.planes;
 
@@ -215,6 +216,18 @@ export async function PATCH(request: NextRequest) {
     if (!['confirmado', 'rechazado', 'pendiente', 'expirado'].includes(estado_pago)) {
       return NextResponse.json({ error: 'estado_pago no válido' }, { status: 400 });
     }
+
+    // Fetch detalles del código ANTES del update (para la notificación)
+    let codigoInfo: { email?: string; plan?: string; duracion_meses?: number; codigo?: string } = {};
+    if (estado_pago === 'confirmado') {
+      const { data } = await supabaseAdmin
+        .from('codigos_pago')
+        .select('email, plan, duracion_meses, codigo')
+        .eq('id', id)
+        .single();
+      if (data) codigoInfo = data;
+    }
+
     const { error } = await supabaseAdmin
       .from('codigos_pago')
       .update({ estado_pago })
@@ -225,6 +238,18 @@ export async function PATCH(request: NextRequest) {
     }
     await registrarAccion('codigo_estado_pago', 'codigo_pago', id, { estado_pago },
       request.headers.get('x-real-ip') || request.headers.get('x-forwarded-for')?.split(',')[0]?.trim(), request.headers.get('user-agent') || undefined);
+
+    // Notificar al admin por Telegram solo al confirmar pago
+    if (estado_pago === 'confirmado' && codigoInfo.email) {
+      const email = escaparTelegram(codigoInfo.email);
+      const plan = escaparTelegram(codigoInfo.plan ?? '—');
+      const duracion = codigoInfo.duracion_meses ?? 1;
+      const codigo = escaparTelegram(codigoInfo.codigo ?? id.slice(0, 8));
+      notificarTelegram(
+        `💰 <b>Código canjeado</b>\nEmail: ${email}\nPlan: ${plan} (${duracion} meses)\nCódigo: ${codigo}`
+      );
+    }
+
     return NextResponse.json({ ok: true });
   } catch {
     return NextResponse.json({ error: 'Error interno' }, { status: 500 });

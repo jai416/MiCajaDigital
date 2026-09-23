@@ -31,7 +31,7 @@ function valoresIguales(a: string, b: string): boolean {
 // SIEMPRE aunque el email ya haya fallado para igualar el tiempo de CPU y no
 // delatar por timing si el email del admin es el correcto.
 const HASH_SENUELO =
-  'scrypt$16384$8$1$0123456789abcdef0123456789abcdef:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef';
+  'scrypt:16384:8:1:0123456789abcdef0123456789abcdef:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef';
 
 function verificarHash(password: string, hash: string): boolean {
   // Formato scrypt:N:r:p:salt_hex:hash_hex (sin '$', ver nota arriba).
