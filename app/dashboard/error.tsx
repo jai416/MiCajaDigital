@@ -13,7 +13,7 @@ export default function DashboardError({
         Algo falló al cargar esta sección.
       </p>
       <p className="max-w-md text-sm text-gray-500">
-        {error.message || 'Error desconocido'}
+        Ocurrió un error inesperado. Consulta la consola del navegador para más detalles.
       </p>
       <button
         onClick={reset}

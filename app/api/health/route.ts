@@ -48,9 +48,12 @@ export async function GET() {
       detalle: error ? 'Error de conexión Supabase (detalle no expuesto)' : 'Conexión a Supabase OK (tabla negocios accesible)',
     };
   } catch (e) {
+    // Detalle real solo a logs del servidor; la respuesta no expone el
+    // mensaje crudo (mismo patrón sanitizado que el resto de /api/*).
+    console.error('health/supabase:', e);
     checks.supabase = {
       ok: false,
-      detalle: e instanceof Error ? e.message : 'Error de red al conectar con Supabase',
+      detalle: 'Error de red al conectar con Supabase (detalle en logs del servidor)',
     };
   }
 
