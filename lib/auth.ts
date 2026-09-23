@@ -3,22 +3,16 @@ import { redirect } from 'next/navigation';
 import { timingSafeEqual, scryptSync } from 'crypto';
 import { SESSION_COOKIE, SESSION_TTL_MS, crearValorSesion, verificarValorSesion } from './session';
 
-const ADMIN_EMAIL = process.env.ADMIN_EMAIL!;
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD!;
-// Hash generado con scripts/hash_password.mjs (formato
-// scrypt:N:r:p:salt_hex:hash_hex, sin '$' porque @next/env lo expandiría).
-// Si está definido, se prefiere sobre ADMIN_PASSWORD (fallback por compatibilidad).
-const ADMIN_PASSWORD_HASH = process.env.ADMIN_PASSWORD_HASH;
-
-if (
-  process.env.NODE_ENV === 'production' &&
-  !ADMIN_PASSWORD_HASH
-) {
-  throw new Error(
-    'ADMIN_PASSWORD_HASH ausente en producción. Genera el hash con ' +
-      '`node scripts/hash_password.mjs <clave>` y elimina ADMIN_PASSWORD.'
-  );
-}
+// ──────────────────────────────────────────────────────────────────────────
+// IMPORTANTE: NADA de leer env vars ni lanzar errores a nivel de módulo.
+// Durante `next build`, Next.js importa los route handlers para analizarlos,
+// y con NODE_ENV=production + vars no presentes en build time, cualquier
+// throw o acceso `!` explotaba con "Failed to collect page data for /api/...".
+//
+// Ahora todo se lee dentro de las funciones que lo usan (verifyCredentials).
+// El fail-fast de producción se conserva, pero solo se dispara cuando alguien
+// intenta loguearse — no cuando Render compila.
+// ──────────────────────────────────────────────────────────────────────────
 
 function valoresIguales(a: string, b: string): boolean {
   const bufA = Buffer.from(a);
@@ -51,16 +45,33 @@ function verificarHash(password: string, hash: string): boolean {
 }
 
 export function verifyCredentials(email: string, password: string): boolean {
-  const emailOk = valoresIguales(email, ADMIN_EMAIL);
+  // Lazy: leer env aquí, no a nivel de módulo.
+  const adminEmail = process.env.ADMIN_EMAIL;
+  const adminPassword = process.env.ADMIN_PASSWORD;
+  const adminPasswordHash = process.env.ADMIN_PASSWORD_HASH;
+
+  if (!adminEmail) {
+    throw new Error('ADMIN_EMAIL ausente. Configúralo en .env.local o en el hosting.');
+  }
+
+  // Fail-fast de producción: SOLO al intentar loguear, no al importar.
+  if (process.env.NODE_ENV === 'production' && !adminPasswordHash) {
+    throw new Error(
+      'ADMIN_PASSWORD_HASH ausente en producción. Genera el hash con ' +
+        '`node scripts/hash_password.mjs <clave>` y elimina ADMIN_PASSWORD.'
+    );
+  }
+
+  const emailOk = valoresIguales(email, adminEmail);
   let passOk: boolean;
-  if (ADMIN_PASSWORD_HASH) {
+  if (adminPasswordHash) {
     // scrypt corre siempre (~100 ms): da igual qué campo falló.
-    passOk = verificarHash(password, ADMIN_PASSWORD_HASH);
+    passOk = verificarHash(password, adminPasswordHash);
   } else {
     // Sin hash real, quema el mismo tiempo de CPU con el señuelo antes de la
     // comparación plana para que el tiempo total no filtre información.
     verificarHash(password, HASH_SENUELO);
-    passOk = valoresIguales(password, ADMIN_PASSWORD);
+    passOk = !!adminPassword && valoresIguales(password, adminPassword);
   }
   return emailOk && passOk;
 }
