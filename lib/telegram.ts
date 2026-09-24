@@ -83,7 +83,7 @@ export async function enviarTelegram(
     if (!res.ok) {
       const detalle = await res.text();
       console.error(`[telegram] HTTP ${res.status}: ${detalle}`);
-      return { ok: false, motivo: `HTTP ${res.status} desde el proxy` };
+      return { ok: false, motivo: `HTTP ${res.status} (proxy ${TELEGRAM_PROXY_URL.replace('https://', '')})` };
     }
     return { ok: true };
   } catch (e) {
