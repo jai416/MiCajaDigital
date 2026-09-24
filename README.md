@@ -198,6 +198,22 @@ Chequeos (cada 15 min):
   `Authorization: Bearer <CRON_SECRET>`, cada 15 minutos.
 - **GitHub Actions** (alternativa): añadir un workflow que haga `curl` cada 15 min.
 
+### Verificación del Worker antes de desplegar
+
+En el proyecto del Worker Cloudflare (no en `admin/`):
+
+```bash
+rm -rf node_modules package-lock.json
+npm install
+# Debe terminar sin errores ERESOLVE
+npx wrangler deploy --dry-run
+# Debe pasar sin error → haz el deploy real
+npx wrangler deploy
+```
+
+**Nota:** El Worker son ~30 líneas. No necesita ESLint (añádelo solo cuando crezca
+a ~200 líneas para reducir superficie de fallo).
+
 ### Fail-safe
 
 - Si falta cualquier env var, las notificaciones se ignoran silenciosamente.
