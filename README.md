@@ -196,11 +196,40 @@ Chequeos (cada 15 min):
 3. Health check del panel
 4. Códigos por vencer (3 días)
 
-**Programar el cron:**
-- **Render**: si el plan lo permite, crear un Cron Job apuntando a
-  `GET https://tu-panel.onrender.com/api/cron/notificaciones` con header
-  `Authorization: Bearer <CRON_SECRET>`, cada 15 minutos.
-- **GitHub Actions** (alternativa): añadir un workflow que haga `curl` cada 15 min.
+**Programar el cron:** el disparador vive en GitHub Actions
+(`.github/workflows/cron-notificaciones.yml`, schedule `*/15 * * * *`,
+environment `backups`). El workflow hace `curl` al endpoint con el Bearer. Para
+que corra, el secret `CRON_SECRET` debe existir en
+Settings → Environments → `backups`. (Alternativa en Render si el plan lo
+permite: Cron Job apuntando a la misma URL con el header.)
+
+### Bot de Telegram (comandos del admin)
+
+`POST /api/bot/webhook` — endpoint de los updates del bot. Validaciones:
+`x-telegram-bot-api-secret-token === CRON_SECRET` y `chat.id ===
+TELEGRAM_CHAT_ID` (solo el admin). Respuesta `{ok:true}` inmediata y
+procesamiento en segundo plano.
+
+**14 comandos**: `/resumen`, `/ventas_hoy`, `/clienta <email>`, `/deudoras`,
+`/nuevas`, `/vencen`, `/inactivas`, `/errores`, `/codigos`, `/tickets`,
+`/version`, `/salud`, `/ayuda`, `/ping`.
+
+**Registrar el webhook** (solo se hace al crear el bot o si cambia el token):
+
+```bash
+# Desde la URL del bot: setWebhook a la URL pública del panel
+curl -s "https://micajadigital-telegram-proxy.hereirajaison.workers.dev/bot<TOKEN>/setWebhook" \
+  --data-urlencode "url=https://micajadigital.onrender.com/api/bot/webhook" \
+  --data-urlencode "secret_token=<CRON_SECRET>"
+# Y de nuevo el menú de comandos:
+curl -s "https://micajadigital-telegram-proxy.hereirajaison.workers.dev/bot<TOKEN>/setMyCommands" \
+  -H "Content-Type: application/json" \
+  -d '<JSON de comandos>'
+```
+
+> ⚠️ El webhook usa **el mismo `CRON_SECRET`** como `secret_token`. Si rotas el
+> token del bot, vuelve a registrar el webhook; si rotas `CRON_SECRET`, actualiza
+> Render, el secret de GitHub (environment `backups`) y re-registra el webhook.
 
 ### Verificación del Worker antes de desplegar
 
