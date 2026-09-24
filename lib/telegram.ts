@@ -33,7 +33,20 @@ export async function notificarTelegram(
   mensaje: string,
   opciones?: { parseMode?: 'HTML' | 'MarkdownV2' }
 ): Promise<void> {
-  if (!TELEGRAM_PROXY_URL || !TELEGRAM_BOT_TOKEN || !TELEGRAM_CHAT_ID) {
+  if (!TELEGRAM_CHAT_ID) return;
+  await enviarTelegram(TELEGRAM_CHAT_ID, mensaje, opciones);
+}
+
+/**
+ * Envía un mensaje a un chat arbitrario (usado por el webhook de comandos
+ * para responder directamente al chat que escribió).
+ */
+export async function enviarTelegram(
+  chatId: string | number,
+  mensaje: string,
+  opciones?: { parseMode?: 'HTML' | 'MarkdownV2' }
+): Promise<void> {
+  if (!TELEGRAM_PROXY_URL || !TELEGRAM_BOT_TOKEN) {
     return;
   }
 
@@ -48,7 +61,7 @@ export async function notificarTelegram(
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        chat_id: TELEGRAM_CHAT_ID,
+        chat_id: chatId,
         text: mensaje,
         parse_mode: parseMode,
       }),
@@ -61,6 +74,6 @@ export async function notificarTelegram(
       console.error(`[telegram] HTTP ${res.status}: ${await res.text()}`);
     }
   } catch (e) {
-    console.error('[telegram] Error enviando notificación:', e);
+    console.error('[telegram] Error enviando mensaje:', e);
   }
 }
