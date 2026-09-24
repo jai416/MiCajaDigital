@@ -167,13 +167,17 @@ El panel envía notificaciones al admin vía Telegram cuando ocurren eventos cla
 ```bash
 # URL base del Worker proxy (Cuba bloquea api.telegram.org)
 TELEGRAM_PROXY_URL=https://tu-worker.workers.dev
-# Token del bot (@BotFather)
-TELEGRAM_BOT_TOKEN=8858641490:AAH222...
+# Token del bot (@BotFather) — se rota desde BotFather /revoke si se filtra
+TELEGRAM_BOT_TOKEN=<token-de-@BotFather>
 # Chat ID privado del admin
-TELEGRAM_CHAT_ID=6988595915
+TELEGRAM_CHAT_ID=<tu-chat-id>
 # Secreto para proteger el cron (generar con: openssl rand -hex 32)
-CRON_SECRET=c0bff979...
+CRON_SECRET=<genera-con-openssl-rand-hex-32>
 ```
+
+> ⚠️ **NUNCA commitees valores reales de `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`
+> o `CRON_SECRET`.** Este README se sube a GitHub. Usa placeholders y deja los
+> valores reales en `.env.local` (gitignored) y en los secrets del hosting.
 
 ### Puntos de notificación
 
