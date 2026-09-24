@@ -1,0 +1,65 @@
+# ============================================================
+# Cron de notificaciones Telegram — cada 15 min
+# ============================================================
+# Llama al endpoint del panel (Render):
+#   GET https://micajadigital.onrender.com/api/cron/notificaciones
+# que chequea: pruebas por vencer, tickets nuevos, health y códigos.
+# GitHub Actions actúa como disparador periódico (call) y el panel
+# hace el trabajo real con su CRON_SECRET.
+#
+# Costo: $0 (reuso del free tier de Actions; ~96 ejecuciones/día →
+# ~5-7 min/día de runtime, muy por debajo de los 2000 min/mes).
+#
+# Secrets del repo (Settings → Secrets and variables → Actions):
+#   - CRON_SECRET → el MISMO valor que vive en Render (env var
+#     CRON_SECRET del panel). Si se rotan, actualizar ambos sitios.
+#
+# NOTA importante: GitHub Actions NO es un cron de precisión real.
+# El scheduler de Actions puede retrasar la ejecución algunos minutos
+# (no es un disparo exacto a :00/:15/:30/:45). Para notificaciones
+# es aceptable; si algún día se necesita precisión al segundo, mover
+# el disparo a Render Cron Jobs (New → Cron Job → URL del endpoint).
+# ============================================================
+
+name: Cron Notificaciones Telegram
+
+on:
+  # Cada 15 minutos. GitHub usa reloj UTC y acepta la sintaxis estándar.
+  schedule:
+    - cron: '*/15 * * * *'
+  # Permite probarlo a mano: Actions → Cron Notificaciones → Run workflow.
+  workflow_dispatch:
+
+concurrency:
+  group: cron-notificaciones
+  cancel-in-progress: false
+
+jobs:
+  notificar:
+    runs-on: ubuntu-latest
+    environment: backups
+    timeout-minutes: 10
+
+    steps:
+      # --------------------------------------------------------
+      # Llamar al cron del panel con el Bearer del CRON_SECRET.
+      # Sin checkout: solo es una petición HTTP saliente.
+      # --------------------------------------------------------
+      - name: Llamar al cron de notificaciones
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          if [ -z "$CRON_SECRET" ]; then
+            echo "::error::Falta el secret CRON_SECRET en el environment 'backups'."
+            echo "::error::Añádelo en Settings → Environments → backups → Environment secrets."
+            exit 1
+          fi
+          CODE=$(curl -s -o /tmp/cron_resp.json -w "%{http_code}" --max-time 60 \
+            -H "Authorization: Bearer $CRON_SECRET" \
+            "https://micajadigital.onrender.com/api/cron/notificaciones")
+          echo "HTTP status: $CODE"
+          echo "Respuesta: $(cat /tmp/cron_resp.json)"
+          if [ "$CODE" != "200" ]; then
+            echo "::error::El cron respondió $CODE — revisa Render/CRON_SECRET."
+            exit 1
+          fi
