@@ -16,8 +16,15 @@ export default defineConfig({
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
   webServer: {
     command: 'npm run dev',
-    url: 'http://localhost:3000/api/health',
+    // OJO: la sonda de "listo" NO puede ser /api/health. Esa ruta devuelve
+    // 500 a propósito cuando algo está degradado (monitorización) y Playwright
+    // solo acepta 2xx/3xx → el webServer se quedaba esperando 120 s y el job
+    // e2e moría con "Timed out waiting 120000ms from config.webServer".
+    // /login es una página estática pública: siempre 200 si el server listens.
+    url: 'http://localhost:3000/login',
     reuseExistingServer: !process.env.CI,
-    timeout: 120000,
+    // Next dev compila /middleware y la primera ruta al vuelo: con frío
+    // alrededor de 20-30 s.
+    timeout: 180000,
   },
 });
