@@ -58,6 +58,38 @@ npm run test:e2e        # Playwright (requiere npx playwright install chromium)
 
 ## Mantenimiento
 
+### Verificar los workflows antes de pushear
+
+```bash
+node scripts/verificar-workflows.mjs
+```
+
+Un workflow con YAML inválido **no arranca**: GitHub crea el run, lo marca rojo
+y no crea ningún job, así que no hay log que diga por qué (pasó entre ago y
+sep 2026: 46 runs rojos seguidos en `admin-ci.yml`). El script lo detecta en
+segundos y el workflow `verificar-workflows.yml` lo corre en cada push que
+toque `.github/workflows/**`.
+
+Trampas ya resueltas (no reintroducirlas): `name:` con dos puntos sin comillas,
+`working-directory: admin` (el repo raíz **es** el panel), `@eslint/js` en una
+major distinta a `eslint`, y la sonda de Playwright apuntando a `/api/health`
+(devuelve 500 a propósito cuando está degradado). Ver
+`docs/TROUBLESHOOTING.md` (ronda 25).
+
+### CSP y desarrollo local
+
+`next.config.js` añade `'unsafe-eval'` a `script-src` **solo** con
+`NODE_ENV=development`. Sin eso, React Refresh no hidrata, la página se queda
+sin JS y los formularios hacen submit nativo (`/login?`). En producción la CSP
+sigue estricta.
+
+### Caché del service worker
+
+`public/sw.js` nombra la caché con `?v=NEXT_PUBLIC_APP_VERSION`. Ese valor sale
+de `docs/version.json` (misma fuente que `lib/version.ts`), **no** de
+`package.json` — que estaba congelado en 1.0.0 y hacía que la caché nunca se
+invalidara al desplegar.
+
 ### Actualizar Next.js a 15.x (plan)
 
 1. Revisar el changelog: <https://nextjs.org/docs/app/building-your-application/upgrading/version-15>
@@ -106,6 +138,15 @@ detalles y login fallido. Así corren en CI sin secretos.
 npx playwright install chromium   # una vez
 npm run test:e2e
 ```
+
+En CI el panel corre contra **un Supabase inalcanzable** y por eso:
+- `NEXT_PUBLIC_SUPABASE_URL=http://127.0.0.1:9` (puerto cerrado → fallo
+  instantáneo). **No** usar `placeholder.supabase.co`: resuelve por DNS
+  wildcard y el fetch se queda esperando el TLS (~14 s por login).
+- El test del login afirma sobre la **respuesta** del `POST /api/login`
+  (401 + mensaje), no sobre el texto en pantalla, y mete `pageerror` y
+  `console.error` en el mensaje de fallo. Así un fallo dice la causa real en
+  vez de "element not found".
 
 ## Páginas del dashboard
 
