@@ -33,22 +33,36 @@ test('health público no expone detalles', async ({ request }) => {
   expect(body.status).toBeDefined();
 });
 
-/// Login con credenciales inválidas: error visible, nunca entra.
+/// Login con credenciales inválidas: la API responde 401 con el mensaje y el
+/// usuario sigue en /login (nunca entra).
 ///
-/// Timeout amplio a propósito: en CI el panel corre contra un Supabase
-/// inalcanzable (127.0.0.1:9), y cada llamada del login (rate-limit,
-/// registro de intento y auditoría) reintenta antes de rendirse. Medido en
-/// el runner: el 401 correcto llega en ~14 s. Con los 15 s por defecto el test
-/// fallaba por poco, no por un fallo del panel. En producción (Supabase real)
-/// la respuesta es inmediata.
-test('login fallido muestra error y sigue en /login', async ({ page }) => {
-  test.setTimeout(60_000);
+/// Se afirma sobre la RESPUESTA, no sobre el texto renderizado: en CI el
+/// panel corre contra un Supabase inalcanzable (127.0.0.1:9) y cada llamada
+/// del login (rate-limit, registro de intento, auditoría) reintenta antes de
+/// rendirse — el 401 correcto tarda ~14 s. Esperar a que el texto
+/// apareciera en pantalla convertía un retardo del stub en un falso negativo.
+/// El cuerpo va en el mensaje de aserción: si algún día falla, dice qué
+/// devolvió la API de verdad.
+test('login fallido devuelve 401 y deja al usuario en /login', async ({ page }) => {
+  test.setTimeout(120_000);
   await page.goto('/login');
   await page.fill('#login-email', 'intruso@ejemplo.com');
   await page.fill('#login-password', 'contraseña-errónea-123');
+
+  const respuestaLogin = page.waitForResponse(
+    (r) => r.url().includes('/api/login') && r.request().method() === 'POST',
+    { timeout: 90_000 }
+  );
   await page.getByRole('button', { name: 'Entrar' }).click();
-  await expect(page.locator('text=Credenciales incorrectas')).toBeVisible({
-    timeout: 45_000,
-  });
+
+  const res = await respuestaLogin;
+  const cuerpo = await res.text();
+  expect(
+    cuerpo,
+    `POST /api/login devolvió ${res.status()}: ${cuerpo.slice(0, 300)}`
+  ).toContain('Credenciales incorrectas');
+  expect(res.status()).toBe(401);
+
+  // Y el usuario sigue en /login (navegar a un dashboard = sesión creada).
   await expect(page).toHaveURL(/\/login$/);
 });
