@@ -29,7 +29,15 @@ const nextConfig = {
             key: 'Content-Security-Policy',
             value: [
               "default-src 'self'",
-              "script-src 'self' 'unsafe-inline'",
+              // En DESARROLLO React Refresh necesita 'unsafe-eval' para evaluar
+              // el bundle con HMR. Sin esto, el CSP bloquea la hidratación
+              // (pageerror: "Evaluating a string as JavaScript violates ...")
+              // y la página se queda sin JS: los formularios hacen submit
+              // NATIVO y ninguna llamada fetch sale nunca. Solo se permite en
+              // dev; en producción la CSP sigue igual de estricta.
+              `script-src 'self' 'unsafe-inline'${
+                process.env.NODE_ENV === 'development' ? " 'unsafe-eval'" : ''
+              }`,
               "style-src 'self' 'unsafe-inline'",
               "img-src 'self' data: blob: https://*.supabase.co",
               "font-src 'self'",
