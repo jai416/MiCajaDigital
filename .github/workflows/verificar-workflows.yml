@@ -1,0 +1,47 @@
+# ============================================================
+# Verificador de workflows (separa a propósito)
+# ============================================================
+# Por qué existe: un workflow con YAML inválido NO puede detectarlo él mismo
+# (GitHub crea un run rojo con 0 jobs y el error no aparece en la pestaña del
+# run). Este workflow es válido por definición, así que puede validar a los
+# demás en cada push que toque .github/workflows/**.
+#
+# Historia: `admin-ci.yml` estuvo roto desde 2026-08-22 por un `name:` con dos
+# puntos sin comillas → 46 runs rojos seguidos, siempre con 0 jobs. El error
+# solo se vio al validar el archivo por fuera (scripts/verificar-workflows.mjs).
+#
+# Coste: un job de ~10 s en pushes que tocan .github/workflows/**.
+
+name: Verificar Workflows
+
+on:
+  push:
+    paths:
+      - '.github/workflows/**'
+      - 'scripts/verificar-workflows.mjs'
+  pull_request:
+    paths:
+      - '.github/workflows/**'
+      - 'scripts/verificar-workflows.mjs'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  yaml-valido:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Instalar dependencias
+        run: npm ci
+
+      - name: Validar el YAML de todos los workflows
+        run: node scripts/verificar-workflows.mjs

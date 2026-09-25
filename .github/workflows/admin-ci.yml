@@ -100,10 +100,10 @@ jobs:
       - name: Instalar dependencias
         run: npm ci
 
-      - name: Instalar Playwright (no está en package.json: se activa solo aquí)
+      - name: "Instalar Playwright (no está en package.json; se activa solo aquí)"
         run: npm install --no-save @playwright/test@^1.49.0
 
-      - name: Instalar navegador (cacheado: ~3 min la 1ª vez, ~10 s después)
+      - name: "Instalar navegador (cacheado: ~3 min la 1ª vez, ~10 s después)"
         uses: actions/cache@v4
         with:
           path: ~/.cache/ms-playwright
