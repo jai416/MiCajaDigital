@@ -2,13 +2,23 @@
  * Notificaciones vía Telegram — envía mensajes al admin a través de un
  * Cloudflare Worker proxy (Cuba bloquea api.telegram.org directamente).
  *
- * Fail-safe: si falta任何 env var o el fetch falla, nunca propaga la excepción.
- * La notificación es best-effort — el panel NUNCA se rompe por esto.
+ * Fail-safe: si falta cualquier env var o el fetch falla, nunca propaga la
+ * excepción. La notificación es best-effort — el panel NUNCA se rompe por esto.
  */
 
 const TELEGRAM_PROXY_URL = process.env.TELEGRAM_PROXY_URL;
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID;
+
+/** Botón de teclado inline de Telegram. */
+export interface BotonTelegram {
+  text: string;
+  /** callback_data: el bot vuelve a recibirlo como callback_query. */
+  callback_data?: string;
+  url?: string;
+}
+
+export type TecladoTelegram = { inline_keyboard: BotonTelegram[][] };
 
 /**
  * Escapa caracteres especiales de HTML para Telegram.
@@ -48,7 +58,7 @@ export async function notificarTelegram(
 export async function enviarTelegram(
   chatId: string | number,
   mensaje: string,
-  opciones?: { parseMode?: 'HTML' | 'MarkdownV2' }
+  opciones?: { parseMode?: 'HTML' | 'MarkdownV2'; teclado?: TecladoTelegram }
 ): Promise<{ ok: boolean; motivo?: string }> {
   if (!TELEGRAM_PROXY_URL || !TELEGRAM_BOT_TOKEN) {
     const faltan = [
@@ -74,6 +84,8 @@ export async function enviarTelegram(
         chat_id: chatId,
         text: mensaje,
         parse_mode: parseMode,
+        // Botones: sin teclado, Telegram ignora el campo.
+        ...(opciones?.teclado ? { reply_markup: opciones.teclado } : {}),
       }),
       signal: controller.signal,
     });
@@ -90,5 +102,31 @@ export async function enviarTelegram(
     console.error('[telegram] Error enviando mensaje:', e);
     const nombre = e instanceof Error ? e.name : 'error';
     return { ok: false, motivo: `fetch falló (${nombre})` };
+  }
+}
+
+/**
+ * Responde a un `callback_query` (pulsación de botón) para que Telegram quite
+ * el spinner del botón al instante. Silencioso: es cosmético.
+ */
+export async function responderCallback(
+  callbackId: string,
+  texto?: string
+): Promise<void> {
+  if (!TELEGRAM_PROXY_URL || !TELEGRAM_BOT_TOKEN || !callbackId) return;
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 5000);
+    await fetch(`${TELEGRAM_PROXY_URL}/bot${TELEGRAM_BOT_TOKEN}/answerCallbackQuery`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(
+        texto ? { callback_query_id: callbackId, text: texto } : { callback_query_id: callbackId }
+      ),
+      signal: controller.signal,
+    });
+    clearTimeout(timeout);
+  } catch {
+    // Cosmético: si falla, el botón sigue funcionando.
   }
 }

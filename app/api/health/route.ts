@@ -38,6 +38,21 @@ export async function GET() {
       : 'ADMIN_SESSION_SECRET falta o es corto (<32). Genera uno con: openssl rand -hex 64',
   };
 
+  // El webhook del bot es fail-CLOSED sin CRON_SECRET (misma política que el
+  // cron). Sin él, el bot queda inoperativo aunque el panel sea "verde":
+  // conviene que se note en el health en vez de descubrirlo enviando /ping.
+  const telegramOk = Boolean(
+    process.env.TELEGRAM_PROXY_URL && process.env.TELEGRAM_BOT_TOKEN
+  );
+  const webhookOk = Boolean(process.env.CRON_SECRET && process.env.TELEGRAM_CHAT_ID);
+  checks.telegram = {
+    ok: telegramOk && webhookOk,
+    detalle:
+      !telegramOk || !webhookOk
+        ? 'Bot Telegram incompleto: requiere TELEGRAM_PROXY_URL, TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID y CRON_SECRET'
+        : 'Bot Telegram configurado (notificaciones + comandos)',
+  };
+
   try {
     const { data, error } = await supabaseAdmin
       .from('negocios')

@@ -1,6 +1,8 @@
+import { timingSafeEqual, createHash } from 'node:crypto';
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
-import { enviarTelegram, escaparTelegram } from '@/lib/telegram';
+import { enviarTelegram, escaparTelegram, responderCallback, type TecladoTelegram } from '@/lib/telegram';
+import { registrarAccion } from '@/lib/audit';
 import { getAppVersion, getVersionCode } from '@/lib/version';
 
 export const dynamic = 'force-dynamic';
@@ -9,6 +11,77 @@ export const dynamic = 'force-dynamic';
 // Cualquier otro chat es ignorado en silencio — nunca filtrar datos.
 const CHAT_ADMIN = process.env.TELEGRAM_CHAT_ID;
 const BOT_WEBHOOK_SECRET = process.env.CRON_SECRET;
+
+/** Límite de comandos por ventana: evita storms y duplicados por reintento. */
+const MAX_COMANDOS_POR_MINUTO = 20;
+const VENTANA_MS = 60_000;
+/** Caché de consultas pesadas (el dashboard no cambia cada segundo). */
+const CACHE_MS_RESUMEN = 60_000;
+
+/**
+ * Comparación en tiempo constante del secret_token. Un `!==` normal filtra
+ * información por tiempo, y sobre todo deja el endpoint ABIERTO si la env var
+ * falta (fail-open) — aquí siempre cerrado.
+ */
+function secretoValido(recibido: string | null): boolean {
+  if (!BOT_WEBHOOK_SECRET) return false; // fail-closed: sin secreto, nobody entra
+  if (!recibido) return false;
+  const a = createHash('sha256').update(BOT_WEBHOOK_SECRET).digest();
+  const b = createHash('sha256').update(recibido).digest();
+  return timingSafeEqual(a, b);
+}
+
+// Rate-limit en memoria del proceso (suficiente para un admin humano).
+const ventanaComandos = new Map<string, number[]>();
+function permitirComando(chatId: string): boolean {
+  const ahora = Date.now();
+  const previos = (ventanaComandos.get(chatId) ?? []).filter((t) => ahora - t < VENTANA_MS);
+  if (previos.length >= MAX_COMANDOS_POR_MINUTO) {
+    ventanaComandos.set(chatId, previos);
+    return false;
+  }
+  previos.push(ahora);
+  ventanaComandos.set(chatId, previos);
+  return true;
+}
+
+// Dedup por update_id: si Telegram reintenta el mismo update (timeout >10 s),
+// no repetimos la respuesta ni la consulta.
+const updatesVistos = new Map<number, number>();
+function updateYaVisto(id: number | undefined): boolean {
+  if (id === undefined) return false;
+  const ahora = Date.now();
+  for (const [k, t] of updatesVistos) if (ahora - t > CACHE_MS_RESUMEN * 5) updatesVistos.delete(k);
+  if (updatesVistos.has(id)) return true;
+  updatesVistos.set(id, ahora);
+  return false;
+}
+
+// Caché simple de /resumen (la consulta más pesada: RPC de dashboard).
+let cacheResumen: { texto: string; hasta: number } | null = null;
+
+/** Teclado raíz: permite operar el bot sin escribir nada. */
+const TECLADO_RAIZ: TecladoTelegram = {
+  inline_keyboard: [
+    [
+      { text: '🏠 Resumen', callback_data: '/resumen' },
+      { text: '💰 Ventas hoy', callback_data: '/ventas_hoy' },
+    ],
+    [
+      { text: '📋 Deudoras', callback_data: '/deudoras' },
+      { text: '🎫 Tickets', callback_data: '/tickets' },
+    ],
+    [
+      { text: '⏰ Vencen', callback_data: '/vencen' },
+      { text: '🆕 Nuevas', callback_data: '/nuevas' },
+    ],
+    [
+      { text: '💤 Inactivas', callback_data: '/inactivas' },
+      { text: '🐞 Errores', callback_data: '/errores' },
+    ],
+    [{ text: '❓ Ayuda', callback_data: '/ayuda' }],
+  ],
+};
 
 const AYUDA = `🤖 <b>Mi Caja Digital — Bot de gestion</b>
 
@@ -26,12 +99,20 @@ const AYUDA = `🤖 <b>Mi Caja Digital — Bot de gestion</b>
 • /version — version publicada de la app
 • /salud — estado del panel y Supabase
 • /ayuda — esta ayuda
-• /ping — pong (check de conexion)`;
+• /ping — pong (check de conexion)
+
+<u>Sin escribir</u>: usa los botones de abajo en cada respuesta.`;
 
 interface Update {
+  update_id?: number;
   message?: {
     chat?: { id?: number };
     text?: string;
+  };
+  callback_query?: {
+    id: string;
+    data?: string;
+    message?: { chat?: { id?: number } };
   };
 }
 
@@ -108,15 +189,25 @@ async function comandoVentasHoy(): Promise<Respuesta> {
   }
 }
 
+/**
+ * Escapa los comodines de los patrones ILIKE de PostgREST. Sin esto, un
+ * argumento con `%` o `_` (p. ej. `/clienta %`) devuelve los primeros correos
+ * de la tabla en vez de "sin resultados".
+ */
+function escaparLike(s: string): string {
+  return s.replace(/([\\%_])/g, '\\$1');
+}
+
 async function comandoClienta(email: string): Promise<Respuesta> {
   if (!email) {
     return '👤 <b>/clienta</b>: da el email\nEj: `/clienta ana@gmail.com`';
   }
+  const patron = `%${escaparLike(email.trim())}%`;
   try {
     const { data, error } = await supabaseAdmin
       .from('negocios')
       .select('email, nombre_negocio, plan, activo, fecha_registro, fecha_expiracion, ultimo_uso_at, deleted_at, tc_usd, tc_mlc')
-      .ilike('email', `%${email}%`)
+      .ilike('email', patron)
       .is('deleted_at', null)
       .limit(1)
       .single();
@@ -124,7 +215,7 @@ async function comandoClienta(email: string): Promise<Respuesta> {
       const { data: enPapelera } = await supabaseAdmin
         .from('negocios')
         .select('email, plan, deleted_at')
-        .ilike('email', `%${email}%`)
+        .ilike('email', patron)
         .limit(1)
         .single();
       if (enPapelera?.deleted_at) {
@@ -346,10 +437,57 @@ async function comandoTickets(): Promise<Respuesta> {
   }
 }
 
+/** Ejecuta un comando y devuelve su texto (sin envío). */
+async function ejecutar(cmd: string, args: string[]): Promise<string> {
+  switch (cmd) {
+    case '/ping':
+      return 'pong 🏓';
+    case '/salud':
+      return comandoSalud();
+    case '/version':
+      return `📦 <b>Version publicada</b>: v${getAppVersion()}+${getVersionCode()}`;
+    case '/resumen': {
+      if (cacheResumen && cacheResumen.hasta > Date.now()) return cacheResumen.texto;
+      const texto = await comandoResumen();
+      cacheResumen = { texto, hasta: Date.now() + CACHE_MS_RESUMEN };
+      return texto;
+    }
+    case '/ventas_hoy':
+      return comandoVentasHoy();
+    case '/clienta':
+      return comandoClienta(args.join(' '));
+    case '/deudoras':
+      return comandoDeudoras();
+    case '/nuevas':
+      return comandoNuevas();
+    case '/vencen':
+      return comandoVencen();
+    case '/inactivas':
+      return comandoInactivas();
+    case '/errores':
+      return comandoErrores();
+    case '/codigos':
+      return comandoCodigos();
+    case '/tickets':
+      return comandoTickets();
+    case '/ayuda':
+      return AYUDA;
+    default:
+      return AYUDA;
+  }
+}
+
+/** Envía la respuesta con el teclado raíz (para poder seguir navegando). */
+async function responder(chatId: number, texto: string, conTeclado = true) {
+  return enviarTelegram(chatId, texto, conTeclado ? { teclado: TECLADO_RAIZ } : undefined);
+}
+
 export async function POST(request: NextRequest) {
   // Seguridad: el webhook debe llevar el secret_token configurado en setWebhook.
+  // Fail-CLOSED: si CRON_SECRET no está en el entorno, NADIE entra (antes el
+  // guard era `if (BOT_WEBHOOK_SECRET && ...)` → sin env var aceptaba a todos).
   const secretHeader = request.headers.get('x-telegram-bot-api-secret-token');
-  if (BOT_WEBHOOK_SECRET && secretHeader !== BOT_WEBHOOK_SECRET) {
+  if (!secretoValido(secretHeader)) {
     return NextResponse.json({ ok: false }, { status: 401 });
   }
 
@@ -360,66 +498,59 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: false }, { status: 400 });
   }
 
+  // --- Pulsación de botón (callback_query) -------------------------------
+  const cb = update?.callback_query;
+  if (cb?.id) {
+    const cbChat = String(cb.message?.chat?.id ?? '');
+    if (!CHAT_ADMIN || cbChat !== CHAT_ADMIN) {
+      return NextResponse.json({ ok: true, ignorado: 'chat no autorizado' });
+    }
+    const cmd = String(cb.data ?? '');
+    // El callback debe resolverse <10 s o Telegram lo marca como fallido.
+    await responderCallback(cb.id);
+    if (!permitirComando(cbChat)) {
+      await responder(Number(cbChat), '⏳ Demasiados comandos seguidos. Espera un momento.');
+      return NextResponse.json({ ok: true, comando: cmd, limitado: true });
+    }
+    const texto = await ejecutar(cmd, []);
+    const r = await responder(Number(cbChat), texto);
+    // Auditoría: qué se consultó desde el bot (el token es la única credencial).
+    await registrarAccion('bot_comando', 'telegram', null, { comando: cmd, enviado: r.ok });
+    return NextResponse.json({ ok: true, comando: cmd, enviado: r.ok, motivo: r.motivo });
+  }
+
+  // --- Mensaje de texto ----------------------------------------------------
   const chatId = update?.message?.chat?.id;
   const mensaje = update?.message?.text ?? '';
   const { cmd, args } = parsear(mensaje);
 
   // Solo el admin recibe respuesta; el resto se ignora en silencio.
   if (chatId === undefined || !CHAT_ADMIN || String(chatId) !== CHAT_ADMIN) {
-    if (BOT_WEBHOOK_SECRET) {
-      return NextResponse.json({ ok: true, ignorado: 'chat no autorizado' });
-    }
-    return NextResponse.json({ ok: true });
+    return NextResponse.json({ ok: true, ignorado: 'chat no autorizado' });
   }
   if (!cmd) return NextResponse.json({ ok: true });
 
-  let respuesta: Respuesta;
-  switch (cmd) {
-    case '/ping':
-      respuesta = 'pong 🏓';
-      break;
-    case '/salud':
-      respuesta = await comandoSalud();
-      break;
-    case '/version':
-      respuesta = `📦 <b>Version publicada</b>: v${getAppVersion()}+${getVersionCode()}`;
-      break;
-    case '/resumen':
-      respuesta = await comandoResumen();
-      break;
-    case '/ventas_hoy':
-      respuesta = await comandoVentasHoy();
-      break;
-    case '/clienta':
-      respuesta = await comandoClienta(args.join(' '));
-      break;
-    case '/deudoras':
-      respuesta = await comandoDeudoras();
-      break;
-    case '/nuevas':
-      respuesta = await comandoNuevas();
-      break;
-    case '/vencen':
-      respuesta = await comandoVencen();
-      break;
-    case '/inactivas':
-      respuesta = await comandoInactivas();
-      break;
-    case '/errores':
-      respuesta = await comandoErrores();
-      break;
-    case '/codigos':
-      respuesta = await comandoCodigos();
-      break;
-    case '/tickets':
-      respuesta = await comandoTickets();
-      break;
-    default:
-      respuesta = AYUDA;
+  // Telegram reintenta el mismo update si la respuesta tarda >10 s: sin este
+  // guard el admin recibía el mismo resumen 2-3 veces.
+  if (updateYaVisto(update.update_id)) {
+    return NextResponse.json({ ok: true, duplicado: true });
   }
 
+  if (!permitirComando(String(chatId))) {
+    const r = await responder(chatId, '⏳ Demasiados comandos seguidos. Espera un momento.');
+    return NextResponse.json({ ok: true, limitado: true, enviado: r.ok });
+  }
+
+  // /ayuda con teclado: pulsando un botón ya se ve qué hace cada cosa.
+  const texto = await ejecutar(cmd === '/help' ? '/ayuda' : cmd, args);
+  const resultado = await responder(chatId, texto);
+
+  await registrarAccion('bot_comando', 'telegram', null, {
+    comando: cmd,
+    enviado: resultado.ok,
+  });
+
   // Diagnóstico: responder si el mensaje salió o por qué no.
-  const resultado = await enviarTelegram(chatId, respuesta);
   return NextResponse.json({ ok: true, enviado: resultado.ok, motivo: resultado.motivo });
 }
 
