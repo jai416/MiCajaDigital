@@ -34,13 +34,21 @@ test('health público no expone detalles', async ({ request }) => {
 });
 
 /// Login con credenciales inválidas: error visible, nunca entra.
+///
+/// Timeout amplio a propósito: en CI el panel corre contra un Supabase
+/// inalcanzable (127.0.0.1:9), y cada llamada del login (rate-limit,
+/// registro de intento y auditoría) reintenta antes de rendirse. Medido en
+/// el runner: el 401 correcto llega en ~14 s. Con los 15 s por defecto el test
+/// fallaba por poco, no por un fallo del panel. En producción (Supabase real)
+/// la respuesta es inmediata.
 test('login fallido muestra error y sigue en /login', async ({ page }) => {
+  test.setTimeout(60_000);
   await page.goto('/login');
   await page.fill('#login-email', 'intruso@ejemplo.com');
   await page.fill('#login-password', 'contraseña-errónea-123');
   await page.getByRole('button', { name: 'Entrar' }).click();
   await expect(page.locator('text=Credenciales incorrectas')).toBeVisible({
-    timeout: 15000,
+    timeout: 45_000,
   });
   await expect(page).toHaveURL(/\/login$/);
 });
