@@ -81,7 +81,14 @@ jobs:
     # no en cada push de documentación.
     if: github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/main'
     env:
-      NEXT_PUBLIC_SUPABASE_URL: https://placeholder.supabase.co
+      # OJO: 127.0.0.1:9 (puerto "discard", cerrado) en vez de un dominio tipo
+      # placeholder.supabase.co. El dominio placeholder sí resuelve (Supabase
+      # tiene DNS wildcard) y el cliente se queda esperando TLS/conexión: el
+      # POST /api/login tardaba más que los 15 s del test y 'Credenciales
+      # incorrectas' nunca llegaba a tiempo. Con un puerto cerrado el fallo es
+      # instantáneo (ECONNREFUSED) y el rate-limit cae al contador en memoria
+      # (NODE_ENV=development), que es justo lo que se quiere testear.
+      NEXT_PUBLIC_SUPABASE_URL: http://127.0.0.1:9
       NEXT_PUBLIC_SUPABASE_ANON_KEY: placeholder-anon-key
       SUPABASE_SERVICE_ROLE_KEY: placeholder-service-role-key
       ADMIN_EMAIL: admin@example.com
