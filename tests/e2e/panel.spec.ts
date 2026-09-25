@@ -45,14 +45,34 @@ test('health público no expone detalles', async ({ request }) => {
 /// devolvió la API de verdad.
 test('login fallido devuelve 401 y deja al usuario en /login', async ({ page }) => {
   test.setTimeout(120_000);
-  await page.goto('/login');
+
+  // Si React no ha hidratado, el clic hace el submit NATIVO del formulario
+  // (GET a /login) y nunca sale un POST /api/login: el test se queda esperando
+  // una respuesta que jamás ocurre. `networkidle` + este aviso de consola
+  // hacen que un fallo futuro diga la causa en vez de un timeout mudo.
+  const errores: string[] = [];
+  page.on('pageerror', (e) => errores.push(`pageerror: ${e.message}`));
+  page.on('console', (m) => {
+    if (m.type() === 'error') errores.push(`console: ${m.text()}`);
+  });
+
+  await page.goto('/login', { waitUntil: 'networkidle' });
+  await expect(page.getByRole('button', { name: 'Entrar' })).toBeEnabled();
+
   await page.fill('#login-email', 'intruso@ejemplo.com');
   await page.fill('#login-password', 'contraseña-errónea-123');
 
   const respuestaLogin = page.waitForResponse(
     (r) => r.url().includes('/api/login') && r.request().method() === 'POST',
-    { timeout: 90_000 }
-  );
+    { timeout: 60_000 }
+  ).catch((e) => {
+    throw new Error(
+      `No salió ningún POST /api/login tras pulsar Entrar. ` +
+        `URL actual: ${page.url()} | errores de consola: ` +
+        `${errores.length ? errores.join(' // ') : '(ninguno)'} | ${e.message}`
+    );
+  });
+
   await page.getByRole('button', { name: 'Entrar' }).click();
 
   const res = await respuestaLogin;
@@ -63,6 +83,5 @@ test('login fallido devuelve 401 y deja al usuario en /login', async ({ page }) 
   ).toContain('Credenciales incorrectas');
   expect(res.status()).toBe(401);
 
-  // Y el usuario sigue en /login (navegar a un dashboard = sesión creada).
   await expect(page).toHaveURL(/\/login$/);
 });
