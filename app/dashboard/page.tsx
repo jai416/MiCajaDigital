@@ -71,31 +71,44 @@ async function getStats(dias: number) {
   const nuevosPrev = (rpcData.nuevos_prev as number) ?? 0;
   const errores7 = (rpcData.logs_errores_7d as number) ?? 0;
 
+  // ---- RPC de detalle: pre-agrega en Postgres lo que antes se traía con
+  // .limit(50000) y se agregaba en Node (ventas del rango y códigos de 6 meses).
+  // Si la RPC no está aplicada todavía (PGRST202), se cae al cálculo en JS:
+  // el dashboard nunca queda roto por esto. ----
+  const { data: detalleRpc } = await supabaseAdmin
+    .rpc('stats_dashboard_detalle', { p_desde: desde + 'T00:00:00Z' })
+    .maybeSingle();
+  const detalle = (detalleRpc ?? null) as Record<string, unknown> | null;
+
   // ---- Queries detalladas (solo lo que el RPC no cubre) ----
   const [rNegocios, rVentasDetalle, rCodigosConNegocio, rIngresosMeses] = await Promise.all([
     supabaseAdmin
       .from('negocios')
-      .select('id, activo, plan, fecha_registro, fecha_expiracion, deleted_at, tc_usd, tc_mlc, nombre_negocio, email')
-      .limit(50000),
-    supabaseAdmin
-      .from('ventas')
-      .select('fecha, moneda, precio, descuento, user_id')
-      .eq('devuelto', 0)
-      .is('deleted_at', null)
-      .gte('fecha', desde)
-      .limit(50000),
+      .select('id, activo, plan, fecha_registro, fecha_expiracion, deleted_at, tc_usd, tc_mlc, nombre_negocio, email'),
+    // Con la RPC disponible no hace falta traer las ventas una a una.
+    detalle
+      ? Promise.resolve({ data: [], error: null })
+      : supabaseAdmin
+          .from('ventas')
+          .select('fecha, moneda, precio, descuento, user_id')
+          .eq('devuelto', 0)
+          .is('deleted_at', null)
+          .gte('fecha', desde)
+          .limit(50000),
     supabaseAdmin
       .from('codigos_pago')
-      .select('negocio_id, duracion_meses, plan')
+      .select('negocio_id, duracion_meses, plan, usado_en')
       .eq('usado', true)
       .not('negocio_id', 'is', null)
       .limit(50000),
-    supabaseAdmin
-      .from('codigos_pago')
-      .select('precio_pagado, usado_en, negocio_id')
-      .eq('usado', true)
-      .gte('usado_en', hace6mIso)
-      .limit(50000),
+    detalle
+      ? Promise.resolve({ data: [], error: null })
+      : supabaseAdmin
+          .from('codigos_pago')
+          .select('precio_pagado, usado_en, negocio_id')
+          .eq('usado', true)
+          .gte('usado_en', hace6mIso)
+          .limit(50000),
   ]);
 
   notaFallo('negocios', rNegocios);
@@ -168,12 +181,23 @@ async function getStats(dias: number) {
   }
 
   // Ingreso real y desgloses
-  const ingresoRealCup = ingresosReales.reduce((s: number, c: { precio_pagado?: number }) => s + (c.precio_pagado ?? 0), 0);
-  const ticketPromedio = ingresosReales.length > 0 ? Math.round(ingresoRealCup / ingresosReales.length) : 0;
+  // Camino rápido (RPC aplicada) vs. agregación en JS (fallback).
   const ingresosPorMesMap = new Map<string, number>();
-  for (const c of ingresosReales) {
-    const k = String(c.usado_en).slice(0, 7);
-    ingresosPorMesMap.set(k, (ingresosPorMesMap.get(k) ?? 0) + ((c as { precio_pagado?: number }).precio_pagado ?? 0));
+  let ingresoRealCup: number;
+  let ticketPromedio: number;
+  if (detalle) {
+    ingresoRealCup = Number(detalle.ingreso_real_cup ?? 0);
+    const pagos = Number(detalle.pagos_6m ?? 0);
+    ticketPromedio = pagos > 0 ? Math.round(ingresoRealCup / pagos) : 0;
+    const porMes = (detalle.ingresos_por_mes ?? {}) as Record<string, number>;
+    for (const [k, v] of Object.entries(porMes)) ingresosPorMesMap.set(k, Number(v));
+  } else {
+    ingresoRealCup = ingresosReales.reduce((s: number, c: { precio_pagado?: number }) => s + (c.precio_pagado ?? 0), 0);
+    ticketPromedio = ingresosReales.length > 0 ? Math.round(ingresoRealCup / ingresosReales.length) : 0;
+    for (const c of ingresosReales) {
+      const k = String(c.usado_en).slice(0, 7);
+      ingresosPorMesMap.set(k, (ingresosPorMesMap.get(k) ?? 0) + ((c as { precio_pagado?: number }).precio_pagado ?? 0));
+    }
   }
   const ingresosPorMes: { mes: string; total: number }[] = [];
   for (let i = 5; i >= 0; i--) {
@@ -186,38 +210,63 @@ async function getStats(dias: number) {
   }
 
   // Top clientas LTV
-  const ltvPorNegocio = new Map<string, number>();
-  for (const c of ingresosReales) {
-    const cid = (c as { negocio_id?: string }).negocio_id;
-    if (!cid) continue;
-    ltvPorNegocio.set(cid, (ltvPorNegocio.get(cid) ?? 0) + ((c as { precio_pagado?: number }).precio_pagado ?? 0));
-  }
-  const nombreDe = new Map(vivos.map((n) => [String(n.id), n]));
-  const topClientas = Array.from(ltvPorNegocio.entries())
-    .map(([id, monto]) => ({
-      nombre: nombreDe.get(id)?.nombre_negocio ?? '(negocio eliminado)',
-      email: nombreDe.get(id)?.email ?? '',
-      monto,
-    }))
-    .sort((a, b) => b.monto - a.monto)
-    .slice(0, 10);
+  const topClientas: { nombre: string; email: string; monto: number }[] = detalle
+    ? ((detalle.top_ltv ?? []) as { nombre: string; email: string; monto: number }[])
+    : (() => {
+        const ltvPorNegocio = new Map<string, number>();
+        for (const c of ingresosReales) {
+          const cid = (c as { negocio_id?: string }).negocio_id;
+          if (!cid) continue;
+          ltvPorNegocio.set(cid, (ltvPorNegocio.get(cid) ?? 0) + ((c as { precio_pagado?: number }).precio_pagado ?? 0));
+        }
+        const nombreDe = new Map(vivos.map((n) => [String(n.id), n]));
+        return Array.from(ltvPorNegocio.entries())
+          .map(([id, monto]) => ({
+            nombre: nombreDe.get(id)?.nombre_negocio ?? '(negocio eliminado)',
+            email: nombreDe.get(id)?.email ?? '',
+            monto,
+          }))
+          .sort((a, b) => b.monto - a.monto)
+          .slice(0, 10);
+      })();
 
-  // Actividad por día
+  // Actividad por día, desglose por moneda, GMV y vendedores activos
   const ventasPorDiaMap = new Map<string, number>();
   const monedaResumen: Record<string, number> = {};
-  const vendedoresHoy = new Set<string>();
   let gmvCup = 0;
-  for (const v of rVentasDetalle.data ?? []) {
-    const fechaStr = String((v as { fecha: string }).fecha);
-    const dia = fechaStr.slice(0, 10);
-    ventasPorDiaMap.set(dia, (ventasPorDiaMap.get(dia) ?? 0) + 1);
-    if (dia === hoyStr && (v as { user_id?: string }).user_id) vendedoresHoy.add(String((v as { user_id?: string }).user_id));
-    const m = String((v as { moneda?: string }).moneda ?? 'CUP');
-    monedaResumen[m] = (monedaResumen[m] ?? 0) + 1;
-    const bruto = Math.max(0, (Number((v as { precio?: number }).precio) || 0) - (Number((v as { descuento?: number }).descuento) || 0));
-    if (m === 'USD') gmvCup += bruto * tcDe(String((v as { user_id?: string }).user_id)).usd;
-    else if (m === 'MLC') gmvCup += bruto * tcDe(String((v as { user_id?: string }).user_id)).mlc;
-    else gmvCup += bruto;
+  let vendedoresHoyCount = 0;
+  let vendedores7Count = 0;
+  if (detalle) {
+    const porDia = (detalle.ventas_por_dia ?? []) as { dia: string; total: number }[];
+    for (const d of porDia) ventasPorDiaMap.set(d.dia, Number(d.total));
+    for (const [m, n] of Object.entries((detalle.ventas_por_moneda ?? {}) as Record<string, number>)) {
+      monedaResumen[m] = Number(n);
+    }
+    gmvCup = Number(detalle.gmv_cup ?? 0);
+    vendedoresHoyCount = Number(detalle.vendedores_hoy ?? 0);
+    vendedores7Count = Number(detalle.vendedores_7d ?? 0);
+  } else {
+    const vendedoresHoy = new Set<string>();
+    for (const v of rVentasDetalle.data ?? []) {
+      const fechaStr = String((v as { fecha: string }).fecha);
+      const dia = fechaStr.slice(0, 10);
+      ventasPorDiaMap.set(dia, (ventasPorDiaMap.get(dia) ?? 0) + 1);
+      if (dia === hoyStr && (v as { user_id?: string }).user_id) vendedoresHoy.add(String((v as { user_id?: string }).user_id));
+      const m = String((v as { moneda?: string }).moneda ?? 'CUP');
+      monedaResumen[m] = (monedaResumen[m] ?? 0) + 1;
+      const bruto = Math.max(0, (Number((v as { precio?: number }).precio) || 0) - (Number((v as { descuento?: number }).descuento) || 0));
+      if (m === 'USD') gmvCup += bruto * tcDe(String((v as { user_id?: string }).user_id)).usd;
+      else if (m === 'MLC') gmvCup += bruto * tcDe(String((v as { user_id?: string }).user_id)).mlc;
+      else gmvCup += bruto;
+    }
+    const hace7Ms = ahora - 7 * MS_DIA;
+    const vendedores7 = new Set<string>();
+    for (const v of rVentasDetalle.data ?? []) {
+      const f = new Date(String((v as { fecha: string }).fecha)).getTime();
+      if (f >= hace7Ms && (v as { user_id?: string }).user_id) vendedores7.add(String((v as { user_id?: string }).user_id));
+    }
+    vendedoresHoyCount = vendedoresHoy.size;
+    vendedores7Count = vendedores7.size;
   }
   const actividadPorDia: { dia: string; ventas: number }[] = [];
   for (let i = dias - 1; i >= 0; i--) {
@@ -265,13 +314,19 @@ async function getStats(dias: number) {
   const denominadorConversion = conPago + todosExpirados;
   const conversion = denominadorConversion > 0 ? Math.round((conPago / denominadorConversion) * 100) : 0;
 
-  const hace30Ms = ahora - 30 * MS_DIA;
-  const activasConDatos = new Set<string>();
-  for (const v of rVentasDetalle.data ?? []) {
-    const f = new Date(String((v as { fecha: string }).fecha)).getTime();
-    if (f >= hace30Ms && (v as { user_id?: string }).user_id) activasConDatos.add(String((v as { user_id?: string }).user_id));
-  }
-  const inactivas30 = vivos.filter((n) => !activasConDatos.has(String(n.id))).length;
+  // Activas en los últimos 30 días (métrica de inactivas, independiente del
+  // rango): la RPC lo trae ya contado; en fallback se calcula en JS.
+  const inactivas30 = detalle
+    ? Math.max(0, vivos.length - Math.min(Number(detalle.vendedores_30d ?? 0), vivos.length))
+    : (() => {
+        const hace30Ms = ahora - 30 * MS_DIA;
+        const activasConDatos = new Set<string>();
+        for (const v of rVentasDetalle.data ?? []) {
+          const f = new Date(String((v as { fecha: string }).fecha)).getTime();
+          if (f >= hace30Ms && (v as { user_id?: string }).user_id) activasConDatos.add(String((v as { user_id?: string }).user_id));
+        }
+        return vivos.filter((n) => !activasConDatos.has(String(n.id))).length;
+      })();
 
   return {
     fallos, dias, total, activos, enPrueba, expiradasSinActivar, enPapelera,
@@ -285,7 +340,7 @@ async function getStats(dias: number) {
     ventasRango, ventasDelta: deltaPct(ventasRango, ventasRangoPrev),
     gastosRango, gastosDelta: deltaPct(gastosRango, gastosRangoPrev),
     monedaResumen, conversion, renovados, retencion, inactivas30,
-    vendedoresHoy: vendedoresHoy.size, vendedores7: vendedores7.size,
+    vendedoresHoy: vendedoresHoyCount, vendedores7: vendedores7Count,
     ingresosPorMes, topClientas, errores7,
   };
 }
