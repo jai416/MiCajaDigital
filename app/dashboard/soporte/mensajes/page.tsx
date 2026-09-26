@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { fechaHora } from '@/lib/formato';
 
 interface Negocio {
@@ -39,7 +39,11 @@ const PLANTILLAS_MENSAJES = [
 
 export default function MensajesPage() {
   const [mensajes, setMensajes] = useState<Mensaje[]>([]);
+  // Los negocios ya cargados (top) para resolver nombre/email de los mensajes.
   const [negocios, setNegocios] = useState<Negocio[]>([]);
+  // Si no encontramos el nombre de un mensaje en el mapa, pedimos ese negocio
+  // concreto. Evita traerse TODOS los negocios solo para pintar un nombre.
+  const [faltan, setFaltan] = useState<Record<string, Negocio>>({});
   const [pagina, setPagina] = useState(1);
   const [total, setTotal] = useState(0);
   const [totalPaginas, setTotalPaginas] = useState(1);
@@ -52,10 +56,42 @@ export default function MensajesPage() {
   const [enviando, setEnviando] = useState(false);
   const [feedback, setFeedback] = useState('');
 
-  // El GET /api/mensajes no trae join a negocios; se resuelve con el listado
-  // ya cargado en `negocios` (todos los negocios, sin paginar por buscador).
+  // El GET /api/mensajes no trae join a negocios. Antes esta pantalla se
+  // descargaba TODOS los negocios (pagina a pagina) solo para pintar un nombre:
+  // con muchas clientas eran miles de filas por visita (auditoría ronda 27, S2).
+  // Ahora se cargan solo los que aparecen en los mensajes, y el selector de
+  // destinatario se llena bajo demanda al abrirse.
   const negocioDe = (user_id: string): Negocio | undefined =>
-    negocios.find((n) => String(n.id) === String(user_id));
+    negocios.find((n) => String(n.id) === String(user_id)) ?? faltan[String(user_id)];
+
+  /** Pide solo los negocios cuyo id aparece en la lista de mensajes. */
+  const cargarNegociosDeMensajes = useCallback(async (userIds: string[]) => {
+    const faltanIds = [...new Set(userIds)].filter((id) => id && !negocios.some((n) => String(n.id) === id));
+    if (faltanIds.length === 0) return;
+    const pedidos = new Set(negocios.map((n) => String(n.id)));
+    const nuevos: Negocio[] = [];
+    // El endpoint pagina de 100 en 100; aquí solo se piden los ids necesarios.
+    for (let pagina = 1; pagina <= 20; pagina++) {
+      const res = await fetch(`/api/negocios?porPagina=100&activo=todos&pagina=${pagina}`);
+      if (!res.ok) break;
+      const json = await res.json();
+      const lote: Negocio[] = Array.isArray(json.data) ? json.data : [];
+      for (const n of lote) {
+        if (faltanIds.includes(String(n.id)) && !pedidos.has(String(n.id))) nuevos.push(n);
+      }
+      const total = json.totalPaginas ?? 1;
+      // Parar en cuanto se hayan encontrado todos los que faltaban.
+      if (lote.length === 0 || pagina >= total || nuevos.length === faltanIds.length) break;
+    }
+    if (nuevos.length > 0) {
+      setNegocios((prev) => [...prev, ...nuevos]);
+      setFaltan((prev) => {
+        const copia = { ...prev };
+        for (const n of nuevos) copia[String(n.id)] = n;
+        return copia;
+      });
+    }
+  }, [negocios]);
 
   useEffect(() => {
     if (feedback) {
@@ -69,10 +105,13 @@ export default function MensajesPage() {
       const res = await fetch(`/api/mensajes?pagina=${p}&porPagina=20`);
       const json = await res.json();
       if (res.ok) {
-        setMensajes(json.data ?? []);
+        const lista = (json.data ?? []) as Mensaje[];
+        setMensajes(lista);
         setPagina(json.pagina ?? 1);
         setTotalPaginas(json.totalPaginas ?? 1);
         setTotal(json.total ?? 0);
+        // Solo los negocios que aparecen en ESTA página de mensajes (S2).
+        void cargarNegociosDeMensajes(lista.map((m) => String(m.user_id)));
       } else {
         setFeedback(`Error: ${json.error ?? 'No se pudieron cargar los mensajes'}`);
       }
@@ -82,33 +121,19 @@ export default function MensajesPage() {
     setCargado(true);
   };
 
-  const cargarNegocios = async () => {
-    try {
-      // El listado necesita TODOS los negocios (mapa de user_id → nombre).
-      // /api/negocios limita porPagina a 100, así que se pagina completo.
-      const todos: Negocio[] = [];
-      let paginaN = 1;
-      let totalPaginasN = 1;
-      while (paginaN <= totalPaginasN) {
-        const res = await fetch(`/api/negocios?porPagina=100&activo=todos&pagina=${paginaN}`);
-        const json = await res.json();
-        if (res.ok && Array.isArray(json.data)) {
-          todos.push(...json.data);
-          totalPaginasN = json.totalPaginas ?? totalPaginasN;
-        } else {
-          break;
-        }
-        if (paginaN >= totalPaginasN) break;
-        paginaN++;
-      }
-      setNegocios(todos);
-    } catch { /* silent */ }
-  };
-
   useEffect(() => {
     cargar(1);
-    cargarNegocios();
   }, []);
+
+  /** Carga el listado de negocios para el selector, bajo demanda (S2). */
+  const cargarNegociosParaSelector = useCallback(async () => {
+    if (negocios.length > 0) return;
+    try {
+      const res = await fetch('/api/negocios?porPagina=100&activo=todos&pagina=1');
+      const json = await res.json();
+      if (res.ok && Array.isArray(json.data)) setNegocios(json.data as Negocio[]);
+    } catch { /* silent */ }
+  }, [negocios]);
 
   const enviar = async () => {
     if (enviando) return;
@@ -196,9 +221,12 @@ export default function MensajesPage() {
             <select
               value={formUserId}
               onChange={(e) => setFormUserId(e.target.value)}
+              onFocus={() => void cargarNegociosParaSelector()}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-emerald-500 focus:border-emerald-500"
             >
-              <option value="">Seleccionar usuario…</option>
+              <option value="">
+                {negocios.length === 0 ? 'Toca para cargar usuarios…' : 'Seleccionar usuario…'}
+              </option>
               {negocios.map((n) => (
                 <option key={n.id} value={n.id}>
                   {n.nombre_negocio} ({n.email})

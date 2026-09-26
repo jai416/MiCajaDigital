@@ -15,8 +15,6 @@ const BOT_WEBHOOK_SECRET = process.env.CRON_SECRET;
 /** Límite de comandos por ventana: evita storms y duplicados por reintento. */
 const MAX_COMANDOS_POR_MINUTO = 20;
 const VENTANA_MS = 60_000;
-/** Caché de consultas pesadas (el dashboard no cambia cada segundo). */
-const CACHE_MS_RESUMEN = 60_000;
 
 /**
  * Comparación en tiempo constante del secret_token. Un `!==` normal filtra
@@ -48,17 +46,39 @@ function permitirComando(chatId: string): boolean {
 // Dedup por update_id: si Telegram reintenta el mismo update (timeout >10 s),
 // no repetimos la respuesta ni la consulta.
 const updatesVistos = new Map<number, number>();
+/** Antigüedad máxima de un update_id para considerarlo "ya visto". */
+const DEDUP_TTL_MS = 5 * 60_000;
 function updateYaVisto(id: number | undefined): boolean {
   if (id === undefined) return false;
   const ahora = Date.now();
-  for (const [k, t] of updatesVistos) if (ahora - t > CACHE_MS_RESUMEN * 5) updatesVistos.delete(k);
+  for (const [k, t] of updatesVistos) if (ahora - t > DEDUP_TTL_MS) updatesVistos.delete(k);
   if (updatesVistos.has(id)) return true;
   updatesVistos.set(id, ahora);
   return false;
 }
 
-// Caché simple de /resumen (la consulta más pesada: RPC de dashboard).
-let cacheResumen: { texto: string; hasta: number } | null = null;
+/**
+ * Caché de resultados de comandos (M4, ronda 27). Antes solo /resumen tenía
+ * caché: /deudoras, /inactivas, /codigos y /errores re-consultaban en cada
+ * pulsación del botón, y Telegram reintenta si la respuesta tarda.
+ * 45 s es suficiente para que un humano no note el retraso y quita de en medio
+ * las consultas repetidas.
+ */
+const CACHE_COMANDOS_MS = 45_000;
+const cacheComandos = new Map<string, { texto: string; hasta: number }>();
+
+async function conCache<T extends string>(clave: T, fn: () => Promise<string>): Promise<string> {
+  const previo = cacheComandos.get(clave);
+  if (previo && previo.hasta > Date.now()) return previo.texto;
+  const texto = await fn();
+  cacheComandos.set(clave, { texto, hasta: Date.now() + CACHE_COMANDOS_MS });
+  // Poda: no crecer sin límite si algún día hay más claves.
+  if (cacheComandos.size > 20) {
+    const ahora = Date.now();
+    for (const [k, v] of cacheComandos) if (v.hasta < ahora) cacheComandos.delete(k);
+  }
+  return texto;
+}
 
 /** Teclado raíz: permite operar el bot sin escribir nada. */
 const TECLADO_RAIZ: TecladoTelegram = {
@@ -266,13 +286,25 @@ async function comandoClienta(email: string): Promise<Respuesta> {
 
 async function comandoDeudoras(): Promise<Respuesta> {
   try {
+    // El total se cuenta aparte (head:true) y el listado se pide ACOTADO por
+    // saldo descendente: antes traía 5000 filas y las agrupaba en memoria, así
+    // que con más de 5000 deudoras el resultado mentía (M5, ronda 27).
+    const { count: totalVentas } = await supabaseAdmin
+      .from('ventas')
+      .select('id', { count: 'exact', head: true })
+      .is('deleted_at', null)
+      .eq('devuelto', 0)
+      .gt('saldo_pendiente', 0);
+
     const { data, error } = await supabaseAdmin
       .from('ventas')
       .select('cliente, saldo_pendiente, moneda, user_id')
       .is('deleted_at', null)
       .eq('devuelto', 0)
       .gt('saldo_pendiente', 0)
-      .limit(5000);
+      // 2000 es el tope de la vista previa; el texto dice si hay más.
+      .order('saldo_pendiente', { ascending: false })
+      .limit(2000);
     if (error) return '💳 Deudoras: ❌ error';
 
     // Agrupar por user_id+cliente sumando saldos.
@@ -286,6 +318,10 @@ async function comandoDeudoras(): Promise<Respuesta> {
       porCliente.set(clave, cur);
     }
     if (porCliente.size === 0) return '💳 No hay deudoras (todo al dia).';
+
+    // Si se alcanza el tope de la vista previa, se avisa: el número mostrado
+    // no es el total real.
+    const truncado = (totalVentas ?? 0) > (data?.length ?? 0);
 
     const top = [...porCliente.entries()]
       .sort((a, b) => b[1].saldo - a[1].saldo)
@@ -305,7 +341,11 @@ async function comandoDeudoras(): Promise<Respuesta> {
       const email = emailPorId.get(v.user) ?? '';
       return `• ${escaparTelegram(nombre)} · ${fmt(v.saldo)} · ${v.n} venta(s)${email ? ` · ${escaparTelegram(email)}` : ''}`;
     });
-    return `💳 <b>Deudoras top 10</b>\n` + lineas.join('\n');
+    const pie = truncado
+      ? `\n\n⚠️ Se muestran las 10 mayores de <b>${totalVentas ?? 0}</b> ventas con saldo. ` +
+        'Usa el panel para el listado completo.'
+      : '';
+    return `💳 <b>Deudoras top 10</b>\n` + lineas.join('\n') + pie;
   } catch {
     return '💳 Deudoras: ❌ sin datos';
   }
@@ -443,33 +483,29 @@ async function ejecutar(cmd: string, args: string[]): Promise<string> {
     case '/ping':
       return 'pong 🏓';
     case '/salud':
-      return comandoSalud();
+      return conCache('/salud', comandoSalud);
     case '/version':
       return `📦 <b>Version publicada</b>: v${getAppVersion()}+${getVersionCode()}`;
-    case '/resumen': {
-      if (cacheResumen && cacheResumen.hasta > Date.now()) return cacheResumen.texto;
-      const texto = await comandoResumen();
-      cacheResumen = { texto, hasta: Date.now() + CACHE_MS_RESUMEN };
-      return texto;
-    }
+    case '/resumen':
+      return conCache('/resumen', comandoResumen);
     case '/ventas_hoy':
-      return comandoVentasHoy();
+      return conCache('/ventas_hoy', comandoVentasHoy);
     case '/clienta':
       return comandoClienta(args.join(' '));
     case '/deudoras':
-      return comandoDeudoras();
+      return conCache('/deudoras', comandoDeudoras);
     case '/nuevas':
-      return comandoNuevas();
+      return conCache('/nuevas', comandoNuevas);
     case '/vencen':
-      return comandoVencen();
+      return conCache('/vencen', comandoVencen);
     case '/inactivas':
-      return comandoInactivas();
+      return conCache('/inactivas', comandoInactivas);
     case '/errores':
-      return comandoErrores();
+      return conCache('/errores', comandoErrores);
     case '/codigos':
-      return comandoCodigos();
+      return conCache('/codigos', comandoCodigos);
     case '/tickets':
-      return comandoTickets();
+      return conCache('/tickets', comandoTickets);
     case '/ayuda':
       return AYUDA;
     default:
