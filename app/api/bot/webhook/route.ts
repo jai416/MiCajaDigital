@@ -4,6 +4,7 @@ import { supabaseAdmin } from '@/lib/supabase';
 import { enviarTelegram, escaparTelegram, responderCallback, type TecladoTelegram } from '@/lib/telegram';
 import { registrarAccion } from '@/lib/audit';
 import { getAppVersion, getVersionCode } from '@/lib/version';
+import { numero } from '@/lib/formato';
 
 export const dynamic = 'force-dynamic';
 
@@ -155,7 +156,7 @@ function haceDias(dias: number): string {
 }
 
 function fmt(n: number | undefined | null): string {
-  return (n ?? 0).toLocaleString('es-CU', { maximumFractionDigits: 2 });
+  return numero(n ?? 0);
 }
 
 async function comandoResumen(): Promise<Respuesta> {

@@ -1,6 +1,7 @@
 import { supabaseAdmin } from '@/lib/supabase';
 import { requireSession } from '@/lib/auth';
 import { unstable_cache } from 'next/cache';
+import { entero } from '@/lib/formato';
 import precios from '@config/precios.json';
 import {
   MS_DIA,
@@ -388,7 +389,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Se
     { label: 'En Prueba', value: stats.enPrueba, color: 'bg-yellow-500', icon: '⏳' },
     { label: 'Vencidas sin renovar', value: stats.vencidasSinRenovar, color: 'bg-red-500', icon: '📞', title: 'Cuentas activas cuyo plan ya venció.' },
     { label: 'Ingresos Mensuales (MRR)', value: `${(stats.mrrCup / 1000).toFixed(1)}k CUP`, color: 'bg-purple-500', icon: '💰' },
-    { label: 'ARPU', value: `${stats.arpuCup.toLocaleString()} CUP`, color: 'bg-purple-400', icon: '🧮' },
+    { label: 'ARPU', value: `${entero(stats.arpuCup)} CUP`, color: 'bg-purple-400', icon: '🧮' },
     { label: `Nuevos (${stats.dias} días)`, value: `${stats.nuevos}${flecha(stats.nuevosDelta)}`, color: 'bg-sky-500', icon: '🆕' },
     { label: 'Próx. Renovaciones (7d)', value: stats.renovaciones7, color: 'bg-orange-500', icon: '⏰' },
     { label: 'Conversión a Pago', value: `${stats.conversion}%`, color: 'bg-lime-600', icon: '📈' },
@@ -481,7 +482,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Se
               <div key={plan} className="flex items-center justify-between">
                 <span className="text-sm text-gray-600">{labelPlan(plan)}</span>
                 <span className="text-sm font-bold text-gray-800">
-                  {n} · {((PRECIOS_PLAN[plan] ?? 0) * n).toLocaleString()} CUP/mes
+                  {n} · {entero((PRECIOS_PLAN[plan] ?? 0) * n)} CUP/mes
                 </span>
               </div>
             ))}
@@ -619,7 +620,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Se
                   <span className="text-gray-500 ml-2 hidden sm:inline">{c.email}</span>
                 </span>
                 <span className="font-bold text-emerald-700 whitespace-nowrap">
-                  {Math.round(c.monto).toLocaleString()} CUP
+                  {entero(c.monto)} CUP
                 </span>
               </div>
             ))}
@@ -639,7 +640,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Se
           </div>
           <div className="mt-4 pt-4 border-t border-gray-100">
             <p className="text-sm text-gray-600">
-              Ticket promedio: <strong>{stats.ticketPromedio.toLocaleString()} CUP</strong>
+              Ticket promedio: <strong>{entero(stats.ticketPromedio)} CUP</strong>
             </p>
           </div>
         </div>
@@ -693,7 +694,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Se
                       <div className={`${etapa.color} h-full rounded-full flex items-center pl-3 transition-all`}
                         style={{ width: `${ancho}%` }}>
                         <span className="text-xs font-bold text-white whitespace-nowrap">
-                          {etapa.total.toLocaleString()}
+                          {entero(etapa.total)}
                         </span>
                       </div>
                     </div>
