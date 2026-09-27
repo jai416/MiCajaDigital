@@ -1,6 +1,15 @@
 import { supabaseAdmin } from '@/lib/supabase';
 import { requireSession } from '@/lib/auth';
+import { unstable_cache } from 'next/cache';
 import precios from '@config/precios.json';
+import {
+  MS_DIA,
+  DIAS_PRUEBA,
+  DIAS_POR_VENCER,
+  DIAS_RETENCION,
+  DIAS_INACTIVA,
+  DIAS_SEIS_MESES,
+} from '@/lib/constantes';
 
 export const dynamic = 'force-dynamic';
 
@@ -21,7 +30,7 @@ interface SearchParams {
   rango?: string;
 }
 
-const MS_DIA = 86400000;
+
 const TC_DEFAULT = 340;
 
 function deltaPct(actual: number, previo: number): number | null {
@@ -33,7 +42,7 @@ async function getStats(dias: number) {
   const ahora = Date.now();
   const hoyStr = new Date(ahora).toISOString().slice(0, 10);
   const desde = new Date(ahora - (dias - 1) * MS_DIA).toISOString().slice(0, 10);
-  const hace6mIso = new Date(ahora - 183 * MS_DIA).toISOString();
+  const hace6mIso = new Date(ahora - DIAS_SEIS_MESES * MS_DIA).toISOString();
   const ahoraIso = new Date(ahora).toISOString();
 
 
@@ -151,12 +160,12 @@ async function getStats(dias: number) {
 
   const vigentes = rows.filter((n) => n.activo && n.expiracion > ahora);
   const vencidasSinRenovar = rows.filter((n) => n.activo && n.expiracion > 0 && n.expiracion <= ahora);
-  const enPrueba = rows.filter((n) => !n.activo && n.registro >= ahora - 15 * MS_DIA).length;
-  const expiradasSinActivar = rows.filter((n) => !n.activo && n.registro < ahora - 15 * MS_DIA).length;
+  const enPrueba = rows.filter((n) => !n.activo && n.registro >= ahora - DIAS_PRUEBA * MS_DIA).length;
+  const expiradasSinActivar = rows.filter((n) => !n.activo && n.registro < ahora - DIAS_PRUEBA * MS_DIA).length;
   const pruebasTerminando = rows.filter((n) => {
-    if (n.activo || n.registro < ahora - 15 * MS_DIA) return false;
-    const fin = n.registro + 15 * MS_DIA;
-    return fin <= ahora + 3 * MS_DIA && fin > ahora - MS_DIA;
+    if (n.activo || n.registro < ahora - DIAS_PRUEBA * MS_DIA) return false;
+    const fin = n.registro + DIAS_PRUEBA * MS_DIA;
+    return fin <= ahora + DIAS_POR_VENCER * MS_DIA && fin > ahora - MS_DIA;
   }).length;
 
   const mrrCup = vigentes.reduce((s, n) => s + (PRECIOS_PLAN[n.plan] ?? 0), 0);
@@ -166,7 +175,7 @@ async function getStats(dias: number) {
     return acc;
   }, {});
 
-  const renovaciones7 = vigentes.filter((n) => n.expiracion <= ahora + 7 * MS_DIA).length;
+  const renovaciones7 = vigentes.filter((n) => n.expiracion <= ahora + DIAS_RETENCION * MS_DIA).length;
 
   // Registros por día
   const registrosPorDia: { dia: string; total: number }[] = [];
@@ -259,7 +268,7 @@ async function getStats(dias: number) {
       else if (m === 'MLC') gmvCup += bruto * tcDe(String((v as { user_id?: string }).user_id)).mlc;
       else gmvCup += bruto;
     }
-    const hace7Ms = ahora - 7 * MS_DIA;
+    const hace7Ms = ahora - DIAS_RETENCION * MS_DIA;
     const vendedores7 = new Set<string>();
     for (const v of rVentasDetalle.data ?? []) {
       const f = new Date(String((v as { fecha: string }).fecha)).getTime();
@@ -278,7 +287,7 @@ async function getStats(dias: number) {
     });
   }
 
-  const hace7Ms = ahora - 7 * MS_DIA;
+  const hace7Ms = ahora - DIAS_RETENCION * MS_DIA;
   const vendedores7 = new Set<string>();
   for (const v of rVentasDetalle.data ?? []) {
     const f = new Date(String((v as { fecha: string }).fecha)).getTime();
@@ -304,7 +313,7 @@ async function getStats(dias: number) {
   pagosPorNegocio.forEach((pagos) => {
     if (pagos.length < 2) return;
     const sorted = pagos.slice().sort((a, b) => a.usado_en.localeCompare(b.usado_en));
-    const primerPagoFin = new Date(sorted[0].usado_en).getTime() + sorted[0].meses * 30 * MS_DIA;
+    const primerPagoFin = new Date(sorted[0].usado_en).getTime() + sorted[0].meses * DIAS_INACTIVA * MS_DIA;
     const ultimoPago = new Date(sorted[sorted.length - 1].usado_en).getTime();
     if (ultimoPago > primerPagoFin) renovados++;
   });
@@ -319,7 +328,7 @@ async function getStats(dias: number) {
   const inactivas30 = detalle
     ? Math.max(0, vivos.length - Math.min(Number(detalle.vendedores_30d ?? 0), vivos.length))
     : (() => {
-        const hace30Ms = ahora - 30 * MS_DIA;
+        const hace30Ms = ahora - DIAS_INACTIVA * MS_DIA;
         const activasConDatos = new Set<string>();
         for (const v of rVentasDetalle.data ?? []) {
           const f = new Date(String((v as { fecha: string }).fecha)).getTime();
@@ -345,11 +354,30 @@ async function getStats(dias: number) {
   };
 }
 
+/**
+ * Datos del dashboard con caché de 60 s.
+ *
+ * Antes cada visita re-ejecutaba TODAS las consultas (incluidas las de 50k
+ * filas que ya se quitaron con `stats_dashboard_detalle`). 60 s es
+ * imperceptible para el uso real (una persona mirando sus cifras) y evita que
+ * recargar tres veces seguidas dispare tres veces las consultas.
+ */
+const getStatsCached = unstable_cache(
+  async (dias: number) => getStats(dias),
+  ['dashboard-stats'],
+  { revalidate: 60 }
+);
+
 export default async function DashboardPage({ searchParams }: { searchParams: SearchParams }) {
+  // La sesión se comprueba SIEMPRE, fuera de la caché (M3, ronda 27).
   await requireSession();
   const rango = Number(searchParams?.rango);
   const dias = (RANGOS as readonly number[]).includes(rango) ? rango : 7;
-  const stats = await getStats(dias);
+  // Los datos agregados se cachean 60 s: el panel lo mira una persona, así
+  // que refrescar al instante no aporta nada y sí cuesta 7 consultas a
+  // Supabase por visita. Es una única administradora (ADMIN_EMAIL), por eso
+  // la caché se puede compartir entre sesiones sin filtrar nada.
+  const stats = await getStatsCached(dias);
 
   const flecha = (d: number | null) =>
     d === null ? '' : d >= 0 ? ` ↑${d}%` : ` ↓${Math.abs(d)}%`;
