@@ -106,7 +106,22 @@ export async function POST(request: NextRequest) {
     await registrarAccion('login_fallido', 'sesion', null, { ip, email },
       ip, request.headers.get('user-agent') || undefined);
     return NextResponse.json({ error: 'Credenciales incorrectas' }, { status: 401 });
-  } catch {
-    return NextResponse.json({ error: 'Error interno' }, { status: 500 });
+  } catch (e) {
+    // Distinguir "clave incorrecta" (401 de arriba) de "panel mal configurado".
+    // Antes cualquier fallo de configuración devolvía "Error interno", igual que
+    // una clave mala: no había forma de saber si había que cambiar la clave o
+    // las variables del hosting, y el error real se perdía aquí.
+    console.error('[login] fallo inesperado:', e);
+    const esConfig = e instanceof Error &&
+      /ADMIN_EMAIL|ADMIN_PASSWORD|Falta la clave/.test(e.message);
+    return NextResponse.json(
+      {
+        error: esConfig
+          ? 'El panel no está configurado (credenciales del admin). Revisa ADMIN_EMAIL y ADMIN_PASSWORD/ADMIN_PASSWORD_HASH en el hosting.'
+          : 'Error interno del panel. Inténtalo de nuevo.',
+        ...(esConfig ? { detalle: e.message } : {}),
+      },
+      { status: 500 }
+    );
   }
 }

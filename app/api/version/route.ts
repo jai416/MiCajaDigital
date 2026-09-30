@@ -16,7 +16,7 @@ export async function POST() {
     const versionData = {
       version,
       versionCode,
-      url: process.env.APK_DOWNLOAD_URL || 'https://apkpure.com/p/com.tunegocio.micajadigital.app',
+      url: process.env.APK_DOWNLOAD_URL || 'https://qmuvnfduhidadbhtmxvh.supabase.co/storage/v1/object/public/apk/app-release-1.3.4.apk',
       mensaje: `Mi Caja Digital ${version}`,
     };
 

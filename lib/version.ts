@@ -25,7 +25,7 @@ export function getVersion(): VersionData {
     _cache = {
       version: process.env.APP_VERSION || '1.3.4',
       versionCode: Number(process.env.APP_VERSION_CODE || '2022'),
-      url: process.env.APK_DOWNLOAD_URL || 'https://apkpure.com/p/com.tunegocio.micajadigital.app',
+      url: process.env.APK_DOWNLOAD_URL || 'https://qmuvnfduhidadbhtmxvh.supabase.co/storage/v1/object/public/apk/app-release-1.3.4.apk',
       mensaje: `Mi Caja Digital ${process.env.APP_VERSION || '1.3.4'}`,
     };
     return _cache!;

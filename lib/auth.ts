@@ -54,11 +54,15 @@ export function verifyCredentials(email: string, password: string): boolean {
     throw new Error('ADMIN_EMAIL ausente. Configúralo en .env.local o en el hosting.');
   }
 
-  // Fail-fast de producción: SOLO al intentar loguear, no al importar.
-  if (process.env.NODE_ENV === 'production' && !adminPasswordHash) {
+  // Fail-fast: solo al intentar loguear, no al importar. Se acepta CUALQUIERA
+  // de las dos formas de guardar la clave; el hash manda si están las dos.
+  if (process.env.NODE_ENV === 'production' && !adminPasswordHash && !adminPassword) {
     throw new Error(
-      'ADMIN_PASSWORD_HASH ausente en producción. Genera el hash con ' +
-        '`node scripts/hash_password.mjs <clave>` y elimina ADMIN_PASSWORD.'
+      'Falta la clave del panel. Configura una de estas dos: ' +
+        'ADMIN_PASSWORD_HASH (recomendado, generado con ' +
+        '`node scripts/hash_password.mjs <clave>`) o ADMIN_PASSWORD en texto ' +
+        'plano (más simple, pero quien lea las variables del hosting obtiene ' +
+        'la clave directamente).'
     );
   }
 
@@ -72,6 +76,12 @@ export function verifyCredentials(email: string, password: string): boolean {
     // comparación plana para que el tiempo total no filtre información.
     verificarHash(password, HASH_SENUELO);
     passOk = !!adminPassword && valoresIguales(password, adminPassword);
+    if (process.env.NODE_ENV === 'production' && passOk) {
+      console.warn(
+        '[auth] El panel está usando ADMIN_PASSWORD en texto plano. ' +
+          'Migrado a ADMIN_PASSWORD_HASH con `node scripts/hash_password.mjs <clave>`.'
+      );
+    }
   }
   return emailOk && passOk;
 }
