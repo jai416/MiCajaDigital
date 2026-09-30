@@ -70,6 +70,47 @@ export const supabaseAdmin = new Proxy({} as SupabaseClient, {
 // getSupabaseAdmin() explícitamente.
 // ──────────────────────────────────────────────────────────────────────────
 
+/// Bucket público `apk` con los binarios de actualización OTA.
+///
+/// Se verifica desde /api/health porque el 30-09 la OTA falló en producción
+/// durante días: la `url` de `version.json` apuntaba a la página de una tienda
+/// de apps en vez de al APK, y el health check miraba `fotos` y `config` pero
+/// **no** el bucket donde vive el binario. Si el APK no está o no es público,
+/// las clientas ven el diálogo de actualizar y no se les instala nada.
+export async function ensureApkBucketExists(): Promise<{
+  ok: boolean;
+  error?: string;
+}> {
+  try {
+    const admin = getSupabaseAdmin();
+    const { data: buckets, error: listError } = await admin.storage.listBuckets();
+    if (listError) return { ok: false, error: listError.message };
+    const bucket = (buckets ?? []).find((b) => b.name === 'apk');
+    if (!bucket) {
+      const { error: createError } = await admin.storage.createBucket('apk', {
+        public: true,
+      });
+      if (createError) return { ok: false, error: createError.message };
+      return { ok: true };
+    }
+    // Existe pero privado: el APK dejaría de descargarse sin login.
+    if (bucket.public !== true) {
+      const { error: updError } = await admin.storage.updateBucket('apk', {
+        public: true,
+      });
+      if (updError) {
+        return { ok: false, error: `Bucket apk no es público: ${updError.message}` };
+      }
+    }
+    return { ok: true };
+  } catch (e) {
+    return {
+      ok: false,
+      error: e instanceof Error ? e.message : 'Error desconocido',
+    };
+  }
+}
+
 /// Asegura que el bucket privado "fotos" exista (URLs firmadas desde la app).
 export async function ensureFotosBucketExists(): Promise<{
   ok: boolean;
