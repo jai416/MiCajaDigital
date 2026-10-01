@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase';
 import { getSession } from '@/lib/auth';
-import { getAppVersion, getVersionCode } from '@/lib/version';
+import { getAppVersion, getVersion, getVersionCode } from '@/lib/version';
 
 export const dynamic = 'force-dynamic';
 
@@ -13,11 +13,16 @@ export async function POST() {
     const version = getAppVersion();
     const versionCode = getVersionCode();
 
+    // Se devuelve el contenido de config/version.json tal cual (versión, url,
+    // mensaje y "cambios"), con el env var como overrides. Antes el mensaje se
+    // fabricaba aquí y la url tenía un 1.3.4 escrito a mano.
+    const publicada = getVersion();
     const versionData = {
       version,
       versionCode,
-      url: process.env.APK_DOWNLOAD_URL || 'https://qmuvnfduhidadbhtmxvh.supabase.co/storage/v1/object/public/apk/app-release-1.3.4.apk',
-      mensaje: `Mi Caja Digital ${version}`,
+      url: process.env.APK_DOWNLOAD_URL || publicada.url,
+      mensaje: publicada.mensaje || `Mi Caja Digital ${version}`,
+      cambios: publicada.cambios ?? [],
     };
 
     const { error } = await supabaseAdmin
