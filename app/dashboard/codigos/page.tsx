@@ -211,30 +211,30 @@ export default function CodigosPage() {
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold text-gray-800">Códigos de pago</h1>
-        <span className="text-sm text-gray-500">{total} generados</span>
+        <h1 className="text-2xl font-bold text-mc-text">Códigos de pago</h1>
+        <span className="text-sm text-mc-muted">{total} generados</span>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-          <h2 className="text-lg font-bold text-gray-800 mb-4">Generar código</h2>
+        <div className="bg-mc-surface rounded-xl shadow-sm border border-mc-border p-6">
+          <h2 className="text-lg font-bold text-mc-text mb-4">Generar código</h2>
           <div className="space-y-4">
             <div>
-              <label htmlFor="codigo-email" className="block text-sm font-medium text-gray-600 mb-1">Correo de la clienta</label>
+              <label htmlFor="codigo-email" className="block text-sm font-medium text-mc-muted mb-1">Correo de la clienta</label>
               <input
                 id="codigo-email"
                 type="email"
                 placeholder="cliente@correo.com"
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
+                className="w-full px-4 py-2 border border-mc-border rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
               />
             </div>
             <div>
-              <label htmlFor="codigo-plan" className="block text-sm font-medium text-gray-600 mb-1">Plan</label>
+              <label htmlFor="codigo-plan" className="block text-sm font-medium text-mc-muted mb-1">Plan</label>
               <select
                 id="codigo-plan"
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
+                className="w-full px-4 py-2 border border-mc-border rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
                 value={plan}
                 onChange={(e) => setPlan(e.target.value)}
               >
@@ -246,10 +246,10 @@ export default function CodigosPage() {
               </select>
             </div>
             <div>
-              <label htmlFor="codigo-duracion" className="block text-sm font-medium text-gray-600 mb-1">Duración</label>
+              <label htmlFor="codigo-duracion" className="block text-sm font-medium text-mc-muted mb-1">Duración</label>
               <select
                 id="codigo-duracion"
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
+                className="w-full px-4 py-2 border border-mc-border rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
                 value={duracion}
                 onChange={(e) => setDuracion(Number(e.target.value))}
               >
@@ -259,10 +259,10 @@ export default function CodigosPage() {
               </select>
             </div>
             <div>
-              <label htmlFor="codigo-metodo" className="block text-sm font-medium text-gray-600 mb-1">Método de pago</label>
+              <label htmlFor="codigo-metodo" className="block text-sm font-medium text-mc-muted mb-1">Método de pago</label>
               <select
                 id="codigo-metodo"
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
+                className="w-full px-4 py-2 border border-mc-border rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
                 value={metodo}
                 onChange={(e) => setMetodo(e.target.value)}
               >
@@ -271,24 +271,24 @@ export default function CodigosPage() {
                 <option value="usdt">USDT (Binance)</option>
               </select>
             </div>
-            <div className="bg-emerald-50 border border-emerald-200 rounded-lg px-4 py-3">
-              <p className="text-sm font-semibold text-emerald-700">
+            <div className="bg-mc-soft border border-mc-primary rounded-lg px-4 py-3">
+              <p className="text-sm font-semibold text-mc-primary">
                 Total: {precio.toLocaleString()} CUP
               </p>
             </div>
-            {error && <p className="text-sm text-red-600">{error}</p>}
+            {error && <p className="text-sm text-mc-danger">{error}</p>}
             <div className="flex gap-2">
               <button
                 onClick={() => generar(false)}
                 disabled={cargando}
-                className="flex-1 px-4 py-3 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white rounded-lg font-bold transition"
+                className="flex-1 px-4 py-3 bg-mc-primary hover:bg-mc-primary disabled:opacity-50 text-white rounded-lg font-bold transition"
               >
                 {cargando ? 'Generando...' : 'Generar código'}
               </button>
               <button
                 onClick={() => generar(true)}
                 disabled={cargando}
-                className="flex-1 px-4 py-3 bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white rounded-lg font-bold transition"
+                className="flex-1 px-4 py-3 bg-mc-primary hover:bg-green-700 disabled:opacity-50 text-white rounded-lg font-bold transition"
                 title="Generar código y abrir WhatsApp con el mensaje listo"
               >
                 {cargando ? 'Generando...' : ' Confirmar y enviar'}
@@ -296,25 +296,25 @@ export default function CodigosPage() {
             </div>
 
             {confirmarGenerar && (
-              <div className="mt-4 bg-amber-50 border border-amber-300 rounded-xl p-4">
-                <p className="text-sm font-bold text-amber-800 mb-2">¿Confirmar?</p>
-                <p className="text-sm text-amber-700 mb-1">
+              <div className="mt-4 bg-mc-warning/10 border border-mc-warning rounded-xl p-4">
+                <p className="text-sm font-bold text-mc-warning mb-2">¿Confirmar?</p>
+                <p className="text-sm text-mc-warning mb-1">
                   Se generará un código para <strong>{email.trim()}</strong>
                 </p>
-                <p className="text-xs text-amber-600 mb-3">
+                <p className="text-xs text-mc-warning mb-3">
                   Plan {plan === 'basico' ? 'Básico' : plan === 'premium' ? 'Premium' : 'Pro'} ·{''}
                   {durSel.label} · {precio.toLocaleString()} CUP
                 </p>
                 <div className="flex gap-2">
                   <button
                     onClick={confirmarGenerarCodigo}
-                    className="flex-1 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold text-sm transition"
+                    className="flex-1 px-4 py-2 bg-mc-primary hover:bg-mc-primary text-white rounded-lg font-bold text-sm transition"
                   >
                     Confirmar
                   </button>
                   <button
                     onClick={() => setConfirmarGenerar(false)}
-                    className="flex-1 px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg font-bold text-sm transition"
+                    className="flex-1 px-4 py-2 bg-mc-border hover:bg-mc-border text-mc-text rounded-lg font-bold text-sm transition"
                   >
                     Cancelar
                   </button>
@@ -324,19 +324,19 @@ export default function CodigosPage() {
           </div>
 
           {generado && (
-            <div className="mt-6 bg-blue-50 border border-blue-200 rounded-xl p-4 text-center">
-              <p className="text-xs text-blue-700 font-semibold uppercase tracking-wide">Código generado</p>
-              <p className="text-3xl font-black text-blue-900 my-2 tracking-[0.3em]">{generado.codigo}</p>
-              <p className="text-sm text-blue-700">
+            <div className="mt-6 bg-mc-info/10 border border-mc-info rounded-xl p-4 text-center">
+              <p className="text-xs text-mc-info font-semibold uppercase tracking-wide">Código generado</p>
+              <p className="text-3xl font-black text-mc-info my-2 tracking-[0.3em]">{generado.codigo}</p>
+              <p className="text-sm text-mc-info">
                 {generado.plan === 'basico' ? 'Básico' : generado.plan === 'premium' ? 'Premium' : 'Pro'} ·{''}
                 {DURACIONES.find((d) => d.id === generado.duracion_meses)?.label} ·{''}
                 {generado.precio_pagado.toLocaleString()} CUP
               </p>
-              <p className="text-xs text-blue-600 mt-1">{generado.email}</p>
+              <p className="text-xs text-mc-info mt-1">{generado.email}</p>
               <div className="flex justify-center gap-2 mt-3">
                 <button
                   onClick={() => copiar(generado.codigo)}
-                  className="px-4 py-2 text-xs font-semibold bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
+                  className="px-4 py-2 text-xs font-semibold bg-mc-info text-white rounded-lg hover:bg-blue-700 transition"
                 >
                   {copiado === generado.codigo ? ' Copiado' : 'Copiar'}
                 </button>
@@ -346,7 +346,7 @@ export default function CodigosPage() {
                   )}`}
                   target="_blank"
                   rel="noreferrer"
-                  className="px-4 py-2 text-xs font-semibold bg-green-600 text-white rounded-lg hover:bg-green-700 transition"
+                  className="px-4 py-2 text-xs font-semibold bg-mc-primary text-white rounded-lg hover:bg-green-700 transition"
                 >
                   Enviar por WhatsApp
                 </a>
@@ -355,8 +355,8 @@ export default function CodigosPage() {
           )}
         </div>
 
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-x-auto">
-          <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200">
+        <div className="bg-mc-surface rounded-xl shadow-sm border border-mc-border overflow-x-auto">
+          <div className="flex items-center justify-between px-4 py-3 border-b border-mc-border">
             <div className="flex gap-2">
               {[
                 { id: 'todos', label: 'Todos' },
@@ -369,8 +369,8 @@ export default function CodigosPage() {
                   onClick={() => setFiltro(f.id)}
                   className={`px-3 py-1.5 rounded-full text-xs font-semibold transition ${
                     filtro === f.id
-                      ? 'bg-emerald-600 text-white'
-                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                      ? 'bg-mc-primary text-white'
+                      : 'bg-mc-field text-mc-muted hover:bg-mc-border'
                   }`}
                 >
                   {f.label}
@@ -380,30 +380,30 @@ export default function CodigosPage() {
             <button
               onClick={descargarCSV}
               disabled={visibles.length === 0}
-              className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-blue-50 text-blue-700 hover:bg-blue-100 disabled:opacity-50 transition"
+              className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-mc-info/10 text-mc-info hover:bg-mc-info/10 disabled:opacity-50 transition"
             >
                Exportar CSV
             </button>
           </div>
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-gray-200 bg-gray-50">
-                <th scope="col" className="text-left px-4 py-3 font-semibold text-gray-600">Código</th>
-                <th scope="col" className="text-left px-4 py-3 font-semibold text-gray-600">Email</th>
-                <th scope="col" className="text-center px-4 py-3 font-semibold text-gray-600">Plan</th>
-                <th scope="col" className="text-center px-4 py-3 font-semibold text-gray-600">Meses</th>
-                <th scope="col" className="text-center px-4 py-3 font-semibold text-gray-600">Precio</th>
-                <th scope="col" className="text-center px-4 py-3 font-semibold text-gray-600">Estado</th>
-                <th scope="col" className="text-center px-4 py-3 font-semibold text-gray-600">Pago</th>
-                <th scope="col" className="text-left px-4 py-3 font-semibold text-gray-600">Creado</th>
-                <th scope="col" className="text-center px-4 py-3 font-semibold text-gray-600"></th>
+              <tr className="border-b border-mc-border bg-mc-bg">
+                <th scope="col" className="text-left px-4 py-3 font-semibold text-mc-muted">Código</th>
+                <th scope="col" className="text-left px-4 py-3 font-semibold text-mc-muted">Email</th>
+                <th scope="col" className="text-center px-4 py-3 font-semibold text-mc-muted">Plan</th>
+                <th scope="col" className="text-center px-4 py-3 font-semibold text-mc-muted">Meses</th>
+                <th scope="col" className="text-center px-4 py-3 font-semibold text-mc-muted">Precio</th>
+                <th scope="col" className="text-center px-4 py-3 font-semibold text-mc-muted">Estado</th>
+                <th scope="col" className="text-center px-4 py-3 font-semibold text-mc-muted">Pago</th>
+                <th scope="col" className="text-left px-4 py-3 font-semibold text-mc-muted">Creado</th>
+                <th scope="col" className="text-center px-4 py-3 font-semibold text-mc-muted"></th>
               </tr>
             </thead>
             <tbody>
               {visibles.map((c) => (
-                <tr key={c.id} className="border-b border-gray-100 hover:bg-gray-50 transition">
+                <tr key={c.id} className="border-b border-mc-border hover:bg-mc-bg transition">
                   <td className="px-4 py-3 font-mono font-bold">{c.codigo}</td>
-                  <td className="px-4 py-3 text-gray-500">{c.email}</td>
+                  <td className="px-4 py-3 text-mc-muted">{c.email}</td>
                   <td className="px-4 py-3 text-center">{labelPlan(c.plan)}</td>
                   <td className="px-4 py-3 text-center">{c.duracion_meses}</td>
                   <td className="px-4 py-3 text-center">{c.precio_pagado.toLocaleString()} CUP</td>
@@ -411,30 +411,30 @@ export default function CodigosPage() {
                     <span
                       className={`inline-flex px-2 py-1 rounded-full text-xs font-semibold ${
                         c.usado
-                          ? 'bg-gray-100 text-gray-500'
+                          ? 'bg-mc-field text-mc-muted'
                           : new Date(c.fecha_expiracion).getTime() < Date.now()
                             ? 'bg-rose-100 text-rose-700'
-                            : 'bg-emerald-100 text-emerald-700'
+                            : 'bg-mc-soft text-mc-primary'
                       }`}
                     >
                       {c.usado ? 'Usado' : new Date(c.fecha_expiracion).getTime() < Date.now() ? 'Vencido' : 'Disponible'}
                     </span>
                     {c.usado && c.usado_en && (
-                      <p className="text-[10px] text-gray-500 mt-1">
+                      <p className="text-[10px] text-mc-muted mt-1">
                         el {fechaHora(c.usado_en)}
                       </p>
                     )}
                     {!c.usado && (
-                      <p className="text-[10px] text-gray-500 mt-1">
+                      <p className="text-[10px] text-mc-muted mt-1">
                         vence el {fechaCorta(c.fecha_expiracion)}
                       </p>
                     )}
                   </td>
                   <td className="px-4 py-3 text-center">
                     {c.usado ? (
-                      <span className="inline-flex px-2 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-500">—</span>
+                      <span className="inline-flex px-2 py-1 rounded-full text-xs font-semibold bg-mc-field text-mc-muted">—</span>
                     ) : c.estado_pago === 'confirmado' ? (
-                      <span className="inline-flex px-2 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-700">Confirmado</span>
+                      <span className="inline-flex px-2 py-1 rounded-full text-xs font-semibold bg-mc-soft text-mc-primary">Confirmado</span>
                     ) : c.estado_pago === 'rechazado' ? (
                       <span className="inline-flex px-2 py-1 rounded-full text-xs font-semibold bg-rose-100 text-rose-700">Rechazado</span>
                     ) : (
@@ -442,7 +442,7 @@ export default function CodigosPage() {
                         <button
                           onClick={() => actualizarPago(c.id, 'confirmado')}
                           disabled={actualizandoPago === c.id}
-                          className="px-2 py-1 text-[10px] font-semibold rounded bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50 transition"
+                          className="px-2 py-1 text-[10px] font-semibold rounded bg-mc-primary text-white hover:bg-mc-primary disabled:opacity-50 transition"
                           title="Confirmar pago"
                         ></button>
                         <button
@@ -454,7 +454,7 @@ export default function CodigosPage() {
                       </div>
                     )}
                   </td>
-                  <td className="px-4 py-3 text-gray-500 text-xs">
+                  <td className="px-4 py-3 text-mc-muted text-xs">
                     {fechaCorta(c.created_at)}
                   </td>
                   <td className="px-4 py-3 text-center">
@@ -465,7 +465,7 @@ export default function CodigosPage() {
                         )}`}
                         target="_blank"
                         rel="noreferrer"
-                        className="inline-flex px-2 py-1 text-xs font-semibold rounded-lg bg-green-600 text-white hover:bg-green-700 transition"
+                        className="inline-flex px-2 py-1 text-xs font-semibold rounded-lg bg-mc-primary text-white hover:bg-green-700 transition"
                       >
                         Enviar
                       </a>
@@ -475,7 +475,7 @@ export default function CodigosPage() {
               ))}
               {visibles.length === 0 && (
                 <tr>
-                  <td colSpan={9} className="px-4 py-8 text-center text-gray-500">
+                  <td colSpan={9} className="px-4 py-8 text-center text-mc-muted">
                     No hay códigos en este filtro
                   </td>
                 </tr>
@@ -483,21 +483,21 @@ export default function CodigosPage() {
             </tbody>
           </table>
           {totalPaginas > 1 && (
-            <div className="flex items-center justify-between px-4 py-3 border-t border-gray-200">
+            <div className="flex items-center justify-between px-4 py-3 border-t border-mc-border">
               <button
                 onClick={() => cargar(pagina - 1)}
                 disabled={pagina <= 1}
-                className="px-4 py-2 border border-gray-300 rounded-lg text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition"
+                className="px-4 py-2 border border-mc-border rounded-lg text-sm font-semibold text-mc-text hover:bg-mc-bg disabled:opacity-40 disabled:cursor-not-allowed transition"
               >
                  Anterior
               </button>
-              <span className="text-xs text-gray-500">
+              <span className="text-xs text-mc-muted">
                 Página {pagina} de {totalPaginas} · el CSV exporta esta página
               </span>
               <button
                 onClick={() => cargar(pagina + 1)}
                 disabled={pagina >= totalPaginas}
-                className="px-4 py-2 border border-gray-300 rounded-lg text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition"
+                className="px-4 py-2 border border-mc-border rounded-lg text-sm font-semibold text-mc-text hover:bg-mc-bg disabled:opacity-40 disabled:cursor-not-allowed transition"
               >
                 Siguiente 
               </button>

@@ -415,11 +415,11 @@ export default async function DashboardPage({ searchParams }: { searchParams: Se
   return (
     <div>
       <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
-        <h1 className="text-2xl font-bold text-gray-800">Dashboard</h1>
-        <div className="flex items-center gap-1 bg-white border border-gray-200 rounded-lg p-1">
+        <h1 className="text-2xl font-bold text-mc-text">Dashboard</h1>
+        <div className="flex items-center gap-1 bg-mc-surface border border-mc-border rounded-lg p-1">
           {RANGOS.map((r) => (
             <a key={r} href={`/dashboard?rango=${r}`}
-              className={`px-3 py-1.5 rounded-md text-sm font-semibold transition ${stats.dias === r ? 'bg-emerald-600 text-white' : 'text-gray-600 hover:bg-gray-100'}`}>
+              className={`px-3 py-1.5 rounded-md text-sm font-semibold transition ${stats.dias === r ? 'bg-mc-primary text-white' : 'text-mc-muted hover:bg-mc-field'}`}>
               {r} días
             </a>
           ))}
@@ -427,25 +427,25 @@ export default async function DashboardPage({ searchParams }: { searchParams: Se
       </div>
 
       {stats.fallos.length > 0 && (
-        <div role="alert" className="mb-6 rounded-xl border border-orange-300 bg-orange-50 p-4 text-sm text-orange-900">
+        <div role="alert" className="mb-6 rounded-xl border border-orange-300 bg-mc-warning/10 p-4 text-sm text-mc-warning">
           <p className="font-bold"> Datos parciales</p>
           <p className="mt-1">No se pudieron leer: {stats.fallos.join(', ')}. Recarga la página para reintentar.</p>
         </div>
       )}
 
       {/* Acciones de hoy */}
-      <div className="bg-white rounded-xl shadow-sm border border-orange-200 p-6 mb-8">
-        <h2 className="text-lg font-bold text-gray-800 mb-1"> Acciones de hoy</h2>
-        <p className="text-sm text-gray-500 mb-4">Lo que más rápido se convierte en dinero o evita perderlo.</p>
+      <div className="bg-mc-surface rounded-xl shadow-sm border border-orange-200 p-6 mb-8">
+        <h2 className="text-lg font-bold text-mc-text mb-1"> Acciones de hoy</h2>
+        <p className="text-sm text-mc-muted mb-4">Lo que más rápido se convierte en dinero o evita perderlo.</p>
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          <a href="/dashboard/negocios" className="group bg-red-50 hover:bg-red-100 transition rounded-lg p-4">
-            <p className="text-3xl font-black text-red-700">{stats.vencidasSinRenovar}</p>
-            <p className="text-xs text-red-600 font-semibold mt-1">Vencidas sin renovar</p>
+          <a href="/dashboard/negocios" className="group bg-mc-danger/10 hover:bg-mc-danger/10 transition rounded-lg p-4">
+            <p className="text-3xl font-black text-mc-danger">{stats.vencidasSinRenovar}</p>
+            <p className="text-xs text-mc-danger font-semibold mt-1">Vencidas sin renovar</p>
             <p className="text-[11px] text-red-400 mt-1 group-hover:text-red-500">Llámalas  cobro pendiente</p>
           </a>
-          <a href="/dashboard/codigos" className="group bg-amber-50 hover:bg-amber-100 transition rounded-lg p-4">
-            <p className="text-3xl font-black text-amber-700">{stats.codigosPorVencer}</p>
-            <p className="text-xs text-amber-600 font-semibold mt-1">Códigos por vencer (3d)</p>
+          <a href="/dashboard/codigos" className="group bg-mc-warning/10 hover:bg-mc-warning/10 transition rounded-lg p-4">
+            <p className="text-3xl font-black text-mc-warning">{stats.codigosPorVencer}</p>
+            <p className="text-xs text-mc-warning font-semibold mt-1">Códigos por vencer (3d)</p>
             <p className="text-[11px] text-amber-400 mt-1 group-hover:text-amber-500">Recuérdales canjear</p>
           </a>
           <a href="/dashboard/codigos" className="group bg-rose-50 hover:bg-rose-100 transition rounded-lg p-4">
@@ -490,44 +490,44 @@ export default async function DashboardPage({ searchParams }: { searchParams: Se
 
       {/* Suscripciones + Activos por plan */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-          <h2 className="text-lg font-bold text-gray-800 mb-4">Activos por plan (vigentes)</h2>
+        <div className="bg-mc-surface rounded-xl shadow-sm border border-mc-border p-6">
+          <h2 className="text-lg font-bold text-mc-text mb-4">Activos por plan (vigentes)</h2>
           <div className="space-y-3">
             {Object.entries(stats.porPlan).length === 0 && (
-              <p className="text-sm text-gray-500">Aún no hay suscriptores activos.</p>
+              <p className="text-sm text-mc-muted">Aún no hay suscriptores activos.</p>
             )}
             {Object.entries(stats.porPlan).map(([plan, n]) => (
               <div key={plan} className="flex items-center justify-between">
-                <span className="text-sm text-gray-600">{labelPlan(plan)}</span>
-                <span className="text-sm font-bold text-gray-800">
+                <span className="text-sm text-mc-muted">{labelPlan(plan)}</span>
+                <span className="text-sm font-bold text-mc-text">
                   {n} · {entero((PRECIOS_PLAN[plan] ?? 0) * n)} CUP/mes
                 </span>
               </div>
             ))}
           </div>
           {stats.enPapelera > 0 && (
-            <p className="text-xs text-gray-500 mt-4"> {stats.enPapelera} en la papelera.</p>
+            <p className="text-xs text-mc-muted mt-4"> {stats.enPapelera} en la papelera.</p>
           )}
         </div>
 
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 lg:col-span-2">
-          <h2 className="text-lg font-bold text-gray-800 mb-2">Suscripciones</h2>
+        <div className="bg-mc-surface rounded-xl shadow-sm border border-mc-border p-6 lg:col-span-2">
+          <h2 className="text-lg font-bold text-mc-text mb-2">Suscripciones</h2>
           <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-            <div className="bg-emerald-50 rounded-lg p-4">
-              <p className="text-2xl font-bold text-emerald-700">{stats.activos}</p>
-              <p className="text-xs text-emerald-600">Vigentes</p>
+            <div className="bg-mc-soft rounded-lg p-4">
+              <p className="text-2xl font-bold text-mc-primary">{stats.activos}</p>
+              <p className="text-xs text-mc-primary">Vigentes</p>
             </div>
-            <div className="bg-red-50 rounded-lg p-4">
-              <p className="text-2xl font-bold text-red-700">{stats.vencidasSinRenovar}</p>
-              <p className="text-xs text-red-600">Vencidas sin renovar</p>
+            <div className="bg-mc-danger/10 rounded-lg p-4">
+              <p className="text-2xl font-bold text-mc-danger">{stats.vencidasSinRenovar}</p>
+              <p className="text-xs text-mc-danger">Vencidas sin renovar</p>
             </div>
             <div className="bg-yellow-50 rounded-lg p-4">
               <p className="text-2xl font-bold text-yellow-700">{stats.enPrueba}</p>
               <p className="text-xs text-yellow-600">En prueba</p>
             </div>
-            <div className="bg-gray-50 rounded-lg p-4">
-              <p className="text-2xl font-bold text-gray-700">{stats.expiradasSinActivar}</p>
-              <p className="text-xs text-gray-500">Expiradas / sin activar</p>
+            <div className="bg-mc-bg rounded-lg p-4">
+              <p className="text-2xl font-bold text-mc-text">{stats.expiradasSinActivar}</p>
+              <p className="text-xs text-mc-muted">Expiradas / sin activar</p>
             </div>
             <div className="bg-indigo-50 rounded-lg p-4">
               <p className="text-2xl font-bold text-indigo-700">{stats.codigosUsados}/{stats.codigosGenerados}</p>
@@ -539,8 +539,8 @@ export default async function DashboardPage({ searchParams }: { searchParams: Se
 
       {/* Gráficos de registros + actividad */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-6">
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-          <h2 className="text-lg font-bold text-gray-800 mb-4">Registros últimos {stats.dias} días</h2>
+        <div className="bg-mc-surface rounded-xl shadow-sm border border-mc-border p-6">
+          <h2 className="text-lg font-bold text-mc-text mb-4">Registros últimos {stats.dias} días</h2>
           <div className="flex items-end justify-between gap-2 h-40">
             {(() => {
               const max = Math.max(1, ...stats.registrosPorDia.map((x) => x.total));
@@ -548,9 +548,9 @@ export default async function DashboardPage({ searchParams }: { searchParams: Se
                 const altura = Math.max(4, Math.round((d.total / max) * 100));
                 return (
                   <div key={d.dia} className="flex flex-col items-center flex-1 gap-1">
-                    <span className="text-xs font-bold text-gray-700">{d.total}</span>
+                    <span className="text-xs font-bold text-mc-text">{d.total}</span>
                     <div className="w-full rounded-t bg-indigo-500" style={{ height: `${altura}px` }} />
-                    <span className="text-[10px] text-gray-500">{d.dia}</span>
+                    <span className="text-[10px] text-mc-muted">{d.dia}</span>
                   </div>
                 );
               });
@@ -558,8 +558,8 @@ export default async function DashboardPage({ searchParams }: { searchParams: Se
           </div>
         </div>
 
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 lg:col-span-2">
-          <h2 className="text-lg font-bold text-gray-800 mb-2">Actividad real de la app (ventas válidas)</h2>
+        <div className="bg-mc-surface rounded-xl shadow-sm border border-mc-border p-6 lg:col-span-2">
+          <h2 className="text-lg font-bold text-mc-text mb-2">Actividad real de la app (ventas válidas)</h2>
           <div className="flex items-end justify-between gap-2 h-40">
             {(() => {
               const maxAct = Math.max(1, ...stats.actividadPorDia.map((x) => x.ventas));
@@ -567,9 +567,9 @@ export default async function DashboardPage({ searchParams }: { searchParams: Se
                 const altura = Math.max(4, Math.round((d.ventas / maxAct) * 100));
                 return (
                   <div key={d.dia} className="flex flex-col items-center flex-1 gap-1">
-                    <span className="text-xs font-bold text-gray-700">{d.ventas}</span>
+                    <span className="text-xs font-bold text-mc-text">{d.ventas}</span>
                     <div className="w-full rounded-t bg-violet-500" style={{ height: `${altura}px` }} />
-                    <span className="text-[10px] text-gray-500">{d.dia}</span>
+                    <span className="text-[10px] text-mc-muted">{d.dia}</span>
                   </div>
                 );
               });
@@ -580,7 +580,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Se
               <p className="text-2xl font-bold text-violet-700">
                 {stats.ventasRango}
                 {stats.ventasDelta !== null && (
-                  <span className={`text-sm ml-1 ${stats.ventasDelta >= 0 ? 'text-green-600' : 'text-red-500'}`}>
+                  <span className={`text-sm ml-1 ${stats.ventasDelta >= 0 ? 'text-mc-primary' : 'text-red-500'}`}>
                     {flecha(stats.ventasDelta)}
                   </span>
                 )}
@@ -603,8 +603,8 @@ export default async function DashboardPage({ searchParams }: { searchParams: Se
 
       {/* Ingresos por mes + Top clientas */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-          <h2 className="text-lg font-bold text-gray-800 mb-4">Ingresos por mes (códigos canjeados)</h2>
+        <div className="bg-mc-surface rounded-xl shadow-sm border border-mc-border p-6">
+          <h2 className="text-lg font-bold text-mc-text mb-4">Ingresos por mes (códigos canjeados)</h2>
           <div className="flex items-end justify-between gap-3 h-40">
             {(() => {
               const maxMes = Math.max(1, ...stats.ingresosPorMes.map((x) => x.total));
@@ -612,11 +612,11 @@ export default async function DashboardPage({ searchParams }: { searchParams: Se
                 const altura = Math.max(4, Math.round((m.total / maxMes) * 100));
                 return (
                   <div key={m.mes} className="flex flex-col items-center flex-1 gap-1">
-                    <span className="text-xs font-bold text-gray-700">
+                    <span className="text-xs font-bold text-mc-text">
                       {m.total >= 1000 ? `${(m.total / 1000).toFixed(1)}k` : m.total}
                     </span>
                     <div className="w-full rounded-t bg-purple-500" style={{ height: `${altura}px` }} />
-                    <span className="text-[10px] text-gray-500 capitalize">{m.mes}</span>
+                    <span className="text-[10px] text-mc-muted capitalize">{m.mes}</span>
                   </div>
                 );
               });
@@ -624,20 +624,20 @@ export default async function DashboardPage({ searchParams }: { searchParams: Se
           </div>
         </div>
 
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-          <h2 className="text-lg font-bold text-gray-800 mb-2"> Top clientas por pago acumulado</h2>
+        <div className="bg-mc-surface rounded-xl shadow-sm border border-mc-border p-6">
+          <h2 className="text-lg font-bold text-mc-text mb-2"> Top clientas por pago acumulado</h2>
           <div className="space-y-2 max-h-56 overflow-auto">
             {stats.topClientas.length === 0 && (
-              <p className="text-sm text-gray-500">Todavía no hay canjes registrados.</p>
+              <p className="text-sm text-mc-muted">Todavía no hay canjes registrados.</p>
             )}
             {stats.topClientas.map((c, i) => (
-              <div key={c.email + i} className="flex items-center justify-between text-sm border-b border-gray-50 pb-1">
+              <div key={c.email + i} className="flex items-center justify-between text-sm border-b border-mc-border pb-1">
                 <span className="truncate mr-2">
-                  <span className="font-bold text-gray-500 mr-2">#{i + 1}</span>
-                  <span className="text-gray-700 font-medium">{c.nombre}</span>
-                  <span className="text-gray-500 ml-2 hidden sm:inline">{c.email}</span>
+                  <span className="font-bold text-mc-muted mr-2">#{i + 1}</span>
+                  <span className="text-mc-text font-medium">{c.nombre}</span>
+                  <span className="text-mc-muted ml-2 hidden sm:inline">{c.email}</span>
                 </span>
-                <span className="font-bold text-emerald-700 whitespace-nowrap">
+                <span className="font-bold text-mc-primary whitespace-nowrap">
                   {entero(c.monto)} CUP
                 </span>
               </div>
@@ -648,23 +648,23 @@ export default async function DashboardPage({ searchParams }: { searchParams: Se
 
       {/* Renovaciones + Retención */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-6">
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-          <h2 className="text-lg font-bold text-gray-800 mb-4">Próximas renovaciones</h2>
+        <div className="bg-mc-surface rounded-xl shadow-sm border border-mc-border p-6">
+          <h2 className="text-lg font-bold text-mc-text mb-4">Próximas renovaciones</h2>
           <div className="grid grid-cols-2 gap-4">
-            <div className="bg-amber-50 rounded-lg p-4">
-              <p className="text-2xl font-bold text-amber-700">{stats.renovaciones7}</p>
-              <p className="text-xs text-amber-600">Renovaciones próximas 7d</p>
+            <div className="bg-mc-warning/10 rounded-lg p-4">
+              <p className="text-2xl font-bold text-mc-warning">{stats.renovaciones7}</p>
+              <p className="text-xs text-mc-warning">Renovaciones próximas 7d</p>
             </div>
           </div>
-          <div className="mt-4 pt-4 border-t border-gray-100">
-            <p className="text-sm text-gray-600">
+          <div className="mt-4 pt-4 border-t border-mc-border">
+            <p className="text-sm text-mc-muted">
               Ticket promedio: <strong>{entero(stats.ticketPromedio)} CUP</strong>
             </p>
           </div>
         </div>
 
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 lg:col-span-2">
-          <h2 className="text-lg font-bold text-gray-800 mb-2">Retención y activación</h2>
+        <div className="bg-mc-surface rounded-xl shadow-sm border border-mc-border p-6 lg:col-span-2">
+          <h2 className="text-lg font-bold text-mc-text mb-2">Retención y activación</h2>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div className="bg-fuchsia-50 rounded-lg p-4">
               <p className="text-2xl font-bold text-fuchsia-700">{stats.retencion}%</p>
@@ -687,14 +687,14 @@ export default async function DashboardPage({ searchParams }: { searchParams: Se
       </div>
 
       {/* Funnel */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mt-6">
-        <h2 className="text-lg font-bold text-gray-800 mb-1"> Funnel de conversión</h2>
-        <p className="text-sm text-gray-500 mb-6">De registrados a clientes de pago.</p>
+      <div className="bg-mc-surface rounded-xl shadow-sm border border-mc-border p-6 mt-6">
+        <h2 className="text-lg font-bold text-mc-text mb-1"> Funnel de conversión</h2>
+        <p className="text-sm text-mc-muted mb-6">De registrados a clientes de pago.</p>
         {(() => {
           const etapas = [
-            { label: 'Registrados', total: stats.total, color: 'bg-blue-500', textColor: 'text-blue-700' },
+            { label: 'Registrados', total: stats.total, color: 'bg-mc-info', textColor: 'text-mc-info' },
             { label: 'Con prueba activa', total: stats.enPrueba + stats.activos + stats.vencidasSinRenovar, color: 'bg-yellow-500', textColor: 'text-yellow-700' },
-            { label: 'Primer pago', total: stats.conPago, color: 'bg-emerald-500', textColor: 'text-emerald-700' },
+            { label: 'Primer pago', total: stats.conPago, color: 'bg-mc-primary', textColor: 'text-mc-primary' },
             { label: 'Renovaron', total: stats.renovados, color: 'bg-purple-500', textColor: 'text-purple-700' },
           ];
           const maxEtapas = Math.max(1, ...etapas.map((e) => e.total));
@@ -708,7 +708,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Se
                     <span className={`w-36 text-sm font-semibold ${etapa.textColor} text-right shrink-0`}>
                       {etapa.label}
                     </span>
-                    <div className="flex-1 bg-gray-100 rounded-full h-8 overflow-hidden">
+                    <div className="flex-1 bg-mc-field rounded-full h-8 overflow-hidden">
                       <div className={`${etapa.color} h-full rounded-full flex items-center pl-3 transition-all`}
                         style={{ width: `${ancho}%` }}>
                         <span className="text-xs font-bold text-white whitespace-nowrap">
@@ -716,7 +716,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Se
                         </span>
                       </div>
                     </div>
-                    <span className="text-xs text-gray-500 w-12 text-right shrink-0">{pct}%</span>
+                    <span className="text-xs text-mc-muted w-12 text-right shrink-0">{pct}%</span>
                   </div>
                 );
               })}

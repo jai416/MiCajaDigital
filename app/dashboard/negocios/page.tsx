@@ -89,10 +89,10 @@ export default async function NegociosPage({
   return (
     <div>
       <div className="flex items-center justify-between mb-4">
-        <h1 className="text-2xl font-bold text-gray-800">Negocios</h1>
+        <h1 className="text-2xl font-bold text-mc-text">Negocios</h1>
         <div className="flex items-center gap-4">
           <BackupButton />
-          <span className="text-sm text-gray-500">
+          <span className="text-sm text-mc-muted">
             {total} registros · página {pagina} de {totalPaginas}
             {enPapelera > 0 ? ` · ${enPapelera} en papelera` : ''}
           </span>
@@ -104,14 +104,14 @@ export default async function NegociosPage({
         <div className="flex gap-2">
           <input type="search" name="q" defaultValue={sp.q ?? ''}
             placeholder="Buscar por email o nombre..."
-            className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none" />
+            className="flex-1 px-4 py-2 border border-mc-border rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none" />
           <button type="submit"
-            className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-semibold transition">
+            className="px-5 py-2 bg-mc-primary hover:bg-mc-primary text-white rounded-lg font-semibold transition">
             Buscar
           </button>
           {(sp.q || sp.plan || sp.estado || sp.expiran) && (
             <a href="/dashboard/negocios"
-              className="px-4 py-2 border border-gray-300 text-gray-600 rounded-lg hover:bg-gray-50 transition text-sm">
+              className="px-4 py-2 border border-mc-border text-mc-muted rounded-lg hover:bg-mc-bg transition text-sm">
               Limpiar filtros
             </a>
           )}
@@ -120,7 +120,7 @@ export default async function NegociosPage({
         {/* Fila 2: filtros */}
         <div className="flex flex-wrap gap-3">
           <select name="plan" defaultValue={sp.plan ?? 'todos'}
-            className="px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white">
+            className="px-3 py-2 border border-mc-border rounded-lg text-sm bg-mc-surface">
             <option value="todos">Todos los planes</option>
             <option value="basico">Básico</option>
             <option value="pro">Pro</option>
@@ -128,7 +128,7 @@ export default async function NegociosPage({
           </select>
 
           <select name="estado" defaultValue={sp.estado ?? 'todos'}
-            className="px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white">
+            className="px-3 py-2 border border-mc-border rounded-lg text-sm bg-mc-surface">
             <option value="todos">Todos los estados</option>
             <option value="activo">Activo</option>
             <option value="prueba">En prueba (15 días)</option>
@@ -138,7 +138,7 @@ export default async function NegociosPage({
           </select>
 
           <select name="expiran" defaultValue={sp.expiran ?? 'todos'}
-            className="px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white">
+            className="px-3 py-2 border border-mc-border rounded-lg text-sm bg-mc-surface">
             <option value="todos">Sin filtro de expiración</option>
             <option value="3">Expiran en 3 días</option>
             <option value="7">Expiran en 7 días</option>

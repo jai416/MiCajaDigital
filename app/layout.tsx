@@ -27,7 +27,14 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="es">
-      <body className="bg-gray-50 text-gray-900 min-h-screen">
+      <body className="min-h-screen" suppressHydrationWarning>
+        {/* Aplica el tema antes de pintar: sin esto la pagina aparece clara un
+            instante y luego salta a oscura (parpadeo). */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){try{var g=window.localStorage.getItem('panel_tema');var d=g?g==='oscuro':window.matchMedia('(prefers-color-scheme: dark)').matches;document.documentElement.classList.toggle('dark',d);}catch(e){}})();`,
+          }}
+        />
         <RegisterSW />
         {children}
       </body>

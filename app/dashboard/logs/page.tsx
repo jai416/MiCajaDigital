@@ -15,8 +15,8 @@ interface LogEntry {
 }
 
 const NIVEL_COLOR: Record<string, string> = {
-  error: 'bg-red-100 text-red-700',
-  info: 'bg-blue-100 text-blue-700',
+  error: 'bg-mc-danger/10 text-mc-danger',
+  info: 'bg-mc-info/10 text-mc-info',
 };
 
 export default function LogsPage() {
@@ -132,22 +132,22 @@ export default function LogsPage() {
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold text-gray-800">Logs de la app</h1>
+        <h1 className="text-2xl font-bold text-mc-text">Logs de la app</h1>
         <div className="flex items-center gap-2">
           <button onClick={() => cargar(pagina)}
-            className="px-3 py-1.5 text-xs font-semibold bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100">
+            className="px-3 py-1.5 text-xs font-semibold bg-mc-info/10 text-mc-info rounded-lg hover:bg-mc-info/10">
             Recargar
           </button>
         </div>
       </div>
 
-      <p className="text-sm text-gray-500 mb-4">
+      <p className="text-sm text-mc-muted mb-4">
         La app envía errores críticos aquí. Puedes filtrar por nivel, origen o texto.
       </p>
 
       {feedback && (
         <div className={`mb-4 px-4 py-2 rounded-lg text-sm font-semibold ${
-          feedback.startsWith('') ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+          feedback.startsWith('') ? 'bg-mc-primary/10 text-mc-primary' : 'bg-mc-danger/10 text-mc-danger'
         }`}>
           {feedback}
         </div>
@@ -155,7 +155,7 @@ export default function LogsPage() {
 
       <div className="flex flex-wrap gap-3 mb-4">
         <select value={filtroNivel} onChange={(e) => setFiltroNivel(e.target.value)}
-          className="px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white">
+          className="px-3 py-2 border border-mc-border rounded-lg text-sm bg-mc-surface">
           <option value="todos">Todos los niveles</option>
           <option value="error">Error</option>
           <option value="info">Info</option>
@@ -163,41 +163,41 @@ export default function LogsPage() {
 
         <input type="text" value={buscarInput} onChange={(e) => setBuscarInput(e.target.value)}
           placeholder="Buscar en mensaje, email, negocio..."
-          className="flex-1 min-w-[200px] px-3 py-2 border border-gray-300 rounded-lg text-sm" />
+          className="flex-1 min-w-[200px] px-3 py-2 border border-mc-border rounded-lg text-sm" />
 
         {(filtroNivel !== 'todos' || filtroBuscar) && (
           <button onClick={() => { setFiltroNivel('todos'); setBuscarInput(''); setFiltroBuscar(''); }}
-            className="px-3 py-2 text-xs text-gray-500 border border-gray-300 rounded-lg hover:bg-gray-50">
+            className="px-3 py-2 text-xs text-mc-muted border border-mc-border rounded-lg hover:bg-mc-bg">
             Limpiar filtros
           </button>
         )}
       </div>
 
       <div className="flex items-center justify-between mb-4">
-        <span className="text-xs text-gray-500">
+        <span className="text-xs text-mc-muted">
           {total} logs
         </span>
         <div className="flex items-center gap-2">
           <button onClick={toggleTodo}
-            className="px-3 py-1.5 text-xs font-semibold bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200">
+            className="px-3 py-1.5 text-xs font-semibold bg-mc-field text-mc-muted rounded-lg hover:bg-mc-border">
             {seleccion.size === logs.length && logs.length > 0 ? 'Deseleccionar todo' : 'Seleccionar todo'}
           </button>
           {seleccion.size > 0 && (
             <button onClick={eliminarSeleccionados} disabled={eliminando}
-              className="px-3 py-1.5 text-xs font-semibold bg-red-500 text-white rounded-lg hover:bg-red-600 disabled:opacity-50">
+              className="px-3 py-1.5 text-xs font-semibold bg-mc-danger text-white rounded-lg hover:bg-mc-danger disabled:opacity-50">
               Eliminar {seleccion.size} seleccionado(s)
             </button>
           )}
           <button onClick={eliminarTodos} disabled={eliminando}
-            className="px-3 py-1.5 text-xs font-semibold bg-red-100 text-red-600 rounded-lg hover:bg-red-200 disabled:opacity-50">
+            className="px-3 py-1.5 text-xs font-semibold bg-mc-danger/10 text-mc-danger rounded-lg hover:bg-red-200 disabled:opacity-50">
             Eliminar todos
           </button>
         </div>
       </div>
 
-      {!cargado && <p className="text-gray-500">Cargando...</p>}
+      {!cargado && <p className="text-mc-muted">Cargando...</p>}
       {cargado && logs.length === 0 && (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-10 text-center text-gray-500">
+        <div className="bg-mc-surface rounded-xl shadow-sm border border-mc-border p-10 text-center text-mc-muted">
           No hay logs que coincidan con los filtros.
         </div>
       )}
@@ -205,8 +205,8 @@ export default function LogsPage() {
       <div className="space-y-2">
         {logs.map((l) => (
           <div key={l.id}
-            className={`bg-white rounded-xl shadow-sm border p-4 transition ${
-              seleccion.has(l.log_uuid ?? '') ? 'border-blue-400 bg-blue-50' : 'border-gray-200'
+            className={`bg-mc-surface rounded-xl shadow-sm border p-4 transition ${
+              seleccion.has(l.log_uuid ?? '') ? 'border-blue-400 bg-mc-info/10' : 'border-mc-border'
             }`}>
             <div className="flex items-start gap-3">
               <input type="checkbox"
@@ -216,27 +216,27 @@ export default function LogsPage() {
               <div className="flex-1 min-w-0">
                 <div className="flex flex-wrap items-center gap-2 mb-1">
                   <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${
-                    NIVEL_COLOR[l.nivel] ?? 'bg-gray-100 text-gray-600'
+                    NIVEL_COLOR[l.nivel] ?? 'bg-mc-field text-mc-muted'
                   }`}>
                     {l.nivel}
                   </span>
-                  <span className="text-xs font-mono text-gray-600">{l.origen}</span>
+                  <span className="text-xs font-mono text-mc-muted">{l.origen}</span>
                   {l.nombre_negocio && (
-                    <span className="text-xs text-gray-500">
+                    <span className="text-xs text-mc-muted">
                       {l.nombre_negocio} · {l.email}
                     </span>
                   )}
                 </div>
-                <pre className="text-xs text-gray-700 whitespace-pre-wrap break-words bg-gray-50 rounded-lg p-2 mt-1">
+                <pre className="text-xs text-mc-text whitespace-pre-wrap break-words bg-mc-bg rounded-lg p-2 mt-1">
                   {l.mensaje}
                 </pre>
-                <p className="text-[11px] text-gray-400 mt-1">
+                <p className="text-[11px] text-mc-muted mt-1">
                   {l.created_at
                     ? new Date(l.created_at).toLocaleString('es-CU', { timeZone: 'UTC' })
                     : 'sin fecha'}{''}
                   UTC
                   {l.log_uuid && (
-                    <span className="ml-2 font-mono text-gray-300">{l.log_uuid.slice(0, 8)}</span>
+                    <span className="ml-2 font-mono text-mc-muted">{l.log_uuid.slice(0, 8)}</span>
                   )}
                 </p>
               </div>
@@ -248,12 +248,12 @@ export default function LogsPage() {
       {totalPaginas > 1 && (
         <div className="flex items-center justify-between mt-6">
           <button onClick={() => cargar(pagina - 1)} disabled={pagina <= 1}
-            className="px-4 py-2 border border-gray-300 rounded-lg text-sm font-semibold disabled:opacity-40">
+            className="px-4 py-2 border border-mc-border rounded-lg text-sm font-semibold disabled:opacity-40">
             Anterior
           </button>
-          <span className="text-xs text-gray-500">Página {pagina} de {totalPaginas}</span>
+          <span className="text-xs text-mc-muted">Página {pagina} de {totalPaginas}</span>
           <button onClick={() => cargar(pagina + 1)} disabled={pagina >= totalPaginas}
-            className="px-4 py-2 border border-gray-300 rounded-lg text-sm font-semibold disabled:opacity-40">
+            className="px-4 py-2 border border-mc-border rounded-lg text-sm font-semibold disabled:opacity-40">
             Siguiente
           </button>
         </div>

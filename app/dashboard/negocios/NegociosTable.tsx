@@ -86,11 +86,11 @@ function infoSuscripcion(n: Negocio): InfoSuscripcion {
 }
 
 const CLASES_BADGE: Record<InfoSuscripcion['estado'], string> = {
-  activo: 'bg-emerald-100 text-emerald-700',
-  prueba: 'bg-blue-100 text-blue-700',
-  porVencer: 'bg-amber-100 text-amber-700',
-  vencido: 'bg-red-100 text-red-600',
-  papelera: 'bg-gray-200 text-gray-600',
+  activo: 'bg-mc-soft text-mc-primary',
+  prueba: 'bg-mc-info/10 text-mc-info',
+  porVencer: 'bg-mc-warning/10 text-mc-warning',
+  vencido: 'bg-mc-danger/10 text-mc-danger',
+  papelera: 'bg-mc-border text-mc-muted',
 };
 
 export default function NegociosTable({
@@ -346,12 +346,12 @@ export default function NegociosTable({
         <input
           type="text"
           placeholder="Buscar por email o nombre..."
-          className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
+          className="flex-1 px-4 py-2 border border-mc-border rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
         <select
-          className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
+          className="px-4 py-2 border border-mc-border rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
           value={filter}
           onChange={(e) => setFilter(e.target.value)}
         >
@@ -364,56 +364,56 @@ export default function NegociosTable({
       </div>
 
       {error && (
-        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-4 text-sm">
+        <div className="bg-mc-danger/10 border border-mc-danger text-mc-danger px-4 py-3 rounded-lg mb-4 text-sm">
           {error}
         </div>
       )}
       {mensaje && (
-        <div className="bg-emerald-50 border border-emerald-200 text-emerald-700 px-4 py-3 rounded-lg mb-4 text-sm">
+        <div className="bg-mc-soft border border-mc-primary text-mc-primary px-4 py-3 rounded-lg mb-4 text-sm">
           {mensaje}
         </div>
       )}
 
       {seleccionados.size > 0 && (
-        <div className="bg-blue-50 border border-blue-200 rounded-lg px-4 py-3 mb-4 flex flex-wrap items-center gap-3">
-          <span className="text-sm font-semibold text-blue-800">
+        <div className="bg-mc-info/10 border border-mc-info rounded-lg px-4 py-3 mb-4 flex flex-wrap items-center gap-3">
+          <span className="text-sm font-semibold text-mc-info">
             {seleccionados.size} seleccionado{seleccionados.size === 1 ? '' : 's'}
           </span>
           <button
             onClick={() => accionBulk('activar')}
             disabled={cargandoBulk}
-            className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50 transition"
+            className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-mc-primary text-white hover:bg-mc-primary disabled:opacity-50 transition"
           >
             {cargandoBulk ? '...' : ' Activar'}
           </button>
           <button
             onClick={() => accionBulk('desactivar')}
             disabled={cargandoBulk}
-            className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-gray-600 text-white hover:bg-gray-700 disabled:opacity-50 transition"
+            className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-mc-primary text-white hover:opacity-90 disabled:opacity-50 transition"
           >
             {cargandoBulk ? '...' : 'Desactivar'}
           </button>
           <button
             onClick={() => accionBulk('papelera')}
             disabled={cargandoBulk}
-            className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-red-600 text-white hover:bg-red-700 disabled:opacity-50 transition"
+            className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-mc-danger text-white hover:bg-mc-danger disabled:opacity-50 transition"
           >
             {cargandoBulk ? '...' : ' Papelera'}
           </button>
           <button
             onClick={() => setSeleccionados(new Set())}
             disabled={cargandoBulk}
-            className="px-3 py-1.5 rounded-lg text-xs font-semibold border border-blue-300 text-blue-700 hover:bg-blue-100 disabled:opacity-50 transition"
+            className="px-3 py-1.5 rounded-lg text-xs font-semibold border border-mc-info text-mc-info hover:bg-mc-info/10 disabled:opacity-50 transition"
           >
             Cancelar
           </button>
         </div>
       )}
 
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-x-auto">
+      <div className="bg-mc-surface rounded-xl shadow-sm border border-mc-border overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
-            <tr className="border-b border-gray-200 bg-gray-50">
+            <tr className="border-b border-mc-border bg-mc-bg">
               {!filter.includes('papelera') && (
                 <th scope="col" className="px-4 py-3 w-10">
                   <input
@@ -425,19 +425,19 @@ export default function NegociosTable({
                   />
                 </th>
               )}
-              <th scope="col" className="text-left px-4 py-3 font-semibold text-gray-600">Negocio</th>
-              <th scope="col" className="text-left px-4 py-3 font-semibold text-gray-600">Email</th>
-              <th scope="col" className="text-center px-4 py-3 font-semibold text-gray-600">Plan</th>
-              <th scope="col" className="text-center px-4 py-3 font-semibold text-gray-600">Estado</th>
-              <th scope="col" className="text-left px-4 py-3 font-semibold text-gray-600">Suscripción</th>
-              <th scope="col" className="text-center px-4 py-3 font-semibold text-gray-600">Acciones</th>
+              <th scope="col" className="text-left px-4 py-3 font-semibold text-mc-muted">Negocio</th>
+              <th scope="col" className="text-left px-4 py-3 font-semibold text-mc-muted">Email</th>
+              <th scope="col" className="text-center px-4 py-3 font-semibold text-mc-muted">Plan</th>
+              <th scope="col" className="text-center px-4 py-3 font-semibold text-mc-muted">Estado</th>
+              <th scope="col" className="text-left px-4 py-3 font-semibold text-mc-muted">Suscripción</th>
+              <th scope="col" className="text-center px-4 py-3 font-semibold text-mc-muted">Acciones</th>
             </tr>
           </thead>
           <tbody>
             {filtered.map((n) => {
               const info = infoSuscripcion(n);
               return (
-                <tr key={n.id} className={`border-b border-gray-100 hover:bg-gray-50 transition ${seleccionados.has(n.id) ? 'bg-blue-50/50' : ''}`}>
+                <tr key={n.id} className={`border-b border-mc-border hover:bg-mc-bg transition ${seleccionados.has(n.id) ? 'bg-mc-info/10/50' : ''}`}>
                   {!filter.includes('papelera') && (
                     <td className="px-4 py-3">
                       <input
@@ -450,9 +450,9 @@ export default function NegociosTable({
                     </td>
                   )}
                   <td className="px-4 py-3 font-medium">{n.nombre_negocio}</td>
-                  <td className="px-4 py-3 text-gray-500">{n.email}</td>
+                  <td className="px-4 py-3 text-mc-muted">{n.email}</td>
                   <td className="px-4 py-3 text-center">
-                    <span className="text-xs font-semibold text-gray-700">
+                    <span className="text-xs font-semibold text-mc-text">
                       {labelPlan(n.plan)}
                     </span>
                   </td>
@@ -461,7 +461,7 @@ export default function NegociosTable({
                       {info.etiqueta}
                     </span>
                   </td>
-                  <td className="px-4 py-3 text-xs text-gray-600">
+                  <td className="px-4 py-3 text-xs text-mc-muted">
                     {info.detalle}
                   </td>
                   <td className="px-4 py-3">
@@ -470,13 +470,13 @@ export default function NegociosTable({
                         <>
                           <button
                             onClick={() => handleRestaurar(n.id)}
-                            className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-50 text-emerald-600 hover:bg-emerald-100 transition"
+                            className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-mc-soft text-mc-primary hover:bg-mc-soft transition"
                           >
                              Restaurar
                           </button>
                           <button
                             onClick={() => abrirBorradoPermanente(n)}
-                            className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-red-600 text-white hover:bg-red-700 transition"
+                            className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-mc-danger text-white hover:bg-mc-danger transition"
                             title="Eliminar definitivamente todos sus datos"
                             aria-label={`Eliminar permanentemente ${n.nombre_negocio}`}
                           >
@@ -489,27 +489,27 @@ export default function NegociosTable({
                             onClick={() => handleToggle(n.id, n.activo)}
                             className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
                               n.activo
-                                ? 'bg-red-50 text-red-600 hover:bg-red-100'
-                                : 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100'
+                                ? 'bg-mc-danger/10 text-mc-danger hover:bg-mc-danger/10'
+                                : 'bg-mc-soft text-mc-primary hover:bg-mc-soft'
                             }`}
                           >
                             {n.activo ? 'Desactivar' : 'Activar'}
                           </button>
                           <button
                             onClick={() => abrirEditar(n)}
-                            className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-blue-50 text-blue-600 hover:bg-blue-100 transition"
+                            className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-mc-info/10 text-mc-info hover:bg-mc-info/10 transition"
                           >
                             Editar
                           </button>
                           <button
                             onClick={() => abrirRenovar(n)}
-                            className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-50 text-emerald-600 hover:bg-emerald-100 transition"
+                            className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-mc-soft text-mc-primary hover:bg-mc-soft transition"
                           >
                             Renovar
                           </button>
                           <button
                             onClick={() => handleDelete(n.id, n.nombre_negocio)}
-                            className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-red-50 text-red-600 hover:bg-red-100 transition"
+                            className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-mc-danger/10 text-mc-danger hover:bg-mc-danger/10 transition"
                           >
                              Papelera
                           </button>
@@ -523,7 +523,7 @@ export default function NegociosTable({
             })}
             {filtered.length === 0 && (
               <tr>
-                <td colSpan={7} className="px-4 py-8 text-center text-gray-500">
+                <td colSpan={7} className="px-4 py-8 text-center text-mc-muted">
                   No se encontraron negocios
                 </td>
               </tr>
@@ -549,20 +549,20 @@ export default function NegociosTable({
                 {paginacion.pagina > 1 ? (
                   <a
                     href={buildHref(paginacion.pagina - 1)}
-                    className="px-4 py-2 border border-gray-300 rounded-lg text-sm font-semibold text-gray-700 hover:bg-gray-50 transition"
+                    className="px-4 py-2 border border-mc-border rounded-lg text-sm font-semibold text-mc-text hover:bg-mc-bg transition"
                   >
                      Anterior
                   </a>
                 ) : (
                   <span />
                 )}
-                <span className="text-sm text-gray-500">
+                <span className="text-sm text-mc-muted">
                   Página {paginacion.pagina} de {paginacion.totalPaginas}
                 </span>
                 {paginacion.pagina < paginacion.totalPaginas ? (
                   <a
                     href={buildHref(paginacion.pagina + 1)}
-                    className="px-4 py-2 border border-gray-300 rounded-lg text-sm font-semibold text-gray-700 hover:bg-gray-50 transition"
+                    className="px-4 py-2 border border-mc-border rounded-lg text-sm font-semibold text-mc-text hover:bg-mc-bg transition"
                   >
                     Siguiente 
                   </a>
@@ -581,15 +581,15 @@ export default function NegociosTable({
           onClose={cerrarModal}
         >
           <>
-            <h3 className="text-lg font-bold text-gray-800 mb-1">
+            <h3 className="text-lg font-bold text-mc-text mb-1">
               {modal === 'editar' ? 'Editar negocio' : 'Renovar suscripción'}
             </h3>
-            <p className="text-sm text-gray-500 mb-4">
+            <p className="text-sm text-mc-muted mb-4">
               {seleccion.nombre_negocio} · {seleccion.email}
             </p>
 
             {error && (
-              <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-4 text-sm">
+              <div className="bg-mc-danger/10 border border-mc-danger text-mc-danger px-4 py-3 rounded-lg mb-4 text-sm">
                 {error}
               </div>
             )}
@@ -597,10 +597,10 @@ export default function NegociosTable({
             {modal === 'editar' ? (
               <div className="space-y-4">
                 <div>
-                  <label htmlFor="modal-plan" className="block text-sm font-medium text-gray-600 mb-1">Plan</label>
+                  <label htmlFor="modal-plan" className="block text-sm font-medium text-mc-muted mb-1">Plan</label>
                   <select
                     id="modal-plan"
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
+                    className="w-full px-4 py-2 border border-mc-border rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
                     value={plan}
                     onChange={(e) => setPlan(e.target.value)}
                   >
@@ -610,19 +610,19 @@ export default function NegociosTable({
                       </option>
                     ))}
                   </select>
-                  <p className="text-xs text-gray-500 mt-1">
+                  <p className="text-xs text-mc-muted mt-1">
                     Para dar una prueba: no toques el plan, solo deja "Desactivado" y
                     pon la fecha de expiración 15 días adelante.
                   </p>
                 </div>
                 <div>
-                  <label htmlFor="modal-expiracion" className="block text-sm font-medium text-gray-600 mb-1">
-                    Fecha de expiración <span className="text-gray-500">(dejar vacío para no cambiar)</span>
+                  <label htmlFor="modal-expiracion" className="block text-sm font-medium text-mc-muted mb-1">
+                    Fecha de expiración <span className="text-mc-muted">(dejar vacío para no cambiar)</span>
                   </label>
                   <input
                     id="modal-expiracion"
                     type="date"
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
+                    className="w-full px-4 py-2 border border-mc-border rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
                     value={expiracion}
                     onChange={(e) => setExpiracion(e.target.value)}
                   />
@@ -630,21 +630,21 @@ export default function NegociosTable({
                     <button
                       type="button"
                       onClick={() => presetFecha(15)}
-                      className="px-3 py-1 border border-gray-300 rounded-lg text-xs text-gray-600 hover:bg-gray-50 transition"
+                      className="px-3 py-1 border border-mc-border rounded-lg text-xs text-mc-muted hover:bg-mc-bg transition"
                     >
                       Hoy + 15 días
                     </button>
                     <button
                       type="button"
                       onClick={() => presetFecha(30)}
-                      className="px-3 py-1 border border-gray-300 rounded-lg text-xs text-gray-600 hover:bg-gray-50 transition"
+                      className="px-3 py-1 border border-mc-border rounded-lg text-xs text-mc-muted hover:bg-mc-bg transition"
                     >
                       Hoy + 30 días
                     </button>
                     <button
                       type="button"
                       onClick={() => presetFecha(90)}
-                      className="px-3 py-1 border border-gray-300 rounded-lg text-xs text-gray-600 hover:bg-gray-50 transition"
+                      className="px-3 py-1 border border-mc-border rounded-lg text-xs text-mc-muted hover:bg-mc-bg transition"
                     >
                       Hoy + 90 días
                     </button>
@@ -653,18 +653,18 @@ export default function NegociosTable({
               </div>
             ) : (
               <div>
-                <label htmlFor="modal-dias" className="block text-sm font-medium text-gray-600 mb-1">
+                <label htmlFor="modal-dias" className="block text-sm font-medium text-mc-muted mb-1">
                   Días de renovación
                 </label>
                 <input
                   id="modal-dias"
                   type="number"
                   min={1}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
+                  className="w-full px-4 py-2 border border-mc-border rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
                   value={dias}
                   onChange={(e) => setDias(e.target.value)}
                 />
-                <p className="text-xs text-gray-500 mt-2">
+                <p className="text-xs text-mc-muted mt-2">
                   Se extiende desde el vencimiento actual (o desde hoy si ya venció), igual que
                   el canje de código.
                 </p>
@@ -674,14 +674,14 @@ export default function NegociosTable({
             <div className="flex gap-3 mt-6">
               <button
                 onClick={cerrarModal}
-                className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition text-sm font-semibold"
+                className="flex-1 px-4 py-2 border border-mc-border text-mc-text rounded-lg hover:bg-mc-bg transition text-sm font-semibold"
               >
                 Cancelar
               </button>
               <button
                 onClick={modal === 'editar' ? handleGuardarEdicion : handleRenovar}
                 disabled={cargando}
-                className="flex-1 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white rounded-lg transition text-sm font-semibold"
+                className="flex-1 px-4 py-2 bg-mc-primary hover:bg-mc-primary disabled:opacity-50 text-white rounded-lg transition text-sm font-semibold"
               >
                 {cargando ? 'Guardando...' : 'Guardar'}
               </button>
@@ -693,16 +693,16 @@ export default function NegociosTable({
       {borrando && (
         <Modal etiqueta="Confirmar borrado permanente" onClose={() => setBorrando(null)}>
           <>
-            <h3 className="text-lg font-bold text-red-700 mb-1">
+            <h3 className="text-lg font-bold text-mc-danger mb-1">
                Borrado definitivo
             </h3>
-            <p className="text-sm text-gray-600 mb-3">
+            <p className="text-sm text-mc-muted mb-3">
               Vas a eliminar <strong>{borrando.nombre_negocio}</strong> ({borrando.email}) para
               siempre. Se borrarán TODOS sus datos: ventas, gastos, catálogo, compras y pagos.
               <strong> No se podrá recuperar nada.</strong>
             </p>
-            <label htmlFor="confirmar-borrar" className="block text-sm font-medium text-gray-700 mb-1">
-              Escribe <span className="font-mono font-bold text-red-600">ELIMINAR</span> para confirmar:
+            <label htmlFor="confirmar-borrar" className="block text-sm font-medium text-mc-text mb-1">
+              Escribe <span className="font-mono font-bold text-mc-danger">ELIMINAR</span> para confirmar:
             </label>
             <input
               id="confirmar-borrar"
@@ -710,19 +710,19 @@ export default function NegociosTable({
               value={textoConfirmar}
               onChange={(e) => setTextoConfirmar(e.target.value)}
               placeholder="ELIMINAR"
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 outline-none font-mono"
+              className="w-full px-4 py-2 border border-mc-border rounded-lg focus:ring-2 focus:ring-red-500 outline-none font-mono"
             />
             <div className="flex gap-3 mt-5">
               <button
                 onClick={() => setBorrando(null)}
-                className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition text-sm font-semibold"
+                className="flex-1 px-4 py-2 border border-mc-border text-mc-text rounded-lg hover:bg-mc-bg transition text-sm font-semibold"
               >
                 Cancelar
               </button>
               <button
                 onClick={confirmarBorrado}
                 disabled={textoConfirmar !== 'ELIMINAR' || cargandoBorrado}
-                className="flex-1 px-4 py-2 bg-red-600 hover:bg-red-700 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-lg transition text-sm font-semibold"
+                className="flex-1 px-4 py-2 bg-mc-danger hover:bg-mc-danger disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-lg transition text-sm font-semibold"
               >
                 {cargandoBorrado ? 'Eliminando...' : 'Eliminar para siempre'}
               </button>

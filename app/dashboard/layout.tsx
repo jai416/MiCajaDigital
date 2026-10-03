@@ -146,27 +146,27 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               <Icono nombre={item.icon} />
               <span className="flex-1">{item.label}</span>
               {'badge' in item && item.badge != null && item.badge > 0 && (
-                <span className="px-2 py-0.5 bg-red-500 text-white text-[10px] font-bold rounded-full min-w-[18px] text-center">
+                <span className="px-2 py-0.5 bg-mc-danger text-white text-[10px] font-bold rounded-full min-w-[18px] text-center">
                   {item.badge > 99 ? '99+' : item.badge}
                 </span>
               )}
             </Link>
           ))}
         </nav>
-        <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-gray-200">
+        <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-mc-border">
           <button onClick={handleLogout}
-            className="w-full px-4 py-2 text-sm text-red-600 hover:bg-red-50 rounded-lg transition">
+            className="w-full px-4 py-2 text-sm text-mc-danger hover:bg-mc-danger/10 rounded-lg transition">
             Cerrar Sesión
           </button>
         </div>
       </aside>
 
       <div className="flex-1 flex flex-col min-w-0">
-        <header className="bg-white shadow-sm border-b border-gray-200 px-6 py-4 lg:hidden">
+        <header className="bg-mc-surface shadow-sm border-b border-mc-border px-6 py-4 lg:hidden">
           <button onClick={() => setSidebarOpen(!sidebarOpen)}
             aria-label={sidebarOpen ? 'Cerrar menú' : 'Abrir menú'}
             aria-expanded={sidebarOpen}
-            className="text-gray-600">
+            className="text-mc-muted">
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
             </svg>

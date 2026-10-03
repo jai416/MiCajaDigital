@@ -37,10 +37,10 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-emerald-500 to-teal-700 p-4">
-      <div className="w-full max-w-md bg-white rounded-2xl shadow-2xl p-8">
+      <div className="w-full max-w-md bg-mc-surface rounded-2xl shadow-2xl p-8">
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-gray-800">Mi Caja Digital</h1>
-          <p className="text-gray-500 mt-1">Panel de Administración</p>
+          <h1 className="text-3xl font-bold text-mc-text">Mi Caja Digital</h1>
+          <p className="text-mc-muted mt-1">Panel de Administración</p>
         </div>
 
         {error && (
@@ -51,7 +51,7 @@ export default function LoginPage() {
 
         <form onSubmit={handleLogin} className="space-y-4">
           <div>
-            <label htmlFor="login-email" className="block text-sm font-medium text-gray-700 mb-1">
+            <label htmlFor="login-email" className="block text-sm font-medium text-mc-text mb-1">
               Correo electrónico
             </label>
             <input
@@ -59,14 +59,14 @@ export default function LoginPage() {
               type="email"
               required
               autoComplete="email"
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none"
+              className="w-full px-4 py-3 border border-mc-border rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-mc-primary outline-none"
               placeholder="admin@micajadigital.com"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
             />
           </div>
           <div>
-            <label htmlFor="login-password" className="block text-sm font-medium text-gray-700 mb-1">
+            <label htmlFor="login-password" className="block text-sm font-medium text-mc-text mb-1">
               Contraseña
             </label>
             <input
@@ -74,7 +74,7 @@ export default function LoginPage() {
               type="password"
               required
               autoComplete="current-password"
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none"
+              className="w-full px-4 py-3 border border-mc-border rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-mc-primary outline-none"
               placeholder="••••••"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
@@ -83,7 +83,7 @@ export default function LoginPage() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 px-4 rounded-lg transition disabled:opacity-50"
+            className="w-full bg-mc-primary hover:bg-mc-primary text-white font-bold py-3 px-4 rounded-lg transition disabled:opacity-50"
           >
             {loading ? 'Entrando...' : 'Entrar'}
           </button>

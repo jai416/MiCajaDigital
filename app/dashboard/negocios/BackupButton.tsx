@@ -58,11 +58,11 @@ export default function BackupButton({
       <button
         onClick={handleBackup}
         disabled={cargando}
-        className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white rounded-lg text-sm font-semibold transition flex items-center gap-2"
+        className="px-4 py-2 bg-mc-info hover:bg-blue-700 disabled:bg-blue-400 text-white rounded-lg text-sm font-semibold transition flex items-center gap-2"
       >
         {cargando ? (
           <>
-            <span className="inline-block animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent" />
+            <span className="inline-block animate-spin rounded-full h-4 w-4 border-2 border-mc-border border-t-transparent" />
             Exportando…
           </>
         ) : (
@@ -77,7 +77,7 @@ export default function BackupButton({
         )}
       </button>
       {error && (
-        <span className="text-red-600 text-sm">{error}</span>
+        <span className="text-mc-danger text-sm">{error}</span>
       )}
     </div>
   );

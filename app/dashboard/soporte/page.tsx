@@ -26,13 +26,13 @@ const CAT_LABELS: Record<string, string> = {
   pago: ' Pago', sync: ' Sync', bug: ' Bug', sugerencia: ' Sugerencia', otro: ' Otro',
 };
 const CAT_COLORS: Record<string, string> = {
-  pago: 'bg-amber-100 text-amber-700', sync: 'bg-blue-100 text-blue-700',
-  bug: 'bg-red-100 text-red-700', sugerencia: 'bg-green-100 text-green-700',
-  otro: 'bg-gray-100 text-gray-700',
+  pago: 'bg-mc-warning/10 text-mc-warning', sync: 'bg-mc-info/10 text-mc-info',
+  bug: 'bg-mc-danger/10 text-mc-danger', sugerencia: 'bg-mc-primary/10 text-mc-primary',
+  otro: 'bg-mc-field text-mc-text',
 };
 const ESTADO_COLORS: Record<string, string> = {
-  abierto: 'bg-red-100 text-red-700', en_progreso: 'bg-amber-100 text-amber-700',
-  resuelto: 'bg-green-100 text-green-700', cerrado: 'bg-gray-100 text-gray-500',
+  abierto: 'bg-mc-danger/10 text-mc-danger', en_progreso: 'bg-mc-warning/10 text-mc-warning',
+  resuelto: 'bg-mc-primary/10 text-mc-primary', cerrado: 'bg-mc-field text-mc-muted',
 };
 
 const PLANTILLAS = [
@@ -119,19 +119,19 @@ export default function SoportePage() {
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold text-gray-800">Soporte</h1>
+        <h1 className="text-2xl font-bold text-mc-text">Soporte</h1>
         <div className="flex items-center gap-3">
           <a href="/dashboard/soporte/mensajes"
-            className="px-3 py-1.5 bg-emerald-600 text-white rounded-lg text-sm font-semibold hover:bg-emerald-700 transition">
+            className="px-3 py-1.5 bg-mc-primary text-white rounded-lg text-sm font-semibold hover:bg-mc-primary transition">
              Enviar mensaje
           </a>
-          <span className="text-sm text-gray-500">{total} tickets</span>
+          <span className="text-sm text-mc-muted">{total} tickets</span>
         </div>
       </div>
 
       {feedback && (
         <div className={`mb-4 px-4 py-2 rounded-lg text-sm font-semibold ${
-          feedback.startsWith('Error') ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'
+          feedback.startsWith('Error') ? 'bg-mc-danger/10 text-mc-danger' : 'bg-mc-primary/10 text-mc-primary'
         }`}>
           {feedback}
         </div>
@@ -141,7 +141,7 @@ export default function SoportePage() {
         {ESTADOS.map((e) => (
           <button key={e} onClick={() => setFiltro(e)}
             className={`px-3 py-1.5 rounded-full text-xs font-semibold transition ${
-              filtro === e ? 'bg-emerald-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              filtro === e ? 'bg-mc-primary text-white' : 'bg-mc-field text-mc-muted hover:bg-mc-border'
             }`}>
             {e === 'todos' ? 'Todos' : e.replace('_', '')}
           </button>
@@ -149,12 +149,12 @@ export default function SoportePage() {
       </div>
 
       <div className="space-y-4">
-        {!cargado && <p className="text-gray-500">Cargando...</p>}
+        {!cargado && <p className="text-mc-muted">Cargando...</p>}
         {cargado && tickets.length === 0 && (
-          <p className="text-gray-500">No hay tickets en este filtro.</p>
+          <p className="text-mc-muted">No hay tickets en este filtro.</p>
         )}
         {tickets.map((t) => (
-          <div key={t.id} className="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
+          <div key={t.id} className="bg-mc-surface rounded-xl shadow-sm border border-mc-border p-5">
             <div className="flex items-start justify-between gap-4">
               <div className="flex-1">
                 <div className="flex items-center gap-2 mb-2">
@@ -164,10 +164,10 @@ export default function SoportePage() {
                   <span className={`px-2 py-1 rounded-full text-xs font-semibold ${ESTADO_COLORS[t.estado]}`}>
                     {t.estado.replace('_', '')}
                   </span>
-                  <span className="text-xs text-gray-400">#{t.id}</span>
+                  <span className="text-xs text-mc-muted">#{t.id}</span>
                 </div>
                 {t.mensaje && (
-                  <p className="text-sm text-gray-700 whitespace-pre-wrap">{t.mensaje}</p>
+                  <p className="text-sm text-mc-text whitespace-pre-wrap">{t.mensaje}</p>
                 )}
                 {t.audio_url && (
                   <audio controls preload="none" src={t.audio_url}
@@ -176,12 +176,12 @@ export default function SoportePage() {
                   </audio>
                 )}
                 {t.respuesta_admin && (
-                  <div className="mt-3 bg-emerald-50 border border-emerald-200 rounded-lg p-3">
-                    <p className="text-xs font-semibold text-emerald-700 mb-1">Tu respuesta:</p>
-                    <p className="text-sm text-emerald-800 whitespace-pre-wrap">{t.respuesta_admin}</p>
+                  <div className="mt-3 bg-mc-soft border border-mc-primary rounded-lg p-3">
+                    <p className="text-xs font-semibold text-mc-primary mb-1">Tu respuesta:</p>
+                    <p className="text-sm text-mc-primary whitespace-pre-wrap">{t.respuesta_admin}</p>
                   </div>
                 )}
-                <p className="text-xs text-gray-400 mt-2">{fechaHora(t.created_at)}</p>
+                <p className="text-xs text-mc-muted mt-2">{fechaHora(t.created_at)}</p>
               </div>
               <div className="flex flex-col gap-1 shrink-0">
                 {t.estado !== 'cerrado' && (
@@ -189,7 +189,7 @@ export default function SoportePage() {
                     {t.estado === 'abierto' && (
                       <button onClick={() => actualizar(t.id, 'en_progreso')}
                         disabled={tomandoId === t.id}
-                        className="px-3 py-1 text-xs font-semibold bg-amber-500 text-white rounded-lg hover:bg-amber-600 disabled:opacity-50">
+                        className="px-3 py-1 text-xs font-semibold bg-mc-warning text-white rounded-lg hover:bg-mc-warning disabled:opacity-50">
                         {tomandoId === t.id ? 'Tomando...' : 'Tomar'}
                       </button>
                     )}
@@ -197,7 +197,7 @@ export default function SoportePage() {
                       <div className="space-y-2 w-56">
                         {/* Selector de plantillas */}
                         <select value={plantillaSel} onChange={(e) => aplicarPlantilla(e.target.value)}
-                          className="w-full px-2 py-1 border border-gray-300 rounded text-xs bg-white">
+                          className="w-full px-2 py-1 border border-mc-border rounded text-xs bg-mc-surface">
                           <option value="">-- Plantilla --</option>
                           {PLANTILLAS.map((p) => (
                             <option key={p.id} value={p.id}>{p.label}</option>
@@ -205,22 +205,22 @@ export default function SoportePage() {
                         </select>
                         <textarea value={respuesta} onChange={(e) => setRespuesta(e.target.value)}
                           placeholder="Respuesta..." rows={4}
-                          className="w-full px-2 py-1 border border-gray-300 rounded text-xs" />
+                          className="w-full px-2 py-1 border border-mc-border rounded text-xs" />
                         <div className="flex gap-1">
                           <button onClick={() => actualizar(t.id, 'resuelto', respuesta)}
-                            className="px-2 py-1 text-xs bg-green-600 text-white rounded">Enviar</button>
+                            className="px-2 py-1 text-xs bg-mc-primary text-white rounded">Enviar</button>
                           <button onClick={() => { setEditando(null); setPlantillaSel(''); }}
-                            className="px-2 py-1 text-xs bg-gray-200 rounded">Cancelar</button>
+                            className="px-2 py-1 text-xs bg-mc-border rounded">Cancelar</button>
                         </div>
                       </div>
                     ) : (
                       <button onClick={() => { setEditando(t.id); setRespuesta(t.respuesta_admin ?? ''); }}
-                        className="px-3 py-1 text-xs font-semibold bg-emerald-500 text-white rounded-lg hover:bg-emerald-600">
+                        className="px-3 py-1 text-xs font-semibold bg-mc-primary text-white rounded-lg hover:bg-mc-primary">
                         Responder
                       </button>
                     )}
                     <button onClick={() => actualizar(t.id, 'cerrado')}
-                      className="px-3 py-1 text-xs font-semibold bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400">
+                      className="px-3 py-1 text-xs font-semibold bg-mc-border text-mc-text rounded-lg hover:bg-mc-field">
                       Cerrar
                     </button>
                   </>
@@ -234,12 +234,12 @@ export default function SoportePage() {
       {totalPaginas > 1 && (
         <div className="flex items-center justify-between mt-6">
           <button onClick={() => cargar(pagina - 1)} disabled={pagina <= 1}
-            className="px-4 py-2 border border-gray-300 rounded-lg text-sm font-semibold disabled:opacity-40">
+            className="px-4 py-2 border border-mc-border rounded-lg text-sm font-semibold disabled:opacity-40">
              Anterior
           </button>
-          <span className="text-xs text-gray-500">Página {pagina} de {totalPaginas}</span>
+          <span className="text-xs text-mc-muted">Página {pagina} de {totalPaginas}</span>
           <button onClick={() => cargar(pagina + 1)} disabled={pagina >= totalPaginas}
-            className="px-4 py-2 border border-gray-300 rounded-lg text-sm font-semibold disabled:opacity-40">
+            className="px-4 py-2 border border-mc-border rounded-lg text-sm font-semibold disabled:opacity-40">
             Siguiente 
           </button>
         </div>

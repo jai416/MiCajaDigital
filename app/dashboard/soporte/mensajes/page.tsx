@@ -188,26 +188,26 @@ export default function MensajesPage() {
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold text-gray-800">Mensajes directos</h1>
-        <span className="text-sm text-gray-500">{total} mensajes</span>
+        <h1 className="text-2xl font-bold text-mc-text">Mensajes directos</h1>
+        <span className="text-sm text-mc-muted">{total} mensajes</span>
       </div>
 
       {feedback && (
         <div className={`mb-4 px-4 py-2 rounded-lg text-sm font-semibold ${
-          feedback.startsWith('Error') ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'
+          feedback.startsWith('Error') ? 'bg-mc-danger/10 text-mc-danger' : 'bg-mc-primary/10 text-mc-primary'
         }`}>
           {feedback}
         </div>
       )}
 
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5 mb-6">
-        <h2 className="text-sm font-semibold text-gray-700 mb-4">Enviar mensaje</h2>
+      <div className="bg-mc-surface rounded-xl shadow-sm border border-mc-border p-5 mb-6">
+        <h2 className="text-sm font-semibold text-mc-text mb-4">Enviar mensaje</h2>
         <div className="mb-4">
-          <label className="block text-xs font-medium text-gray-600 mb-1">Plantilla rápida</label>
+          <label className="block text-xs font-medium text-mc-muted mb-1">Plantilla rápida</label>
           <select
             value={plantillaSel}
             onChange={(e) => aplicarPlantilla(e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-emerald-500 focus:border-emerald-500 bg-white"
+            className="w-full px-3 py-2 border border-mc-border rounded-lg text-sm focus:ring-emerald-500 focus:border-emerald-500 bg-mc-surface"
           >
             <option value="">Seleccionar plantilla...</option>
             {PLANTILLAS_MENSAJES.map((p) => (
@@ -217,12 +217,12 @@ export default function MensajesPage() {
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
           <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">Destinatario</label>
+            <label className="block text-xs font-medium text-mc-muted mb-1">Destinatario</label>
             <select
               value={formUserId}
               onChange={(e) => setFormUserId(e.target.value)}
               onFocus={() => void cargarNegociosParaSelector()}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-emerald-500 focus:border-emerald-500"
+              className="w-full px-3 py-2 border border-mc-border rounded-lg text-sm focus:ring-emerald-500 focus:border-emerald-500"
             >
               <option value="">
                 {negocios.length === 0 ? 'Toca para cargar usuarios…' : 'Seleccionar usuario…'}
@@ -235,66 +235,66 @@ export default function MensajesPage() {
             </select>
           </div>
           <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">Título</label>
+            <label className="block text-xs font-medium text-mc-muted mb-1">Título</label>
             <input
               type="text"
               value={formTitulo}
               onChange={(e) => setFormTitulo(e.target.value)}
               placeholder="Título del mensaje…"
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-emerald-500 focus:border-emerald-500"
+              className="w-full px-3 py-2 border border-mc-border rounded-lg text-sm focus:ring-emerald-500 focus:border-emerald-500"
             />
           </div>
         </div>
         <div className="mb-4">
-          <label className="block text-xs font-medium text-gray-600 mb-1">Mensaje</label>
+          <label className="block text-xs font-medium text-mc-muted mb-1">Mensaje</label>
           <textarea
             value={formMensaje}
             onChange={(e) => setFormMensaje(e.target.value)}
             placeholder="Escribe el mensaje…"
             rows={3}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-emerald-500 focus:border-emerald-500"
+            className="w-full px-3 py-2 border border-mc-border rounded-lg text-sm focus:ring-emerald-500 focus:border-emerald-500"
           />
         </div>
         <button
           onClick={enviar}
           disabled={!formUserId || formTitulo.trim().length < 3 || formMensaje.trim().length < 5 || enviando}
-          className="px-5 py-2 bg-emerald-600 text-white text-sm font-semibold rounded-lg hover:bg-emerald-700 disabled:opacity-40 disabled:cursor-not-allowed transition"
+          className="px-5 py-2 bg-mc-primary text-white text-sm font-semibold rounded-lg hover:bg-mc-primary disabled:opacity-40 disabled:cursor-not-allowed transition"
         >
           {enviando ? 'Enviando…' : 'Enviar mensaje'}
         </button>
       </div>
 
       <div className="space-y-4">
-        {!cargado && <p className="text-gray-500">Cargando…</p>}
+        {!cargado && <p className="text-mc-muted">Cargando…</p>}
         {cargado && mensajes.length === 0 && (
-          <p className="text-gray-500">No hay mensajes enviados.</p>
+          <p className="text-mc-muted">No hay mensajes enviados.</p>
         )}
         {mensajes.map((m) => (
-          <div key={m.id} className="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
+          <div key={m.id} className="bg-mc-surface rounded-xl shadow-sm border border-mc-border p-5">
             <div className="flex items-start justify-between gap-4">
               <div className="flex-1">
                 <div className="flex items-center gap-2 mb-2">
                   {(() => { const n = negocioDe(m.user_id); return (
                   <>
-                    <span className="text-sm font-semibold text-gray-800">
+                    <span className="text-sm font-semibold text-mc-text">
                       {n?.nombre_negocio ?? '—'}
                     </span>
-                    <span className="text-xs text-gray-400">{n?.email ?? ''}</span>
+                    <span className="text-xs text-mc-muted">{n?.email ?? ''}</span>
                   </>
                 ); })()}
                   <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${
-                    m.leido ? 'bg-gray-100 text-gray-500' : 'bg-emerald-100 text-emerald-700'
+                    m.leido ? 'bg-mc-field text-mc-muted' : 'bg-mc-soft text-mc-primary'
                   }`}>
                     {m.leido ? 'Leído' : 'No leído'}
                   </span>
                 </div>
-                <p className="text-sm font-medium text-gray-700 mb-1">{m.titulo}</p>
-                <p className="text-sm text-gray-500 whitespace-pre-wrap line-clamp-2">{m.mensaje}</p>
-                <p className="text-xs text-gray-400 mt-2">{fechaHora(m.created_at)}</p>
+                <p className="text-sm font-medium text-mc-text mb-1">{m.titulo}</p>
+                <p className="text-sm text-mc-muted whitespace-pre-wrap line-clamp-2">{m.mensaje}</p>
+                <p className="text-xs text-mc-muted mt-2">{fechaHora(m.created_at)}</p>
               </div>
               <button
                 onClick={() => eliminar(m.id)}
-                className="px-3 py-1 text-xs font-semibold bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition shrink-0"
+                className="px-3 py-1 text-xs font-semibold bg-mc-danger/10 text-mc-danger rounded-lg hover:bg-mc-danger/10 transition shrink-0"
               >
                 Eliminar
               </button>
@@ -308,15 +308,15 @@ export default function MensajesPage() {
           <button
             onClick={() => cargar(pagina - 1)}
             disabled={pagina <= 1}
-            className="px-4 py-2 border border-gray-300 rounded-lg text-sm font-semibold disabled:opacity-40"
+            className="px-4 py-2 border border-mc-border rounded-lg text-sm font-semibold disabled:opacity-40"
           >
              Anterior
           </button>
-          <span className="text-xs text-gray-500">Página {pagina} de {totalPaginas}</span>
+          <span className="text-xs text-mc-muted">Página {pagina} de {totalPaginas}</span>
           <button
             onClick={() => cargar(pagina + 1)}
             disabled={pagina >= totalPaginas}
-            className="px-4 py-2 border border-gray-300 rounded-lg text-sm font-semibold disabled:opacity-40"
+            className="px-4 py-2 border border-mc-border rounded-lg text-sm font-semibold disabled:opacity-40"
           >
             Siguiente 
           </button>
