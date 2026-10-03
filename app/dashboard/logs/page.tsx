@@ -92,7 +92,7 @@ export default function LogsPage() {
       });
       const json = await res.json();
       if (res.ok) {
-        setFeedback(`✓ ${json.borrados} logs eliminados`);
+        setFeedback(` ${json.borrados} logs eliminados`);
         setSeleccion(new Set());
         await cargar(pagina);
       } else {
@@ -116,7 +116,7 @@ export default function LogsPage() {
       });
       const json = await res.json();
       if (res.ok) {
-        setFeedback(`✓ ${json.borrados} logs eliminados`);
+        setFeedback(` ${json.borrados} logs eliminados`);
         setSeleccion(new Set());
         await cargar(1);
       } else {
@@ -147,7 +147,7 @@ export default function LogsPage() {
 
       {feedback && (
         <div className={`mb-4 px-4 py-2 rounded-lg text-sm font-semibold ${
-          feedback.startsWith('✓') ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+          feedback.startsWith('') ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
         }`}>
           {feedback}
         </div>
@@ -233,7 +233,7 @@ export default function LogsPage() {
                 <p className="text-[11px] text-gray-400 mt-1">
                   {l.created_at
                     ? new Date(l.created_at).toLocaleString('es-CU', { timeZone: 'UTC' })
-                    : 'sin fecha'}{' '}
+                    : 'sin fecha'}{''}
                   UTC
                   {l.log_uuid && (
                     <span className="ml-2 font-mono text-gray-300">{l.log_uuid.slice(0, 8)}</span>

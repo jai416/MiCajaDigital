@@ -64,7 +64,7 @@ export default function ActividadPage() {
           />
           <button onClick={buscar}
             className="px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-semibold hover:bg-emerald-700">
-            🔍 Buscar
+             Buscar
           </button>
         </div>
       </div>
@@ -81,7 +81,7 @@ export default function ActividadPage() {
             <div className="flex items-start justify-between gap-4">
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-3 mb-2">
-                  <span className="text-lg">🏪</span>
+                  <span className="text-lg"></span>
                   <div>
                     <p className="font-bold text-gray-800 truncate">
                       {a.nombre || '(sin nombre)'}
@@ -113,7 +113,7 @@ export default function ActividadPage() {
                   Última sync: {fechaHora(a.ultimaSync)}
                   {a.fallidos > 0 && (
                     <span className="ml-2 text-red-600 font-semibold">
-                      ⚠️ {a.fallidos} fallo{a.fallidos > 1 ? 's' : ''}
+                       {a.fallidos} fallo{a.fallidos > 1 ? 's' : ''}
                     </span>
                   )}
                 </p>
@@ -154,12 +154,12 @@ export default function ActividadPage() {
         <div className="flex items-center justify-between mt-6">
           <button onClick={() => cargar(pagina - 1)} disabled={pagina <= 1}
             className="px-4 py-2 border border-gray-300 rounded-lg text-sm font-semibold disabled:opacity-40">
-            ← Anterior
+             Anterior
           </button>
           <span className="text-xs text-gray-500">Página {pagina} de {totalPaginas} ({total} usuarios)</span>
           <button onClick={() => cargar(pagina + 1)} disabled={pagina >= totalPaginas}
             className="px-4 py-2 border border-gray-300 rounded-lg text-sm font-semibold disabled:opacity-40">
-            Siguiente →
+            Siguiente 
           </button>
         </div>
       )}

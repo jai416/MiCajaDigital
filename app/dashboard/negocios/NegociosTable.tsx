@@ -359,7 +359,7 @@ export default function NegociosTable({
           <option value="activos">Activos</option>
           <option value="inactivos">Inactivos</option>
           <option value="prueba">En prueba</option>
-          <option value="papelera">🗑️ Papelera</option>
+          <option value="papelera"> Papelera</option>
         </select>
       </div>
 
@@ -384,7 +384,7 @@ export default function NegociosTable({
             disabled={cargandoBulk}
             className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50 transition"
           >
-            {cargandoBulk ? '...' : '✓ Activar'}
+            {cargandoBulk ? '...' : ' Activar'}
           </button>
           <button
             onClick={() => accionBulk('desactivar')}
@@ -398,7 +398,7 @@ export default function NegociosTable({
             disabled={cargandoBulk}
             className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-red-600 text-white hover:bg-red-700 disabled:opacity-50 transition"
           >
-            {cargandoBulk ? '...' : '🗑️ Papelera'}
+            {cargandoBulk ? '...' : ' Papelera'}
           </button>
           <button
             onClick={() => setSeleccionados(new Set())}
@@ -472,7 +472,7 @@ export default function NegociosTable({
                             onClick={() => handleRestaurar(n.id)}
                             className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-50 text-emerald-600 hover:bg-emerald-100 transition"
                           >
-                            ♻️ Restaurar
+                             Restaurar
                           </button>
                           <button
                             onClick={() => abrirBorradoPermanente(n)}
@@ -480,7 +480,7 @@ export default function NegociosTable({
                             title="Eliminar definitivamente todos sus datos"
                             aria-label={`Eliminar permanentemente ${n.nombre_negocio}`}
                           >
-                            🗑️ Eliminar
+                             Eliminar
                           </button>
                         </>
                       ) : (
@@ -511,7 +511,7 @@ export default function NegociosTable({
                             onClick={() => handleDelete(n.id, n.nombre_negocio)}
                             className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-red-50 text-red-600 hover:bg-red-100 transition"
                           >
-                            🗑️ Papelera
+                             Papelera
                           </button>
                           <BackupButton negocioId={n.id} negocioNombre={n.nombre_negocio} />
                         </>
@@ -551,7 +551,7 @@ export default function NegociosTable({
                     href={buildHref(paginacion.pagina - 1)}
                     className="px-4 py-2 border border-gray-300 rounded-lg text-sm font-semibold text-gray-700 hover:bg-gray-50 transition"
                   >
-                    ← Anterior
+                     Anterior
                   </a>
                 ) : (
                   <span />
@@ -564,7 +564,7 @@ export default function NegociosTable({
                     href={buildHref(paginacion.pagina + 1)}
                     className="px-4 py-2 border border-gray-300 rounded-lg text-sm font-semibold text-gray-700 hover:bg-gray-50 transition"
                   >
-                    Siguiente →
+                    Siguiente 
                   </a>
                 ) : (
                   <span />
@@ -694,7 +694,7 @@ export default function NegociosTable({
         <Modal etiqueta="Confirmar borrado permanente" onClose={() => setBorrando(null)}>
           <>
             <h3 className="text-lg font-bold text-red-700 mb-1">
-              ⚠️ Borrado definitivo
+               Borrado definitivo
             </h3>
             <p className="text-sm text-gray-600 mb-3">
               Vas a eliminar <strong>{borrando.nombre_negocio}</strong> ({borrando.email}) para

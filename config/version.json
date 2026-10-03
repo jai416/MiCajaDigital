@@ -1,11 +1,11 @@
 {
-  "version": "1.3.5",
-  "versionCode": 2023,
-  "url": "https://qmuvnfduhidadbhtmxvh.supabase.co/storage/v1/object/public/apk/app-release-1.3.5.apk",
-  "mensaje": "Notificaciones arregladas en Android 13+ y actualizacion automatica fiable.",
+  "version": "1.3.6",
+  "versionCode": 2024,
+  "url": "https://qmuvnfduhidadbhtmxvh.supabase.co/storage/v1/object/public/apk/app-release-1.3.6.apk",
+  "mensaje": "Cantidad por venta y costo en el producto. Se corrigieron las notificaciones en Android 13+.",
   "cambios": [
-    "Las notificaciones vuelven a funcionar en Android 13 y superior (antes no llegaba ninguna).",
-    "La actualización automática descarga el APK de verdad y ya instala sin fallar en silencio.",
-    "Al actualizar puedes cerrar el aviso: la descarga sigue en segundo plano con notificación de progreso."
+    "Ahora puedes vender N unidades de un producto en una sola venta (ej: 10 cervezas, no 10 ventas).",
+    "El costo se escribe en el producto (inventario) y se oculta al vender: quien cobra no lo ve.",
+    "Se corrigieron las notificaciones que no llegaban en Android 13 y superior."
   ]
 }

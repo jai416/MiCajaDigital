@@ -11,6 +11,10 @@ interface Ticket {
   mensaje: string;
   estado: string;
   respuesta_admin: string | null;
+  /** Ruta en el bucket privado (solo lectura para el panel: se sirve firmado). */
+  audio_path?: string | null;
+  /** URL firmada de 1 h que devuelve /api/soporte. */
+  audio_url?: string | null;
   created_at: string;
   updated_at: string;
   email?: string;
@@ -19,7 +23,7 @@ interface Ticket {
 
 const ESTADOS = ['todos', 'abierto', 'en_progreso', 'resuelto', 'cerrado'] as const;
 const CAT_LABELS: Record<string, string> = {
-  pago: '💰 Pago', sync: '🔄 Sync', bug: '🐞 Bug', sugerencia: '💡 Sugerencia', otro: '📝 Otro',
+  pago: ' Pago', sync: ' Sync', bug: ' Bug', sugerencia: ' Sugerencia', otro: ' Otro',
 };
 const CAT_COLORS: Record<string, string> = {
   pago: 'bg-amber-100 text-amber-700', sync: 'bg-blue-100 text-blue-700',
@@ -32,13 +36,13 @@ const ESTADO_COLORS: Record<string, string> = {
 };
 
 const PLANTILLAS = [
-  { id: 'pago_recibido', label: '💰 Pago recibido', texto: '¡Hola! Hemos recibido tu pago. En breve recibirás tu código de activación por correo. ¡Gracias!' },
-  { id: 'codigo_enviado', label: '🔑 Código enviado', texto: '¡Hola! Tu código de activación ha sido enviado a tu correo. Recuerda que tiene 24 horas de vigencia.' },
-  { id: 'renovacion', label: '📅 Aviso renovación', texto: '¡Hola! Tu suscripción está por vencer. Si necesitas renovar, contáctanos para generar un nuevo código.' },
-  { id: 'sync_ok', label: '🔄 Sync resuelto', texto: '¡Hola! El problema de sincronización ha sido revisado. Por favor, intenta sincronizar de nuevo desde la app.' },
-  { id: 'bug_investigando', label: '🐞 Bug en investigación', texto: '¡Hola! Hemos recibido tu reporte y lo estamos investigando. Te avisaremos cuando esté resuelto.' },
-  { id: 'gracias', label: '🙏 Gracias', texto: '¡Gracias por contactarnos! Si tienes otra pregunta, no dudes en escribirnos.' },
-  { id: 'personalizado', label: '✏️ Personalizado', texto: '' },
+  { id: 'pago_recibido', label: ' Pago recibido', texto: '¡Hola! Hemos recibido tu pago. En breve recibirás tu código de activación por correo. ¡Gracias!' },
+  { id: 'codigo_enviado', label: ' Código enviado', texto: '¡Hola! Tu código de activación ha sido enviado a tu correo. Recuerda que tiene 24 horas de vigencia.' },
+  { id: 'renovacion', label: ' Aviso renovación', texto: '¡Hola! Tu suscripción está por vencer. Si necesitas renovar, contáctanos para generar un nuevo código.' },
+  { id: 'sync_ok', label: ' Sync resuelto', texto: '¡Hola! El problema de sincronización ha sido revisado. Por favor, intenta sincronizar de nuevo desde la app.' },
+  { id: 'bug_investigando', label: ' Bug en investigación', texto: '¡Hola! Hemos recibido tu reporte y lo estamos investigando. Te avisaremos cuando esté resuelto.' },
+  { id: 'gracias', label: ' Gracias', texto: '¡Gracias por contactarnos! Si tienes otra pregunta, no dudes en escribirnos.' },
+  { id: 'personalizado', label: ' Personalizado', texto: '' },
 ];
 
 export default function SoportePage() {
@@ -119,7 +123,7 @@ export default function SoportePage() {
         <div className="flex items-center gap-3">
           <a href="/dashboard/soporte/mensajes"
             className="px-3 py-1.5 bg-emerald-600 text-white rounded-lg text-sm font-semibold hover:bg-emerald-700 transition">
-            📩 Enviar mensaje
+             Enviar mensaje
           </a>
           <span className="text-sm text-gray-500">{total} tickets</span>
         </div>
@@ -139,7 +143,7 @@ export default function SoportePage() {
             className={`px-3 py-1.5 rounded-full text-xs font-semibold transition ${
               filtro === e ? 'bg-emerald-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
             }`}>
-            {e === 'todos' ? 'Todos' : e.replace('_', ' ')}
+            {e === 'todos' ? 'Todos' : e.replace('_', '')}
           </button>
         ))}
       </div>
@@ -158,11 +162,19 @@ export default function SoportePage() {
                     {CAT_LABELS[t.categoria] ?? t.categoria}
                   </span>
                   <span className={`px-2 py-1 rounded-full text-xs font-semibold ${ESTADO_COLORS[t.estado]}`}>
-                    {t.estado.replace('_', ' ')}
+                    {t.estado.replace('_', '')}
                   </span>
                   <span className="text-xs text-gray-400">#{t.id}</span>
                 </div>
-                <p className="text-sm text-gray-700 whitespace-pre-wrap">{t.mensaje}</p>
+                {t.mensaje && (
+                  <p className="text-sm text-gray-700 whitespace-pre-wrap">{t.mensaje}</p>
+                )}
+                {t.audio_url && (
+                  <audio controls preload="none" src={t.audio_url}
+                    className="mt-2 w-full max-w-sm">
+                    Tu navegador no puede reproducir este audio.
+                  </audio>
+                )}
                 {t.respuesta_admin && (
                   <div className="mt-3 bg-emerald-50 border border-emerald-200 rounded-lg p-3">
                     <p className="text-xs font-semibold text-emerald-700 mb-1">Tu respuesta:</p>
@@ -223,12 +235,12 @@ export default function SoportePage() {
         <div className="flex items-center justify-between mt-6">
           <button onClick={() => cargar(pagina - 1)} disabled={pagina <= 1}
             className="px-4 py-2 border border-gray-300 rounded-lg text-sm font-semibold disabled:opacity-40">
-            ← Anterior
+             Anterior
           </button>
           <span className="text-xs text-gray-500">Página {pagina} de {totalPaginas}</span>
           <button onClick={() => cargar(pagina + 1)} disabled={pagina >= totalPaginas}
             className="px-4 py-2 border border-gray-300 rounded-lg text-sm font-semibold disabled:opacity-40">
-            Siguiente →
+            Siguiente 
           </button>
         </div>
       )}

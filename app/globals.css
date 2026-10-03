@@ -1,3 +1,120 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* =============================================================================
+   Tema del panel — los MISMOS tokens que la app (colors.dart, AppColors.dark)
+   para que el panel y el teléfono se vean como la misma marca.
+   Verde esmeralda de la app: #059669 (primary) y #34D399 en modo oscuro.
+   Los valores vienen de `lib/core/theme/colors.dart`; si se cambian ahí,
+   se cambian aquí.
+   ========================================================================== */
+
+:root {
+  --mc-bg: #f8fafc;
+  --mc-surface: #ffffff;
+  --mc-field: #f1f5f9;
+  --mc-text: #1e293b;
+  --mc-text-2: #64748b;
+  --mc-primary: #059669;
+  --mc-primary-light: #d1fae5;
+  --mc-border: #e2e8f0;
+  --mc-danger: #dc2626;
+  --mc-warning: #f59e0b;
+  --mc-info: #3b82f6;
+}
+
+/* Modo oscuro: mismos nombres, valores de AppColors.dark */
+.dark {
+  --mc-bg: #121212;
+  --mc-surface: #1e1e1e;
+  --mc-field: #262626;
+  --mc-text: #e0e0e0;
+  --mc-text-2: #aaaaaa;
+  --mc-primary: #059669;
+  --mc-primary-light: #064e3b;
+  --mc-on-primary-light: #34d399;
+  --mc-border: #2f2f2f;
+  --mc-danger: #f87171;
+  --mc-warning: #fbbf24;
+  --mc-info: #60a5fa;
+}
+
+html,
+body {
+  background: var(--mc-bg);
+  color: var(--mc-text);
+}
+
+/* Utilidades con los tokens del panel, para no repetir hex a mano */
+@layer components {
+  .mc-card {
+    @apply rounded-xl border p-4;
+    background: var(--mc-surface);
+    border-color: var(--mc-border);
+  }
+  .mc-title {
+    @apply text-lg font-semibold;
+    color: var(--mc-text);
+  }
+  .mc-muted {
+    @apply text-sm;
+    color: var(--mc-text-2);
+  }
+  .mc-btn {
+    @apply inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors;
+    background: var(--mc-primary);
+    color: #fff;
+  }
+  .mc-btn:hover {
+    filter: brightness(1.08);
+  }
+  .mc-btn-ghost {
+    background: transparent;
+    color: var(--mc-text);
+    border: 1px solid var(--mc-border);
+  }
+  .mc-btn-ghost:hover {
+    background: var(--mc-field);
+  }
+  .mc-input {
+    @apply w-full rounded-lg px-3 py-2 text-sm;
+    background: var(--mc-field);
+    color: var(--mc-text);
+    border: 1px solid var(--mc-border);
+  }
+  .mc-badge {
+    @apply inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium;
+    background: var(--mc-primary-light);
+    color: var(--mc-on-primary-light, #065f46);
+  }
+  .mc-table {
+    @apply w-full text-sm;
+    color: var(--mc-text);
+  }
+  .mc-table th {
+    @apply px-3 py-2 text-left font-medium;
+    color: var(--mc-text-2);
+    border-bottom: 1px solid var(--mc-border);
+  }
+  .mc-table td {
+    @apply px-3 py-2;
+    border-bottom: 1px solid var(--mc-border);
+  }
+  .mc-table tr:hover td {
+    background: var(--mc-field);
+  }
+  .mc-stat {
+    @apply rounded-xl border p-4;
+    background: var(--mc-surface);
+    border-color: var(--mc-border);
+  }
+  .mc-stat-value {
+    @apply text-2xl font-bold;
+    color: var(--mc-text);
+  }
+  .mc-stat-label {
+    @apply text-xs uppercase tracking-wide;
+    color: var(--mc-text-2);
+  }
+}

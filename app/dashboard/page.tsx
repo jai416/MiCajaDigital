@@ -381,29 +381,36 @@ export default async function DashboardPage({ searchParams }: { searchParams: Se
   const stats = await getStatsCached(dias);
 
   const flecha = (d: number | null) =>
-    d === null ? '' : d >= 0 ? ` ↑${d}%` : ` ↓${Math.abs(d)}%`;
+    d === null ? '' : d >= 0 ? ` ${d}%` : ` ${Math.abs(d)}%`;
 
-  const cards = [
-    { label: 'Negocios Registrados', value: stats.total, color: 'bg-blue-500', icon: '🏪' },
-    { label: 'Activos (vigentes)', value: stats.activos, color: 'bg-emerald-500', icon: '✅', title: 'Suscripción pagada y sin vencer.' },
-    { label: 'En Prueba', value: stats.enPrueba, color: 'bg-yellow-500', icon: '⏳' },
-    { label: 'Vencidas sin renovar', value: stats.vencidasSinRenovar, color: 'bg-red-500', icon: '📞', title: 'Cuentas activas cuyo plan ya venció.' },
-    { label: 'Ingresos Mensuales (MRR)', value: `${(stats.mrrCup / 1000).toFixed(1)}k CUP`, color: 'bg-purple-500', icon: '💰' },
-    { label: 'ARPU', value: `${entero(stats.arpuCup)} CUP`, color: 'bg-purple-400', icon: '🧮' },
-    { label: `Nuevos (${stats.dias} días)`, value: `${stats.nuevos}${flecha(stats.nuevosDelta)}`, color: 'bg-sky-500', icon: '🆕' },
-    { label: 'Próx. Renovaciones (7d)', value: stats.renovaciones7, color: 'bg-orange-500', icon: '⏰' },
-    { label: 'Conversión a Pago', value: `${stats.conversion}%`, color: 'bg-lime-600', icon: '📈' },
-    { label: 'Códigos por Vencer (3d)', value: stats.codigosPorVencer, color: 'bg-amber-500', icon: '⏱️' },
-    { label: 'Códigos VENCIDOS sin usar', value: stats.codigosVencidosSinUsar, color: 'bg-rose-600', icon: '💀' },
-    { label: `Ventas válidas (${stats.dias}d)`, value: `${stats.ventasRango}${flecha(stats.ventasDelta)}`, color: 'bg-violet-500', icon: '🧾' },
-    { label: `Gastos (${stats.dias}d)`, value: `${stats.gastosRango}${flecha(stats.gastosDelta)}`, color: 'bg-pink-500', icon: '💸' },
-    { label: 'GMV estimado (CUP, vía TC publicada)', value: `${(stats.gmvCup / 1000).toFixed(1)}k CUP`, color: 'bg-emerald-700', icon: '🌍' },
-    { label: 'Vendieron HOY', value: stats.vendedoresHoy, color: 'bg-green-600', icon: '🔥' },
-    { label: 'Vendieron (7d)', value: stats.vendedores7, color: 'bg-teal-600', icon: '📊' },
-    { label: 'Errores reportados (7d)', value: stats.errores7, color: 'bg-gray-700', icon: '🐞' },
-    { label: 'Retención (renuevan)', value: `${stats.retencion}%`, color: 'bg-fuchsia-600', icon: '🔁' },
-    { label: 'Clientas inactivas (30d)', value: stats.inactivas30, color: 'bg-stone-500', icon: '💤' },
+  // Antes eran 19 tarjetas iguales: el dashboard ocupaba cinco scrolls y las
+  // cifras que deciden el día quedaban mezcladas con las de contexto. Ahora hay
+  // 7 arriba (lo que exige una acción) y el resto en una tabla compacta debajo.
+  const clave = [
+    { label: 'Activos (vigentes)', value: stats.activos, title: 'Suscripcion pagada y sin vencer.' },
+    { label: 'MRR', value: `${(stats.mrrCup / 1000).toFixed(1)}k CUP`, title: 'Ingresos mensuales recurrentes en CUP.' },
+    { label: 'Vendieron hoy', value: stats.vendedoresHoy, title: 'Negocios con alguna venta hoy.' },
+    { label: `Ventas validas (${stats.dias}d)`, value: `${stats.ventasRango}${flecha(stats.ventasDelta)}`, title: 'Ventas cobradas, sin pedidos ni devoluciones.' },
+    { label: 'Vencidas sin renovar', value: stats.vencidasSinRenovar, title: 'Cuentas activas cuyo plan ya vencio. Hay que cobrar.' },
+    { label: `Renuevan (retencion)`, value: `${stats.retencion}%`, title: 'Proporcion que vuelve a pagar.' },
+    { label: 'Conversion a pago', value: `${stats.conversion}%`, title: 'Pruebas terminadas que pagaron.' },
   ];
+
+  const detalle = [
+    { label: 'Negocios registrados', value: stats.total },
+    { label: 'En prueba', value: stats.enPrueba },
+    { label: 'ARPU (por activa)', value: `${entero(stats.arpuCup)} CUP` },
+    { label: `Nuevos (${stats.dias} dias)`, value: `${stats.nuevos}${flecha(stats.nuevosDelta)}` },
+    { label: 'Prox. renovaciones (7d)', value: stats.renovaciones7 },
+    { label: 'Codigos por vencer (3d)', value: stats.codigosPorVencer },
+    { label: 'Codigos vencidos sin usar', value: stats.codigosVencidosSinUsar },
+    { label: `Gastos (${stats.dias}d)`, value: `${stats.gastosRango}${flecha(stats.gastosDelta)}` },
+    { label: 'GMV estimado', value: `${(stats.gmvCup / 1000).toFixed(1)}k CUP` },
+    { label: 'Vendieron (7d)', value: stats.vendedores7 },
+    { label: 'Errores reportados (7d)', value: stats.errores7 },
+    { label: 'Inactivas (30d)', value: stats.inactivas30 },
+  ];
+
 
   return (
     <div>
@@ -421,20 +428,20 @@ export default async function DashboardPage({ searchParams }: { searchParams: Se
 
       {stats.fallos.length > 0 && (
         <div role="alert" className="mb-6 rounded-xl border border-orange-300 bg-orange-50 p-4 text-sm text-orange-900">
-          <p className="font-bold">⚠️ Datos parciales</p>
+          <p className="font-bold"> Datos parciales</p>
           <p className="mt-1">No se pudieron leer: {stats.fallos.join(', ')}. Recarga la página para reintentar.</p>
         </div>
       )}
 
       {/* Acciones de hoy */}
       <div className="bg-white rounded-xl shadow-sm border border-orange-200 p-6 mb-8">
-        <h2 className="text-lg font-bold text-gray-800 mb-1">🎯 Acciones de hoy</h2>
+        <h2 className="text-lg font-bold text-gray-800 mb-1"> Acciones de hoy</h2>
         <p className="text-sm text-gray-500 mb-4">Lo que más rápido se convierte en dinero o evita perderlo.</p>
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           <a href="/dashboard/negocios" className="group bg-red-50 hover:bg-red-100 transition rounded-lg p-4">
             <p className="text-3xl font-black text-red-700">{stats.vencidasSinRenovar}</p>
             <p className="text-xs text-red-600 font-semibold mt-1">Vencidas sin renovar</p>
-            <p className="text-[11px] text-red-400 mt-1 group-hover:text-red-500">Llámalas → cobro pendiente</p>
+            <p className="text-[11px] text-red-400 mt-1 group-hover:text-red-500">Llámalas  cobro pendiente</p>
           </a>
           <a href="/dashboard/codigos" className="group bg-amber-50 hover:bg-amber-100 transition rounded-lg p-4">
             <p className="text-3xl font-black text-amber-700">{stats.codigosPorVencer}</p>
@@ -454,21 +461,32 @@ export default async function DashboardPage({ searchParams }: { searchParams: Se
         </div>
       </div>
 
-      {/* Cards principales */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-        {cards.map((card) => (
-          <div key={card.label} className="bg-white rounded-xl shadow-sm border border-gray-200 p-6" title={card.title}>
-            <div className="flex items-center justify-between mb-4">
-              <span className="text-2xl">{card.icon}</span>
-              <span className={`text-xs font-semibold text-white px-2 py-1 rounded-full ${card.color}`}>
-                {card.label.split(' ')[0]}
-              </span>
-            </div>
-            <p className="text-2xl font-bold text-gray-800">{card.value}</p>
-            <p className="text-sm text-gray-500 mt-1">{card.label}</p>
+      {/* Las 7 cifras que exigen una accion */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+        {clave.map((c) => (
+          <div key={c.label} className="mc-stat" title={c.title}>
+            <p className="mc-stat-label">{c.label}</p>
+            <p className="mc-stat-value mt-1" style={{ color: 'var(--mc-primary)' }}>{c.value}</p>
           </div>
         ))}
       </div>
+
+      {/* El resto, en tabla compacta: contexto sin ocupar media pantalla */}
+      <details className="mc-card mb-8">
+        <summary className="mc-muted cursor-pointer select-none">
+          Otros indicadores ({detalle.length})
+        </summary>
+        <table className="mc-table mt-3">
+          <tbody>
+            {detalle.map((d) => (
+              <tr key={d.label}>
+                <td className="text-muted">{d.label}</td>
+                <td className="text-right font-semibold">{d.value}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </details>
 
       {/* Suscripciones + Activos por plan */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -488,7 +506,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Se
             ))}
           </div>
           {stats.enPapelera > 0 && (
-            <p className="text-xs text-gray-500 mt-4">🗑️ {stats.enPapelera} en la papelera.</p>
+            <p className="text-xs text-gray-500 mt-4"> {stats.enPapelera} en la papelera.</p>
           )}
         </div>
 
@@ -607,7 +625,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Se
         </div>
 
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-          <h2 className="text-lg font-bold text-gray-800 mb-2">🏆 Top clientas por pago acumulado</h2>
+          <h2 className="text-lg font-bold text-gray-800 mb-2"> Top clientas por pago acumulado</h2>
           <div className="space-y-2 max-h-56 overflow-auto">
             {stats.topClientas.length === 0 && (
               <p className="text-sm text-gray-500">Todavía no hay canjes registrados.</p>
@@ -658,7 +676,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Se
             </div>
             <div className="bg-lime-50 rounded-lg p-4">
               <p className="text-2xl font-bold text-lime-700">{stats.conversion}%</p>
-              <p className="text-xs text-lime-600">Registro → Pago</p>
+              <p className="text-xs text-lime-600">Registro  Pago</p>
             </div>
             <div className="bg-stone-50 rounded-lg p-4">
               <p className="text-2xl font-bold text-stone-700">{stats.inactivas30}</p>
@@ -670,7 +688,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Se
 
       {/* Funnel */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mt-6">
-        <h2 className="text-lg font-bold text-gray-800 mb-1">🔄 Funnel de conversión</h2>
+        <h2 className="text-lg font-bold text-gray-800 mb-1"> Funnel de conversión</h2>
         <p className="text-sm text-gray-500 mb-6">De registrados a clientes de pago.</p>
         {(() => {
           const etapas = [

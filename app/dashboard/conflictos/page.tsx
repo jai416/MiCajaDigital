@@ -186,7 +186,7 @@ export default function ConflictosPage() {
       <div className="space-y-3">
         {!cargado && <p className="text-gray-500">Cargando...</p>}
         {cargado && conflictos.length === 0 && (
-          <p className="text-gray-500">No hay conflictos {soloPendientes ? 'pendientes' : ''}. 🎉</p>
+          <p className="text-gray-500">No hay conflictos {soloPendientes ? 'pendientes' : ''}. </p>
         )}
         {conflictos.map((c) => (
           <div key={c.id} className={`bg-white rounded-xl shadow-sm border p-4 ${
@@ -312,12 +312,12 @@ export default function ConflictosPage() {
         <div className="flex items-center justify-between mt-6">
           <button onClick={() => cargar(pagina - 1)} disabled={pagina <= 1}
             className="px-4 py-2 border border-gray-300 rounded-lg text-sm font-semibold disabled:opacity-40">
-            ← Anterior
+             Anterior
           </button>
           <span className="text-xs text-gray-500">Página {pagina} de {totalPaginas}</span>
           <button onClick={() => cargar(pagina + 1)} disabled={pagina >= totalPaginas}
             className="px-4 py-2 border border-gray-300 rounded-lg text-sm font-semibold disabled:opacity-40">
-            Siguiente →
+            Siguiente 
           </button>
         </div>
       )}

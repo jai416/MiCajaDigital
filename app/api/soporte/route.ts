@@ -29,8 +29,30 @@ export async function GET(request: NextRequest) {
     const { data, error, count } = await query;
     if (error) { console.error('API error:', error); return NextResponse.json({ error: 'Error interno' }, { status: 500 }); }
 
+    // Audio de los tickets (1.3.6): el bucket es privado, asi que en vez de la
+    // ruta cruda se devuelve una URL firmada de 1 h. Si el audio no esta (o el
+    // bucket no existe todavia), el ticket sigue siendo valido sin el.
+    const filas = data ?? [];
+    const conAudio = filas.filter((t) => (t as { audio_path?: string | null }).audio_path);
+    const firmadas = new Map<string, string>();
+    for (const t of conAudio) {
+      const ruta = (t as { audio_path: string }).audio_path;
+      try {
+        const { data: f, error: eF } = await supabaseAdmin.storage
+          .from('soporte_audios')
+          .createSignedUrl(ruta, 3600);
+        if (!eF && f?.signedUrl) firmadas.set(ruta, f.signedUrl);
+      } catch {
+        // Un audio que no se puede firmar no debe tumbar la lista de tickets.
+      }
+    }
+
     return NextResponse.json({
-      data: data ?? [],
+      data: filas.map((t) => {
+        const fila = t as Record<string, unknown>;
+        const ruta = fila.audio_path as string | undefined;
+        return { ...fila, audio_url: ruta ? firmadas.get(ruta) ?? null : null };
+      }),
       total: count ?? 0,
       pagina,
       totalPaginas: Math.ceil((count ?? 0) / porPagina),

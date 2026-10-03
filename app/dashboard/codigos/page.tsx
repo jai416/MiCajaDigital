@@ -151,7 +151,7 @@ export default function CodigosPage() {
       await cargar(1);
       if (pendienteWhatsApp && json.data?.codigo) {
         const nombrePlan = json.data.plan === 'basico' ? 'Básico' : json.data.plan === 'premium' ? 'Premium' : 'Pro';
-        const msg = `Mi Caja Digital — Código de activación: ${json.data.codigo} (plan ${nombrePlan}, ${json.data.precio_pagado.toLocaleString()} CUP). Canjéalo en Ajustes → Suscripción.`;
+        const msg = `Mi Caja Digital — Código de activación: ${json.data.codigo} (plan ${nombrePlan}, ${json.data.precio_pagado.toLocaleString()} CUP). Canjéalo en Ajustes  Suscripción.`;
         window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank');
       }
     } catch {
@@ -291,7 +291,7 @@ export default function CodigosPage() {
                 className="flex-1 px-4 py-3 bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white rounded-lg font-bold transition"
                 title="Generar código y abrir WhatsApp con el mensaje listo"
               >
-                {cargando ? 'Generando...' : '💰 Confirmar y enviar'}
+                {cargando ? 'Generando...' : ' Confirmar y enviar'}
               </button>
             </div>
 
@@ -302,7 +302,7 @@ export default function CodigosPage() {
                   Se generará un código para <strong>{email.trim()}</strong>
                 </p>
                 <p className="text-xs text-amber-600 mb-3">
-                  Plan {plan === 'basico' ? 'Básico' : plan === 'premium' ? 'Premium' : 'Pro'} ·{' '}
+                  Plan {plan === 'basico' ? 'Básico' : plan === 'premium' ? 'Premium' : 'Pro'} ·{''}
                   {durSel.label} · {precio.toLocaleString()} CUP
                 </p>
                 <div className="flex gap-2">
@@ -328,8 +328,8 @@ export default function CodigosPage() {
               <p className="text-xs text-blue-700 font-semibold uppercase tracking-wide">Código generado</p>
               <p className="text-3xl font-black text-blue-900 my-2 tracking-[0.3em]">{generado.codigo}</p>
               <p className="text-sm text-blue-700">
-                {generado.plan === 'basico' ? 'Básico' : generado.plan === 'premium' ? 'Premium' : 'Pro'} ·{' '}
-                {DURACIONES.find((d) => d.id === generado.duracion_meses)?.label} ·{' '}
+                {generado.plan === 'basico' ? 'Básico' : generado.plan === 'premium' ? 'Premium' : 'Pro'} ·{''}
+                {DURACIONES.find((d) => d.id === generado.duracion_meses)?.label} ·{''}
                 {generado.precio_pagado.toLocaleString()} CUP
               </p>
               <p className="text-xs text-blue-600 mt-1">{generado.email}</p>
@@ -338,11 +338,11 @@ export default function CodigosPage() {
                   onClick={() => copiar(generado.codigo)}
                   className="px-4 py-2 text-xs font-semibold bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
                 >
-                  {copiado === generado.codigo ? '✓ Copiado' : 'Copiar'}
+                  {copiado === generado.codigo ? ' Copiado' : 'Copiar'}
                 </button>
                 <a
                   href={`https://wa.me/?text=${encodeURIComponent(
-                    `Mi Caja Digital — Código de activación: ${generado.codigo} (plan ${generado.plan === 'basico' ? 'Básico' : generado.plan === 'premium' ? 'Premium' : 'Pro'}, ${generado.precio_pagado.toLocaleString()} CUP). Canjéalo en Ajustes → Suscripción.`
+                    `Mi Caja Digital — Código de activación: ${generado.codigo} (plan ${generado.plan === 'basico' ? 'Básico' : generado.plan === 'premium' ? 'Premium' : 'Pro'}, ${generado.precio_pagado.toLocaleString()} CUP). Canjéalo en Ajustes  Suscripción.`
                   )}`}
                   target="_blank"
                   rel="noreferrer"
@@ -382,7 +382,7 @@ export default function CodigosPage() {
               disabled={visibles.length === 0}
               className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-blue-50 text-blue-700 hover:bg-blue-100 disabled:opacity-50 transition"
             >
-              ⬇ Exportar CSV
+               Exportar CSV
             </button>
           </div>
           <table className="w-full text-sm">
@@ -444,13 +444,13 @@ export default function CodigosPage() {
                           disabled={actualizandoPago === c.id}
                           className="px-2 py-1 text-[10px] font-semibold rounded bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50 transition"
                           title="Confirmar pago"
-                        >✓</button>
+                        ></button>
                         <button
                           onClick={() => actualizarPago(c.id, 'rechazado')}
                           disabled={actualizandoPago === c.id}
                           className="px-2 py-1 text-[10px] font-semibold rounded bg-rose-600 text-white hover:bg-rose-700 disabled:opacity-50 transition"
                           title="Rechazar pago"
-                        >✕</button>
+                        ></button>
                       </div>
                     )}
                   </td>
@@ -461,7 +461,7 @@ export default function CodigosPage() {
                     {!c.usado && (
                       <a
                         href={`https://wa.me/?text=${encodeURIComponent(
-                          `Mi Caja Digital — Código de activación: ${c.codigo} (plan ${c.plan === 'basico' ? 'Básico' : c.plan === 'premium' ? 'Premium' : 'Pro'}, ${c.precio_pagado.toLocaleString()} CUP). Canjéalo en Ajustes → Suscripción.`
+                          `Mi Caja Digital — Código de activación: ${c.codigo} (plan ${c.plan === 'basico' ? 'Básico' : c.plan === 'premium' ? 'Premium' : 'Pro'}, ${c.precio_pagado.toLocaleString()} CUP). Canjéalo en Ajustes  Suscripción.`
                         )}`}
                         target="_blank"
                         rel="noreferrer"
@@ -489,7 +489,7 @@ export default function CodigosPage() {
                 disabled={pagina <= 1}
                 className="px-4 py-2 border border-gray-300 rounded-lg text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition"
               >
-                ← Anterior
+                 Anterior
               </button>
               <span className="text-xs text-gray-500">
                 Página {pagina} de {totalPaginas} · el CSV exporta esta página
@@ -499,7 +499,7 @@ export default function CodigosPage() {
                 disabled={pagina >= totalPaginas}
                 className="px-4 py-2 border border-gray-300 rounded-lg text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition"
               >
-                Siguiente →
+                Siguiente 
               </button>
             </div>
           )}
