@@ -4,8 +4,10 @@
   "url": "https://qmuvnfduhidadbhtmxvh.supabase.co/storage/v1/object/public/apk/app-release-1.3.6.apk",
   "mensaje": "Cantidad por venta y costo en el producto. Se corrigieron las notificaciones en Android 13+.",
   "cambios": [
-    "Ahora puedes vender N unidades de un producto en una sola venta (ej: 10 cervezas, no 10 ventas).",
+    "Ahora puedes vender N unidades de un producto en una sola venta (ej: 10 cervezas en una, no 10 ventas).",
     "El costo se escribe en el producto (inventario) y se oculta al vender: quien cobra no lo ve.",
-    "Se corrigieron las notificaciones que no llegaban en Android 13 y superior."
+    "Se corrigieron las notificaciones que no llegaban en Android 13 y superior.",
+    "La app deja de avisar de un \"reloj desfasado\" que no se podía arreglar, y ahora sincroniza bien aunque el reloj del telefono este corrido.",
+    "Te avisamos con notificación cuando el administrador te responda en el soporte."
   ]
 }
