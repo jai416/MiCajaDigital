@@ -105,12 +105,17 @@ async function getStats(dias: number) {
           .is('deleted_at', null)
           .gte('fecha', desde)
           .limit(50000),
-    supabaseAdmin
-      .from('codigos_pago')
-      .select('negocio_id, duracion_meses, plan, usado_en')
-      .eq('usado', true)
-      .not('negocio_id', 'is', null)
-      .limit(50000),
+    // Con la RPC (P9, ronda 38) no hace falta traer los codigos de pago: hasta
+    // 50.000 filas a Node en cada carga del dashboard. Solo se usa el cálculo en
+    // JS si la RPC no está aplicada todavía (PGRST202), para no romper el panel.
+    detalle && detalle.con_pago !== undefined
+      ? Promise.resolve({ data: [], error: null })
+      : supabaseAdmin
+          .from('codigos_pago')
+          .select('negocio_id, duracion_meses, plan, usado_en')
+          .eq('usado', true)
+          .not('negocio_id', 'is', null)
+          .limit(50000),
     detalle
       ? Promise.resolve({ data: [], error: null })
       : supabaseAdmin
@@ -322,11 +327,25 @@ async function getStats(dias: number) {
 
   const todosExpirados = rows.filter((n) => !n.activo && n.expiracion > 0 && n.expiracion <= ahora).length;
   const denominadorConversion = conPago + todosExpirados;
-  const conversion = denominadorConversion > 0 ? Math.round((conPago / denominadorConversion) * 100) : 0;
+  const conversionCalculada =
+    denominadorConversion > 0 ? Math.round((conPago / denominadorConversion) * 100) : 0;
+
+  // P9 (ronda 38): con la RPC aplicada, estas cuatro cifras vienen ya
+  // agregadas de Postgres. La SQL replica EXACTAMENTE la fórmula de JS (ver
+  // supabase/migrations/20261007000000_p9_metricas_pago.sql), así que los
+  // números no cambian al aplicarla; solo deja de traer 50.000 filas a Node.
+  const usaDetalleP9 = detalle != null && detalle.con_pago !== undefined;
+  const conPagoFinal = usaDetalleP9 ? Number(detalle!.con_pago ?? 0) : conPago;
+  const renovadosFinal = usaDetalleP9 ? Number(detalle!.renovados ?? 0) : renovados;
+  const retencionFinal =
+    conPagoFinal > 0 ? Math.round((renovadosFinal / conPagoFinal) * 100) : 0;
+  const conversion = usaDetalleP9 ? Number(detalle!.conversion_pct ?? 0) : conversionCalculada;
 
   // Activas en los últimos 30 días (métrica de inactivas, independiente del
   // rango): la RPC lo trae ya contado; en fallback se calcula en JS.
-  const inactivas30 = detalle
+  const inactivas30 = detalle && detalle.inactivas30 !== undefined
+    ? Number(detalle.inactivas30)
+    : detalle
     ? Math.max(0, vivos.length - Math.min(Number(detalle.vendedores_30d ?? 0), vivos.length))
     : (() => {
         const hace30Ms = ahora - DIAS_INACTIVA * MS_DIA;
@@ -343,13 +362,13 @@ async function getStats(dias: number) {
     vencidasSinRenovar: vencidasSinRenovar.length, pruebasTerminando, porPlan,
     codigosGenerados, codigosUsados, codigosPorVencer, codigosVencidosSinUsar,
     ingresoRealCup, mrrCup, arpuCup, gmvCup: Math.round(gmvCup),
-    ticketPromedio, conPago, nuevos,
+    ticketPromedio, conPago: conPagoFinal, nuevos,
     nuevosDelta: deltaPct(nuevos, nuevosPrev),
     renovaciones7,
     registrosPorDia, actividadPorDia,
     ventasRango, ventasDelta: deltaPct(ventasRango, ventasRangoPrev),
     gastosRango, gastosDelta: deltaPct(gastosRango, gastosRangoPrev),
-    monedaResumen, conversion, renovados, retencion, inactivas30,
+    monedaResumen, conversion, renovados: renovadosFinal, retencion: retencionFinal, inactivas30,
     vendedoresHoy: vendedoresHoyCount, vendedores7: vendedores7Count,
     ingresosPorMes, topClientas, errores7,
   };

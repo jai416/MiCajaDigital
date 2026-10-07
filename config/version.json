@@ -1,14 +1,13 @@
 {
-  "version": "1.3.7",
-  "versionCode": 2025,
-  "url": "https://qmuvnfduhidadbhtmxvh.supabase.co/storage/v1/object/public/apk/app-release-1.3.7.apk",
-  "mensaje": "Ya puedes vender aunque falte stock (te avisa y sigue). El respaldo es más estable y ya no se queda pensando.",
+  "version": "1.3.9",
+  "versionCode": 2027,
+  "url": "https://qmuvnfduhidadbhtmxvh.supabase.co/storage/v1/object/public/apk/app-release-1.3.9.apk",
+  "mensaje": "Se arregla el aviso de actualización: en algunos teléfonos Android la notificación no se veía y no se podía instalar.",
   "cambios": [
-    "Ya no se bloquea la venta cuando el inventario dice que no hay unidades: te avisa en amarillo de cuántas faltan y puedes vender igual.",
-    "Tocar la notificación de \"Actualización descargada\" ahora sí abre el instalador en Android 11.",
-    "Si abres la app sin internet, al volver a entrar con conexión te aparece la actualización (antes tenías que reiniciar la app).",
-    "El respaldo ya no se queda pensando media hora: tiene un límite de tiempo y continúa después, sin dejar datos sin bajar.",
-    "Si no hay conexión con la nube, el respaldo para de insistir y espera al siguiente intento en vez de cargarle el teléfono.",
+    "Se quita el aviso ámbar de \"tu reloj está desconfigurado\": no ayudaba a nada y se quedaba siempre en pantalla.",
+    "El aviso de actualización ya no se pierde si tenías otra ventana abierta, y se recuerda al volver a la app.",
+    "El respaldo descarga por bloques: si se corta, no se pierde nada y sigue donde lo dejó.",
+    "Si abres la app sin internet, al volver con conexión te aparece la actualización sin tener que reiniciar la app.",
     "Arreglado: al devolver o cancelar una venta de varias unidades, el inventario recuperaba solo 1."
   ]
 }
